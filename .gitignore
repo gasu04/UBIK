@@ -1,0 +1,36 @@
+# Models (too large for git)
+models/deepseek/
+models/checkpoints/
+*.bin
+*.safetensors
+*.pt
+*.pth
+
+# Data
+data/raw/
+data/cache/
+*.jsonl
+
+# Logs
+logs/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+*.key
+credentials.json
