@@ -1,0 +1,29 @@
+{
+    "mesh_name": "ubik-axonal-link",
+    "nodes": {
+        "hippocampal": {
+            "hostname": "minim4-2025",
+            "target_hostname": "ubik-hippocampal",
+            "tailscale_ip": "100.103.242.91",
+            "services": {
+                "neo4j_bolt": 7687,
+                "neo4j_http": 7474,
+                "chromadb": 8001,
+                "mcp_server": 8080
+            }
+        },
+        "somatic": {
+            "hostname": "adrian-wsl",
+            "target_hostname": "ubik-somatic",
+            "tailscale_ip": "100.79.166.114",
+            "services": {
+                "ollama": 11434,
+                "inference_api": 8081
+            }
+        }
+    },
+    "security": {
+        "acl_tags": ["tag:ubik-node"],
+        "require_auth": true
+    }
+}

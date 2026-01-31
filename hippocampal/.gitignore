@@ -1,0 +1,40 @@
+# Environment
+.env
+*.env.local
+
+# Logs
+logs/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.so
+.eggs/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PID files
+.mcp_server.pid
+
+# Data (managed separately)
+data/samples/*.json
+!data/samples/episodic_sample.json
+!data/samples/semantic_sample.json

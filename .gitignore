@@ -1,37 +1,25 @@
-# Models (too large for git)
-models/deepseek/
-models/deepseek-awq/
-models/checkpoints/
-*.bin
-*.safetensors
-*.pt
-*.pth
-
-# Data
-data/raw/
-data/cache/
-*.jsonl
-
-# Logs
-logs/
-
-# Python
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
-*.egg-info/
-
-# IDE
-.vscode/
-.idea/
-
-# OS
+# OS files
 .DS_Store
 Thumbs.db
 
-# Secrets
+# Logs
+logs/
+*.log
+
+# Environment files
 .env
-*.key
-credentials.json
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Database data (managed separately)
+data/

@@ -1,0 +1,55 @@
+{
+  "description": "Sample episodic memories for Ubik Hippocampal Node",
+  "memories": [
+    {
+      "id": "ep_letter_001",
+      "content": "Today I wrote my first letter to my future grandchildren about why I started the Ubik project. I want them to understand that this digital legacy isn't about preserving my ego - it's about passing down wisdom, values, and love across generations. The technology is just a vessel for what truly matters: connection.",
+      "type": "letter",
+      "timestamp": "2024-01-15T10:30:00Z",
+      "emotional_valence": "positive",
+      "importance": 0.95,
+      "participants": "gines,grandchildren",
+      "themes": "legacy,purpose,family,technology,wisdom"
+    },
+    {
+      "id": "ep_therapy_001",
+      "content": "In therapy today, we discussed how my values around authenticity shaped my career decisions. I realized that every major pivot in my career came when I felt I was being asked to compromise my core beliefs. The pattern is clear: I prioritize alignment over advancement.",
+      "type": "therapy_session",
+      "timestamp": "2024-01-14T14:00:00Z",
+      "emotional_valence": "reflective",
+      "importance": 0.85,
+      "participants": "gines,therapist",
+      "themes": "values,career,authenticity,self-discovery,patterns"
+    },
+    {
+      "id": "ep_family_001",
+      "content": "Family meeting tonight. We talked about summer vacation plans and everyone's school achievements. What struck me most was how naturally the kids have started expressing their own values - they're becoming their own people with distinct perspectives. This is the real legacy.",
+      "type": "family_meeting",
+      "timestamp": "2024-01-13T18:00:00Z",
+      "emotional_valence": "positive",
+      "importance": 0.8,
+      "participants": "family",
+      "themes": "planning,celebration,connection,growth,parenting"
+    },
+    {
+      "id": "ep_reflection_001",
+      "content": "Reading Parfit's work on personal identity again. His ideas about psychological continuity resonate deeply with the Ubik project. If identity is about the connections between mental states over time, then preserving those patterns - my values, beliefs, ways of thinking - is a form of identity preservation.",
+      "type": "event",
+      "timestamp": "2024-01-12T21:00:00Z",
+      "emotional_valence": "reflective",
+      "importance": 0.9,
+      "participants": "gines",
+      "themes": "philosophy,identity,reading,parfit,meaning"
+    },
+    {
+      "id": "ep_conversation_001",
+      "content": "Long conversation with my father about his regrets. He wishes he had written more down, recorded more stories. 'Memory is unreliable,' he said, 'but intention can be captured.' This validates the Ubik approach - it's not about perfect recall, it's about preserved intention.",
+      "type": "conversation",
+      "timestamp": "2024-01-10T16:00:00Z",
+      "emotional_valence": "mixed",
+      "importance": 0.92,
+      "participants": "gines,father",
+      "themes": "family,wisdom,regret,legacy,memory"
+    }
+  ]
+}

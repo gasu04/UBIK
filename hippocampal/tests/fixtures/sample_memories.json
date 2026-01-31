@@ -1,0 +1,26 @@
+{
+  "episodic": [
+    {
+      "id": "test_ep_001",
+      "content": "Test episodic memory for unit testing.",
+      "type": "event",
+      "timestamp": "2024-01-01T00:00:00Z",
+      "emotional_valence": "neutral",
+      "importance": 0.5,
+      "participants": "test_user",
+      "themes": "testing"
+    }
+  ],
+  "semantic": [
+    {
+      "id": "test_sem_001",
+      "content": "Test semantic knowledge for unit testing.",
+      "type": "fact",
+      "category": "testing",
+      "confidence": 1.0,
+      "stability": "core",
+      "source": "test",
+      "frozen": false
+    }
+  ]
+}
