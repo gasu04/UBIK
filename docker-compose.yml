@@ -1,0 +1,49 @@
+services:
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: ubik-neo4j
+    restart: unless-stopped
+    ports:
+      - "7474:7474"  # HTTP (Browser interface)
+      - "7687:7687"  # Bolt protocol
+    volumes:
+      - /Volumes/990PRO 4T/ubik/data/neo4j/data:/data
+      - /Volumes/990PRO 4T/ubik/data/neo4j/logs:/logs
+      - /Volumes/990PRO 4T/ubik/data/neo4j/import:/var/lib/neo4j/import
+      - /Volumes/990PRO 4T/ubik/data/neo4j/plugins:/plugins
+    environment:
+      - NEO4J_AUTH=neo4j/ubik_memory_2024
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_security_procedures_unrestricted=apoc.*
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=2G
+      - NEO4J_dbms_memory_pagecache_size=512m
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:7474"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: ubik-chromadb
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - /Volumes/990PRO 4T/ubik/data/chromadb:/chroma/chroma
+    environment:
+      - CHROMA_SERVER_AUTH_PROVIDER=chromadb.auth.token.TokenAuthServerProvider
+      - CHROMA_SERVER_AUTH_CREDENTIALS=ubik_chroma_token_2024
+      - CHROMA_SERVER_AUTH_TOKEN_TRANSPORT_HEADER=Authorization
+      - ANONYMIZED_TELEMETRY=False
+      - IS_PERSISTENT=True
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+networks:
+  default:
+    name: ubik-network
