@@ -1,5 +1,6 @@
 # Models (too large for git)
 models/deepseek/
+models/deepseek-awq/
 models/checkpoints/
 *.bin
 *.safetensors

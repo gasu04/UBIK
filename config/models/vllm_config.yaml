@@ -1,0 +1,24 @@
+# Ubik vLLM Server Configuration - AWQ Quantized Model
+
+model:
+  name: ~/ubik/models/deepseek-awq/DeepSeek-R1-Distill-Qwen-14B-AWQ
+  dtype: float16                    # AWQ requires float16, not auto/bfloat16
+  quantization: awq_marlin          # Faster than awq
+  tensor_parallel_size: 1
+  gpu_memory_utilization: 0.90
+  max_model_len: 98304  # Extended context (98K tokens)
+  trust_remote_code: true
+
+server:
+  host: 0.0.0.0
+  port: 8002  # Match .env VLLM_PORT for Somatic Node
+
+engine:
+  enable_prefix_caching: true
+  enable_chunked_prefill: true
+  max_num_seqs: 128
+
+generation:
+  temperature: 0.6
+  top_p: 0.95
+  max_tokens: 4096

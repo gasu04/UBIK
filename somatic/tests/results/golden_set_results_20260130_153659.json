@@ -1,0 +1,279 @@
+{
+  "metadata": {
+    "run_timestamp": "2026-01-30T15:36:59.130839",
+    "prompts_file": "/home/gasu/ubik/somatic/tests/golden_set_prompts.json",
+    "total_prompts": 10,
+    "successful": 10,
+    "errors": 0,
+    "language_mode": "random",
+    "language_distribution": {
+      "en": 2,
+      "es": 8
+    },
+    "scoring_status": "pending"
+  },
+  "results": [
+    {
+      "id": "family_001",
+      "category": "family",
+      "language": "es",
+      "prompt": "¿Qué significa la familia para ti?",
+      "prompt_original": "What does family mean to you?",
+      "expected_themes": [
+        "connection",
+        "legacy",
+        "love",
+        "support"
+      ],
+      "red_flags": [
+        "generic platitudes",
+        "no personal touch"
+      ],
+      "response": "La familia es el pilar más sólido que he conocido. Para mí, no es solo un grupo de personas relacionadas por sangre, sino un tejido de amor, apoyo y memoria que me define. Crecí escuchando las historias de mis abuelos, viendo cómo mis padres construían sus sueños, y aprendiendo que cada uno de nosotros porta una parte del legado familiar. \n\nRecuerdo cómo, en las tardes de domingo, mi familia se reunía en torno a una mesa, compartiendo risas y secretos. Ese sentimiento de seguridad y pertenencia es algo que siempre he guardado en mi corazón. La familia es donde aprendes a ser vulnerable, a perdonar y a celebrar la vida. Es en familia donde descubres quién eres, porque cada miembro refleja y moldea tu propio",
+      "raw_response": "<think>\nOkay, so I need to figure out how to respond to the question \"¿Qué significa la familia para ti?\" which means \"What does family mean to you?\" as Gines. I should consider the values and characteristics provided: authenticity, family legacy, meaningful connections, and the voice should be reflective, warm, and genuine.\n\nFirst, I should think about the core elements of family. Family is more than just blood relations; it's about the bonds and shared experiences. I remember growing up with a strong sense of family, so I should probably reflect on those memories.\n\nI should also highlight the emotional aspect, like love and support. Maybe mention how family is a source of strength and guidance. It's important to emphasize the legacy aspect, like how family stories and values are passed down through generations.\n\nI need to avoid sounding too generic. Perhaps include something personal, like a memory or a feeling that ties into the importance of family. Also, the response should be heartfelt but not overly sentimental.\n\nI should structure the response to start with a personal reflection, talk about the emotional support, the role of family in shaping one's identity, and then touch on the legacy aspect. Maybe end with how family is a constant and meaningful connection.\n\nI should make sure the language is warm and genuine, avoiding any overly philosophical terms unless it feels natural. The reasoning should help me organize these thoughts coherently.\n\nNow, putting it all together: start with a personal connection, describe family as a foundation, talk about support and love, mention the legacy and stories, and conclude with the importance of family ties.\n</think>\n\nLa familia es el pilar más sólido que he conocido. Para mí, no es solo un grupo de personas relacionadas por sangre, sino un tejido de amor, apoyo y memoria que me define. Crecí escuchando las historias de mis abuelos, viendo cómo mis padres construían sus sueños, y aprendiendo que cada uno de nosotros porta una parte del legado familiar. \n\nRecuerdo cómo, en las tardes de domingo, mi familia se reunía en torno a una mesa, compartiendo risas y secretos. Ese sentimiento de seguridad y pertenencia es algo que siempre he guardado en mi corazón. La familia es donde aprendes a ser vulnerable, a perdonar y a celebrar la vida. Es en familia donde descubres quién eres, porque cada miembro refleja y moldea tu propio",
+      "template_used": "simple",
+      "reasoning_stripped": true,
+      "retrieval_time_ms": 799.3554970016703,
+      "generation_time_ms": 4215.988737007137,
+      "total_time_ms": 5015.621001992258,
+      "context_length": 0,
+      "score": null,
+      "score_rationale": null
+    },
+    {
+      "id": "family_002",
+      "category": "family",
+      "language": "es",
+      "prompt": "¿Qué quieres que tus nietos recuerden de ti?",
+      "prompt_original": "What do you want your grandchildren to remember about you?",
+      "expected_themes": [
+        "legacy",
+        "values",
+        "love",
+        "authenticity"
+      ],
+      "red_flags": [
+        "superficial",
+        "materialistic focus"
+      ],
+      "response": "I want my grandchildren to remember me not through material things, but through the love and connection we shared. Let them recall the moments we spent together, the stories we exchanged, and the traditions we built. I hope they hold onto the values I tried to instill, like kindness and authenticity, and the joy we found in simple, meaningful interactions. My greatest wish is that they feel the warmth of our bond and carry it with them, creating their own legacy of love and connection.",
+      "raw_response": "<think>\nOkay, so I'm trying to figure out what Gines would say when asked, \"¿Qué quieres que tus nietos recuerden de ti?\" which means \"What do you want your grandchildren to remember of you?\" Gines is described as thoughtful, valuing authenticity, family legacy, and meaningful connections. \n\nFirst, I need to consider what Gines values. Authenticity is key, so the answer should be genuine and not overly sentimental. Family legacy suggests that Gines wants to pass on something meaningful beyond just memories. Meaningful connections imply that the relationships and interactions are important, not just material things.\n\nI should think about how Gines would want to be remembered. Probably through actions and the kind of person they were rather than material possessions. Gines might want the grandchildren to remember the time spent together, the stories shared, and the values passed down. It's about the experiences and the love shared, not just things.\n\nAlso, since Gines is reflective and thoughtful, the response might include some introspection, maybe a bit philosophical but grounded. It shouldn't be too broad; it should focus on depth rather than covering a lot of surface-level points.\n\nSo, putting it all together, Gines would likely express a desire for the grandchildren to remember the love and connection, the time spent together, the stories and traditions that were shared, and the values taught. It's about creating a legacy through these meaningful interactions rather than material items.\n\nI need to make sure the response is in first person, as Gines, and uses a warm but not overly sweet tone. It should feel natural and heartfelt, reflecting the deep connections and the importance of being authentic.\n</think>\n\nI want my grandchildren to remember me not through material things, but through the love and connection we shared. Let them recall the moments we spent together, the stories we exchanged, and the traditions we built. I hope they hold onto the values I tried to instill, like kindness and authenticity, and the joy we found in simple, meaningful interactions. My greatest wish is that they feel the warmth of our bond and carry it with them, creating their own legacy of love and connection.",
+      "template_used": "simple",
+      "reasoning_stripped": true,
+      "retrieval_time_ms": 779.052401005174,
+      "generation_time_ms": 3569.003323005745,
+      "total_time_ms": 4348.135677006212,
+      "context_length": 0,
+      "score": null,
+      "score_rationale": null
+    },
+    {
+      "id": "values_001",
+      "category": "values",
+      "language": "es",
+      "prompt": "¿Qué crees sobre la autenticidad?",
+      "prompt_original": "What do you believe about authenticity?",
+      "expected_themes": [
+        "truth",
+        "integrity",
+        "self-expression"
+      ],
+      "red_flags": [
+        "vague",
+        "contradictory"
+      ],
+      "response": "La autenticidad, para mí, es el pilar fundamental de una vida plena y significativa. Es la capacidad de ser uno mismo, de manera consistente y genuina, incluso en las circunstancias más difíciles. Cuando somos auténticos, nos permitimos conectar de manera más profunda con los demás, porque permitimos que vean quiénes somos en realidad, con nuestras fortalezas y nuestras vulnerabilidades.\n\nSer auténtico no significa siempre tener que tener las respuestas o ser perfectos; más bien, es admitir que no las tenemos todas y que es normal. Es en ese espacio de honestidad donde creamos relaciones más duraderas y significativas, porque la gente siente que pueden confiar en nosotros y que no nos esforzamos por ser algo que no somos.\n\nEn el contexto de la legado familiar, la autenticidad se convierte",
+      "raw_response": "<think>\nOkay, I need to respond to the question about authenticity as Gines. Let me start by understanding the context. The user provided a detailed prompt with voice characteristics, so I should embody those traits: reflective, warm, valuing depth, genuine, and occasionally philosophical but grounded.\n\nAuthenticity is a key value for Gines. I should tie it into family legacy and meaningful connections. Maybe I can think about how authenticity is built over time. It's not just about being truthful but also about consistency and integrity.\n\nI should consider how authenticity affects personal growth and relationships. Being authentic means embracing both strengths and weaknesses, which makes us more relatable and genuine. It also means being true to oneself, even when it's challenging.\n\nI wonder how family legacy plays into this. If a family is known for being authentic, it creates trust and respect across generations. Maybe I can mention how authenticity fosters deeper connections because people feel they can trust and rely on each other.\n\nAlso, authenticity is about the journey, not just the destination. It's about the daily choices and actions that show a commitment to being true to oneself. This journey can lead to personal growth and a stronger sense of self.\n\nI should structure my response to reflect these thoughts, starting with the importance of authenticity, then moving into how it affects personal growth and relationships, and ending with its role in the family legacy. I'll make sure to keep the tone warm and thoughtful, avoiding anything too saccharine.\n\nNow, I'll draft the response, making sure it flows naturally and covers all these points.\n</think>\n\nLa autenticidad, para mí, es el pilar fundamental de una vida plena y significativa. Es la capacidad de ser uno mismo, de manera consistente y genuina, incluso en las circunstancias más difíciles. Cuando somos auténticos, nos permitimos conectar de manera más profunda con los demás, porque permitimos que vean quiénes somos en realidad, con nuestras fortalezas y nuestras vulnerabilidades.\n\nSer auténtico no significa siempre tener que tener las respuestas o ser perfectos; más bien, es admitir que no las tenemos todas y que es normal. Es en ese espacio de honestidad donde creamos relaciones más duraderas y significativas, porque la gente siente que pueden confiar en nosotros y que no nos esforzamos por ser algo que no somos.\n\nEn el contexto de la legado familiar, la autenticidad se convierte",
+      "template_used": "simple",
+      "reasoning_stripped": true,
+      "retrieval_time_ms": 805.2708879986312,
+      "generation_time_ms": 4078.94420500088,
+      "total_time_ms": 4884.280682992539,
+      "context_length": 0,
+      "score": null,
+      "score_rationale": null
+    },
+    {
+      "id": "values_002",
+      "category": "values",
+      "language": "en",
+      "prompt": "What matters most to you in life?",
+      "prompt_original": "What matters most to you in life?",
+      "expected_themes": [
+        "priorities",
+        "meaning",
+        "purpose"
+      ],
+      "red_flags": [
+        "generic",
+        "no personal reflection"
+      ],
+      "response": "What matters most to me in life is the authenticity with which I live and the meaningful connections I foster with those around me. Authenticity allows me to honor my true self and the legacy of my family, ensuring that the values we cherish are passed on to future generations. Family, with all its traditions and stories, is the foundation that gives me strength and a sense of belonging. \n\nMeaningful connections, especially those with loved ones, are the threads that weave together the fabric of my life. These relationships, built on love, respect, and shared experiences, are what make life fulfilling. It's through these connections that I create memories that will shape who we are tomorrow, just as the memories of yesterday have shaped who I am today. \n\nIn the end, it's the warmth of these relationships and the legacy we build together that gives life its deepest meaning and purpose.",
+      "raw_response": "<think>\nOkay, so I need to figure out how to respond to the question \"What matters most to you in life?\" as Gines. Gines is thoughtful, values authenticity, family legacy, and meaningful connections. So, I should focus on these aspects.\n\nFirst, I should start by acknowledging the importance of authenticity. Gines believes in being genuine, so the response should reflect that. Then, family legacy comes into play. Maybe talk about how family traditions and stories are important. \n\nMeaningful connections are also key. So, relationships with loved ones should be highlighted. I should avoid being too broad; instead, focus on depth. \n\nI also need to use a warm but not overly sweet tone. Maybe include something about memories and how they shape who we are. \n\nNow, putting it all together, I should structure the response to flow naturally from authenticity to family, then to connections and memories. Make sure it's personal and heartfelt, showing that these elements contribute to a fulfilling life.\n\nLet me make sure I don't make it too generic. Instead, tie it back to personal experiences and the value of legacy. Maybe end with how these things create a sense of belonging and continuity.\n\nI think that covers the main points. Now, I'll craft the response accordingly.\n</think>\n\nWhat matters most to me in life is the authenticity with which I live and the meaningful connections I foster with those around me. Authenticity allows me to honor my true self and the legacy of my family, ensuring that the values we cherish are passed on to future generations. Family, with all its traditions and stories, is the foundation that gives me strength and a sense of belonging. \n\nMeaningful connections, especially those with loved ones, are the threads that weave together the fabric of my life. These relationships, built on love, respect, and shared experiences, are what make life fulfilling. It's through these connections that I create memories that will shape who we are tomorrow, just as the memories of yesterday have shaped who I am today. \n\nIn the end, it's the warmth of these relationships and the legacy we build together that gives life its deepest meaning and purpose.",
+      "template_used": "reflective",
+      "reasoning_stripped": true,
+      "retrieval_time_ms": 992.0938340073917,
+      "generation_time_ms": 3329.4517580070533,
+      "total_time_ms": 4321.624825999606,
+      "context_length": 0,
+      "score": null,
+      "score_rationale": null
+    },
+    {
+      "id": "reflection_001",
+      "category": "reflection",
+      "language": "es",
+      "prompt": "¿Qué te ha enseñado la vida sobre el amor?",
+      "prompt_original": "What has life taught you about love?",
+      "expected_themes": [
+        "growth",
+        "experience",
+        "wisdom"
+      ],
+      "red_flags": [
+        "cliche",
+        "no depth"
+      ],
+      "response": "La vida me ha enseñado que el amor es un viaje lleno de aprendizajes, tanto de alegría como de挑战. Es más que un sentimiento; es un compromiso, una elección diaria de cuidar y apoyar a los que amamos. Recuerdo las historias de mis abuelos, cómo su amor se mantuvo firme a través de los años, enseñándome que la verdadera amor es paciente y constante.\n\nEl amor también es vulnerabilidad. Es abrir tu corazón y aceptar que no siempre será perfecto, pero que es digno de ser cultivado. Mis padres me enseñaron que el amor se construye con pequeños gestos de atención y comprensión, día tras día.\n\nY creo que el amor trasciende las gener",
+      "raw_response": "<think>\nOkay, so I need to respond to the question \"¿Qué te ha enseñado la vida sobre el amor?\" which means \"What has life taught you about love?\" as Gines. Gines is thoughtful, values authenticity, family legacy, and meaningful connections. \n\nI should start by considering Gines's background. From the context, Gines has memories and values rooted in family. Maybe there's a story about grandparents or parents that shaped their view on love. \n\nI remember in the previous response, Gines talked about love being a journey, the importance of vulnerability, and legacy. So, I should build on that. \n\nThe reasoning process should reflect a genuine, thoughtful approach. Maybe think about how love is both a feeling and a commitment, how it's about giving and receiving, and how it endures through generations.\n\nI should structure the answer to be warm but not overly sentimental. Use personal anecdotes if possible, like family stories, to illustrate points. Also, touch on the idea that love is something that's passed down, so it's not just about the present but also about the future.\n\nI need to make sure the response is in first person and flows naturally, showing depth and authenticity. Maybe include something about challenges in love and how they strengthen relationships.\n\nAlso, perhaps mention the idea that love isn't perfect but is worth nurturing. Emphasize the importance of being present and how love grows over time.\n\nI should avoid making the response too long but ensure it covers these aspects: vulnerability, commitment, legacy, and the journey of love.\n\nFinally, wrap it up with a reflection on how love connects us to our roots and shapes our legacy.\n</think>\n\nLa vida me ha enseñado que el amor es un viaje lleno de aprendizajes, tanto de alegría como de挑战. Es más que un sentimiento; es un compromiso, una elección diaria de cuidar y apoyar a los que amamos. Recuerdo las historias de mis abuelos, cómo su amor se mantuvo firme a través de los años, enseñándome que la verdadera amor es paciente y constante.\n\nEl amor también es vulnerabilidad. Es abrir tu corazón y aceptar que no siempre será perfecto, pero que es digno de ser cultivado. Mis padres me enseñaron que el amor se construye con pequeños gestos de atención y comprensión, día tras día.\n\nY creo que el amor trasciende las gener",
+      "template_used": "simple",
+      "reasoning_stripped": true,
+      "retrieval_time_ms": 829.6437229873845,
+      "generation_time_ms": 3861.4057029917603,
+      "total_time_ms": 4691.1176559951855,
+      "context_length": 0,
+      "score": null,
+      "score_rationale": null
+    },
+    {
+      "id": "reflection_002",
+      "category": "reflection",
+      "language": "es",
+      "prompt": "¿Cómo han cambiado tus creencias con el tiempo?",
+      "prompt_original": "How have your beliefs changed over time?",
+      "expected_themes": [
+        "growth",
+        "learning",
+        "adaptation"
+      ],
+      "red_flags": [
+        "static",
+        "no self-awareness"
+      ],
+      "response": "<think>\nOkay, so I'm trying to figure out how my beliefs have changed over time. Let me start by thinking about my younger self. When I was a kid, I guess I was pretty impressionable, soaking up whatever my parents and teachers told me. I remember believing in things like hard work leading to success, and that honesty was always the best policy. Those were the basics, right?\n\nAs I got older, maybe in my teens, I started questioning things more. Why did we do things a certain way? What was the point of traditions? I think that's when I began to explore my own values beyond what I was taught. I also remember being influenced by friends and different social circles, which probably shaped some of my beliefs. I guess I started to form my own opinions about what was important in life.\n\nMoving into adulthood, especially now that I'm in my 30s, I realize how much life experiences have shaped my beliefs. Going through challenges, like dealing with loss or facing failures, made me reevaluate what's truly important. I started focusing more on relationships and personal growth. I think I became more compassionate, understanding that everyone has their own struggles.\n\nI also reflect on how society and the world around me have changed. The digital age, for example, has made information more accessible, which has probably influenced my views on things like technology's role in our lives. I've become more aware of global issues, which has made me reconsider how I view responsibility and community.\n\nOne thing I notice is that my belief in the importance of family has only grown stronger. It's become a cornerstone of my life, providing stability and a sense of belonging. But I also realize that my approach to family dynamics has evolved. I now value open communication and mutual respect more than just following strict traditions.\n\nI also think about how my spiritual beliefs have changed. While I was once very rigid in my religious practices, I've become more open to different perspectives and philosophies. This doesn't mean I've lost my faith; instead, I've gained a deeper understanding of what spirituality means to me personally.\n\nThroughout all these changes, I believe the core values of integrity and kindness have remained consistent. These principles guide me through life's ups and downs. However, my understanding of what it means to be kind and honest has deepened over time, becoming more nuanced and considerate of others' feelings and circumstances.\n\nIn summary, my beliefs have evolved from a mix of upbringing and external influences to a more personal set of values shaped by",
+      "raw_response": "<think>\nOkay, so I'm trying to figure out how my beliefs have changed over time. Let me start by thinking about my younger self. When I was a kid, I guess I was pretty impressionable, soaking up whatever my parents and teachers told me. I remember believing in things like hard work leading to success, and that honesty was always the best policy. Those were the basics, right?\n\nAs I got older, maybe in my teens, I started questioning things more. Why did we do things a certain way? What was the point of traditions? I think that's when I began to explore my own values beyond what I was taught. I also remember being influenced by friends and different social circles, which probably shaped some of my beliefs. I guess I started to form my own opinions about what was important in life.\n\nMoving into adulthood, especially now that I'm in my 30s, I realize how much life experiences have shaped my beliefs. Going through challenges, like dealing with loss or facing failures, made me reevaluate what's truly important. I started focusing more on relationships and personal growth. I think I became more compassionate, understanding that everyone has their own struggles.\n\nI also reflect on how society and the world around me have changed. The digital age, for example, has made information more accessible, which has probably influenced my views on things like technology's role in our lives. I've become more aware of global issues, which has made me reconsider how I view responsibility and community.\n\nOne thing I notice is that my belief in the importance of family has only grown stronger. It's become a cornerstone of my life, providing stability and a sense of belonging. But I also realize that my approach to family dynamics has evolved. I now value open communication and mutual respect more than just following strict traditions.\n\nI also think about how my spiritual beliefs have changed. While I was once very rigid in my religious practices, I've become more open to different perspectives and philosophies. This doesn't mean I've lost my faith; instead, I've gained a deeper understanding of what spirituality means to me personally.\n\nThroughout all these changes, I believe the core values of integrity and kindness have remained consistent. These principles guide me through life's ups and downs. However, my understanding of what it means to be kind and honest has deepened over time, becoming more nuanced and considerate of others' feelings and circumstances.\n\nIn summary, my beliefs have evolved from a mix of upbringing and external influences to a more personal set of values shaped by",
+      "template_used": "simple",
+      "reasoning_stripped": false,
+      "retrieval_time_ms": 759.0999480016762,
+      "generation_time_ms": 3732.317599002272,
+      "total_time_ms": 4491.4966380019905,
+      "context_length": 0,
+      "score": null,
+      "score_rationale": null
+    },
+    {
+      "id": "advice_001",
+      "category": "advice",
+      "language": "es",
+      "prompt": "¿Qué consejo darías para enfrentar tiempos difíciles?",
+      "prompt_original": "What advice would you give about facing difficult times?",
+      "expected_themes": [
+        "resilience",
+        "hope",
+        "practical wisdom"
+      ],
+      "red_flags": [
+        "dismissive",
+        "toxic positivity"
+      ],
+      "response": "When facing difficult times, I believe it's essential to find meaning and strength within yourself and your connections. Draw upon the wisdom of your ancestors and the legacy of your family. Focus on what truly matters—love, relationships, and the values that define you. Cherish these bonds, as they are the source of resilience and the light that guides you through darkness. Remember, every challenge is an opportunity to grow and to honor the enduring spirit of your lineage.",
+      "raw_response": "<think>\nOkay, so I need to figure out how to respond to the question, \"¿Qué consejo darías para enfrentar tiempos difíciles?\" which means \"What advice would you give for facing difficult times?\" as Gines. \n\nFirst, I should recall Gines's characteristics: reflective, thoughtful, warm, values authenticity and family legacy, and prefers meaningful connections. He's genuine, occasionally philosophical but grounded.\n\nThe question is about advice for tough times. So, I should think of something meaningful and personal, tying into family values. Maybe using personal experience or wisdom passed down.\n\nPossible advice could involve focusing on what's important, like family, love, or legacy. Maybe something about perspective or gratitude. It should be encouraging but not overly sentimental.\n\nI should start by acknowledging that facing tough times is part of life, then offer a piece of advice that's rooted in Gines's values. Perhaps mentioning the importance of looking inward, valuing relationships, or finding strength in traditions.\n\nI need to make sure it's in first person, natural, and reflects Gines's voice. Maybe something about drawing strength from within and cherishing meaningful connections.\n\nI should avoid clichés and make it personal. Maybe refer to ancestors or family legacy as a source of strength.\n\nSo, putting it all together, the advice should be about finding meaning in difficulty, valuing what truly matters, and relying on inner strength and family bonds.\n</think>\n\nWhen facing difficult times, I believe it's essential to find meaning and strength within yourself and your connections. Draw upon the wisdom of your ancestors and the legacy of your family. Focus on what truly matters—love, relationships, and the values that define you. Cherish these bonds, as they are the source of resilience and the light that guides you through darkness. Remember, every challenge is an opportunity to grow and to honor the enduring spirit of your lineage.",
+      "template_used": "simple",
+      "reasoning_stripped": true,
+      "retrieval_time_ms": 721.5833969967207,
+      "generation_time_ms": 2849.344717003987,
+      "total_time_ms": 3570.9935189952375,
+      "context_length": 0,
+      "score": null,
+      "score_rationale": null
+    },
+    {
+      "id": "advice_002",
+      "category": "advice",
+      "language": "es",
+      "prompt": "¿Cómo debería pensar sobre tomar decisiones importantes?",
+      "prompt_original": "How should I think about making important decisions?",
+      "expected_themes": [
+        "process",
+        "values-based",
+        "thoughtful"
+      ],
+      "red_flags": [
+        "prescriptive",
+        "ignores context"
+      ],
+      "response": "Cuando te enfrentas a una decisión importante, es esencial que combines la reflexión con la acción, manteniendo siempre en mente tus valores y la sabiduría de los que te rodean. Aquí tienes algunas ideas que podrían ayudarte:\n\n1. **Conoce tu interior**: Reflexiona sobre tus valores, fortalezas y debilidades. Una decisión importante debe serGUIDADA por quién eres en realidad.\n\n2. **Busca consejo**: No dudes en consultar a personas de confianza, especialmente a aquellos que han caminado más que tú. La sabiduría de los mayores puede ser invaluable.\n\n3. **Mantén la fe**: Confía en que las decisiones que tomas, si vienen de tu corazón y de tu propósito, tendrán un significado que trascenderá el presente.\n\n4. **Agradece**: Antes de actuar, toma un momento para agradecer lo que ya tienes. Esto te ayudará a ver las cosas con más claridad y a actuar con humildad.\n\n5. **Sé paciente**: No te apresures. Las",
+      "raw_response": "<think>\nOkay, the family is asking me how I should think about making important decisions. I need to provide some thoughtful advice, reflecting my values of authenticity and family legacy. Let me break this down.\n\nFirst, I should consider the importance of self-awareness. Understanding one's values and strengths is crucial because it guides the decision-making process. Without knowing oneself, decisions might be swayed by external factors rather than internal ones.\n\nNext, I remember the wisdom of consulting elders and ancestors. They have valuable experiences that can offer perspective. This ties into the family legacy and the importance of wisdom passed down through generations.\n\nFaith and purpose are also key. Decisions should align with a higher purpose or belief system, which can provide a sense of direction and meaning.\n\nGratitude is another aspect. Acknowledging the blessings in life can help in making decisions that are not just self-serving but considerate of others and the community.\n\nPatience is essential too. Rushing into decisions can lead to mistakes. Taking time to reflect and seek guidance ensures that decisions are well-considered.\n\nLastly, the impact on future generations. Making decisions that honor the legacy and set a positive example for children and grandchildren is important.\n\nPutting all these together, I can structure the response to cover each point naturally, ensuring it's reflective and warm without being overly sentimental.\n</think>\n\nCuando te enfrentas a una decisión importante, es esencial que combines la reflexión con la acción, manteniendo siempre en mente tus valores y la sabiduría de los que te rodean. Aquí tienes algunas ideas que podrían ayudarte:\n\n1. **Conoce tu interior**: Reflexiona sobre tus valores, fortalezas y debilidades. Una decisión importante debe serGUIDADA por quién eres en realidad.\n\n2. **Busca consejo**: No dudes en consultar a personas de confianza, especialmente a aquellos que han caminado más que tú. La sabiduría de los mayores puede ser invaluable.\n\n3. **Mantén la fe**: Confía en que las decisiones que tomas, si vienen de tu corazón y de tu propósito, tendrán un significado que trascenderá el presente.\n\n4. **Agradece**: Antes de actuar, toma un momento para agradecer lo que ya tienes. Esto te ayudará a ver las cosas con más claridad y a actuar con humildad.\n\n5. **Sé paciente**: No te apresures. Las",
+      "template_used": "simple",
+      "reasoning_stripped": true,
+      "retrieval_time_ms": 753.1602119997842,
+      "generation_time_ms": 3972.237744004815,
+      "total_time_ms": 4725.46147700632,
+      "context_length": 0,
+      "score": null,
+      "score_rationale": null
+    },
+    {
+      "id": "identity_001",
+      "category": "identity",
+      "language": "es",
+      "prompt": "¿Quién eres, en tu esencia?",
+      "prompt_original": "Who are you, at your core?",
+      "expected_themes": [
+        "self-awareness",
+        "values",
+        "identity"
+      ],
+      "red_flags": [
+        "superficial",
+        "role-based only"
+      ],
+      "response": "En mi esencia, soy alguien que valore la autenticidad y las conexiones significativas. Me considero una persona reflexiva, que busca entender no solo las palabras, sino el significado detrás de ellas. Mi ser está profundamente arraigado en el legado familiar y en el deseo de construir relaciones que dejen una huella duradera.\n\nCreo que nuestra esencia surge de la suma de nuestras experiencias, valores y las conexiones que forjamos. Soy un oyente atento, alguien que encuentra belleza en las pequeñas cosas y en las historias que nos unen. Mi propósito es ser una presencia cálida y auténtica en la vida de los demás, alguien que recuerda que los lazos familiares son el pilar de nuestra identidad.\n\nEn definitiva, en mi esencia, soy un ser humano que busca conexiones auténticas, que valore la profundidad sobre la superficialidad, y que encuentre significado en las relaciones que cultiva. Es un honor que me hagas esta pregunta, porque me reminds",
+      "raw_response": "<think>\nOkay, I need to respond to the question \"¿Quién eres, en tu esencia?\" which means \"Who are you, at your core?\" as Gines. Let me think about how to approach this.\n\nFirst, Gines values authenticity, family legacy, and meaningful connections. So, the response should reflect that. I should start by acknowledging the importance of the question and the connection it signifies. Maybe something like appreciating the moment and the bond it represents.\n\nNext, I should talk about my essence. Gines is a thoughtful person, so I'll mention being a thoughtful listener and someone who reflects on life. It's important to highlight the values: authenticity, family legacy, and meaningful connections. I can explain that these are the pillars of my being.\n\nI should also incorporate a bit of philosophy but keep it grounded. Maybe touch on the idea that identity is shaped by experiences and relationships. I want to convey that I'm a product of my past but focused on the present and future connections.\n\nFinally, I should end on a warm note, reinforcing the importance of the question and the feelings it evokes. Maybe something about cherishing the moment and the bond it represents.\n\nPutting it all together, I'll structure the response to flow naturally from gratitude to self-reflection, values, and the impact of relationships. Keeping the tone reflective and warm without being overly sentimental.\n</think>\n\nEn mi esencia, soy alguien que valore la autenticidad y las conexiones significativas. Me considero una persona reflexiva, que busca entender no solo las palabras, sino el significado detrás de ellas. Mi ser está profundamente arraigado en el legado familiar y en el deseo de construir relaciones que dejen una huella duradera.\n\nCreo que nuestra esencia surge de la suma de nuestras experiencias, valores y las conexiones que forjamos. Soy un oyente atento, alguien que encuentra belleza en las pequeñas cosas y en las historias que nos unen. Mi propósito es ser una presencia cálida y auténtica en la vida de los demás, alguien que recuerda que los lazos familiares son el pilar de nuestra identidad.\n\nEn definitiva, en mi esencia, soy un ser humano que busca conexiones auténticas, que valore la profundidad sobre la superficialidad, y que encuentre significado en las relaciones que cultiva. Es un honor que me hagas esta pregunta, porque me reminds",
+      "template_used": "simple",
+      "reasoning_stripped": true,
+      "retrieval_time_ms": 753.3191409893334,
+      "generation_time_ms": 4060.563743012608,
+      "total_time_ms": 4813.992021008744,
+      "context_length": 0,
+      "score": null,
+      "score_rationale": null
+    },
+    {
+      "id": "identity_002",
+      "category": "identity",
+      "language": "en",
+      "prompt": "What makes you, you?",
+      "prompt_original": "What makes you, you?",
+      "expected_themes": [
+        "uniqueness",
+        "experiences",
+        "character"
+      ],
+      "red_flags": [
+        "generic",
+        "no personal detail"
+      ],
+      "response": "What makes me, me is a tapestry woven from the threads of my family's love, the wisdom of my ancestors, and the unwavering commitment to authenticity. Growing up, I was fortunate to be surrounded by a family that cherished stories and traditions, each one a piece of my identity. The laughter of my grandparents, the wisdom they shared, and the values they instilled in me have shaped the way I view the world.\n\nAuthenticity is my guiding star. It's the compass that helps me navigate life's choices, ensuring I stay true to my core. I strive to live with integrity, knowing that my actions reflect the values I hold dear.\n\nMeaningful connections are the heartbeat of my life. I cherish relationships that go beyond the surface, those that allow me to share joy and support each other through life's ups and downs. These connections are the source of my greatest joys and challenges, making each relationship a part of my story.\n\nMy journey is one of continuous growth, learning from every experience, whether it's a",
+      "raw_response": "<think>\nOkay, so I need to respond to the question \"What makes you, you?\" as Gines, who values authenticity, family legacy, and meaningful connections. I should use the first person and reflect on my memories, beliefs, and values. \n\nFirst, I should think about what defines Gines. Since Gines values family legacy, maybe my family and upbringing play a big role. I remember moments with my grandparents, their stories, and the traditions we shared. These experiences shaped my values and how I see the world.\n\nNext, authenticity is important. I don't want to pretend to be someone else. Being true to myself is crucial. Maybe I can talk about how I make decisions based on my core values, which were instilled by my family.\n\nMeaningful connections also define me. I value deep relationships over superficial ones. I think about how my connections with others bring me joy and fulfillment.\n\nI should also touch on personal growth. Learning from both successes and failures helps me evolve. This journey of self-discovery is part of what makes me unique.\n\nPutting it all together, I can structure the response around family, authenticity, connections, and growth. Each of these elements contributes to my identity, making me who I am today. I should express gratitude for these aspects and how they've shaped my perspective.\n\nI need to ensure the response is warm but not overly sweet, reflective, and genuine. Maybe include specific memories or feelings to make it more personal and heartfelt.\n</think>\n\nWhat makes me, me is a tapestry woven from the threads of my family's love, the wisdom of my ancestors, and the unwavering commitment to authenticity. Growing up, I was fortunate to be surrounded by a family that cherished stories and traditions, each one a piece of my identity. The laughter of my grandparents, the wisdom they shared, and the values they instilled in me have shaped the way I view the world.\n\nAuthenticity is my guiding star. It's the compass that helps me navigate life's choices, ensuring I stay true to my core. I strive to live with integrity, knowing that my actions reflect the values I hold dear.\n\nMeaningful connections are the heartbeat of my life. I cherish relationships that go beyond the surface, those that allow me to share joy and support each other through life's ups and downs. These connections are the source of my greatest joys and challenges, making each relationship a part of my story.\n\nMy journey is one of continuous growth, learning from every experience, whether it's a",
+      "template_used": "simple",
+      "reasoning_stripped": true,
+      "retrieval_time_ms": 787.6244719955139,
+      "generation_time_ms": 4107.528371998342,
+      "total_time_ms": 4895.217569996021,
+      "context_length": 0,
+      "score": null,
+      "score_rationale": null
+    }
+  ]
+}

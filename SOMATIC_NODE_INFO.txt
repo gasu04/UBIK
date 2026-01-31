@@ -1,0 +1,316 @@
+================================================================================
+                    UBIK SOMATIC NODE (adrian-wsl) - SYSTEM INFO
+                              Generated: 2026-01-22
+================================================================================
+
+================================================================================
+1. vLLM STARTUP COMMAND/CONFIGURATION
+================================================================================
+
+Currently running vLLM process:
+
+/home/gasu/pytorch_env/bin/python -m vllm.entrypoints.openai.api_server \
+    --model /home/gasu/ubik/models/deepseek-awq/DeepSeek-R1-Distill-Qwen-14B-AWQ \
+    --host 0.0.0.0 \
+    --port 8001 \
+    --dtype float16 \
+    --tensor-parallel-size 1 \
+    --gpu-memory-utilization 0.9 \
+    --max-model-len 98304 \
+    --max-num-seqs 128 \
+    --quantization awq_marlin \
+    --trust-remote-code \
+    --enable-prefix-caching \
+    --enable-chunked-prefill
+
+Key Configuration:
+  - Model: DeepSeek-R1-Distill-Qwen-14B-AWQ (local path)
+  - Port: 8001
+  - Quantization: AWQ (Marlin backend)
+  - Max context: 98304 tokens
+  - GPU memory utilization: 90%
+
+
+================================================================================
+2. TEST_RAG_PIPELINE.PY
+================================================================================
+
+File: /home/gasu/ubik/tests/test_rag_pipeline.py
+
+#!/usr/bin/env python3
+"""End-to-end RAG test - Memory retrieval + Inference"""
+
+import asyncio
+from openai import OpenAI
+import sys
+sys.path.insert(0, '/home/gasu/ubik/somatic')
+
+from mcp_client import HippocampalClient
+
+async def test_rag_pipeline():
+    print("\n" + "=" * 60)
+    print(" END-TO-END RAG PIPELINE TEST")
+    print("=" * 60)
+
+    query = "What do I believe about family and legacy?"
+
+    # Step 1: Get RAG context from Hippocampal Node
+    print(f"\n[1] Query: '{query}'")
+    print("[2] Retrieving context from Hippocampal Node...")
+
+    async with HippocampalClient() as client:
+        context = await client.get_rag_context(query, episodic_results=3, semantic_results=3)
+
+    print(f"    Retrieved {len(context)} characters of context")
+    print(f"\n--- Context Preview ---\n{context[:500]}...\n")
+
+    # Step 2: Build prompt with context
+    print("[3] Building augmented prompt...")
+
+    system_prompt = """You are Gines, speaking authentically based on your memories and values.
+Use the context provided to inform your response, speaking in first person as yourself."""
+
+    full_prompt = f"""<context>
+{context}
+</context>
+
+<question>
+{query}
+</question>
+
+Respond as Gines, drawing on the context above:"""
+
+    # Step 3: Generate response via vLLM
+    print("[4] Generating response via vLLM...")
+
+    client = OpenAI(
+        base_url="http://localhost:8001/v1",
+        api_key="not-needed"
+    )
+
+    response = client.completions.create(
+        model="/home/gasu/ubik/models/deepseek-awq/DeepSeek-R1-Distill-Qwen-14B-AWQ",
+        prompt=full_prompt,
+        max_tokens=300,
+        temperature=0.7,
+        stop=["</response>", "\n\n\n"]
+    )
+
+    generated = response.choices[0].text.strip()
+
+    print("\n" + "=" * 60)
+    print(" GENERATED RESPONSE (as Gines)")
+    print("=" * 60)
+    print(f"\n{generated}\n")
+    print("=" * 60)
+    print(" ✓ END-TO-END RAG TEST COMPLETE")
+    print("=" * 60 + "\n")
+
+if __name__ == "__main__":
+    asyncio.run(test_rag_pipeline())
+
+
+================================================================================
+3. MCP CLIENT CODE
+================================================================================
+
+Location: /home/gasu/ubik/somatic/mcp_client/
+
+Files:
+  - __init__.py
+  - hippocampal_client.py (main client)
+  - rag_integration.py
+  - utils.py
+
+--------------------------------------------------------------------------------
+3.1 __init__.py
+--------------------------------------------------------------------------------
+
+"""
+Ubik Somatic Node - MCP Client Package
+
+Provides connectivity to the Hippocampal Node's memory services.
+"""
+
+from .hippocampal_client import HippocampalClient, MemoryResult, get_context_for_inference
+from .rag_integration import RAGContextBuilder
+
+__all__ = [
+    'HippocampalClient',
+    'MemoryResult',
+    'get_context_for_inference',
+    'RAGContextBuilder'
+]
+
+__version__ = '1.0.0'
+
+--------------------------------------------------------------------------------
+3.2 hippocampal_client.py (MAIN CLIENT - 653 lines)
+--------------------------------------------------------------------------------
+
+Key Features:
+  - Connects to Hippocampal Node MCP server at 100.103.242.91:8080
+  - Async context manager support (async with HippocampalClient() as client)
+  - MCP JSON-RPC 2.0 protocol implementation
+  - SSE response parsing
+
+Classes:
+  - MemoryResult: Dataclass for memory search results
+  - HippocampalClient: Main client class
+
+HippocampalClient Methods:
+
+  Health & Status:
+    - health_check() -> Dict: Check node health and get memory stats
+    - is_connected() -> bool: Quick connectivity check
+
+  Episodic Memory:
+    - store_episodic(content, memory_type, ...) -> Dict: Store new episodic memory
+    - query_episodic(query, n_results=5, filters=None) -> List[MemoryResult]: Search episodic
+
+  Semantic Memory:
+    - store_semantic(content, knowledge_type, category, ...) -> Dict: Store knowledge
+    - query_semantic(query, n_results=5, filters=None) -> List[MemoryResult]: Search semantic
+
+  Identity Graph:
+    - get_identity_context(concept, depth=2) -> Dict: Query Parfitian identity graph
+    - update_identity_graph(from_concept, relation_type, to_concept, ...) -> Dict
+
+  Voice Freeze Control:
+    - freeze_voice() -> Dict: Activate Frozen Voice mode
+    - unfreeze_voice(confirmation) -> Dict: Deactivate with confirmation
+    - is_frozen() -> bool: Check freeze status
+
+  RAG Integration:
+    - get_rag_context(query, episodic_results=3, semantic_results=3, include_identity=True) -> str
+
+Connection Details:
+  - Default host: 100.103.242.91 (or HIPPOCAMPAL_HOST env var)
+  - Default port: 8080 (or HIPPOCAMPAL_PORT env var)
+  - Protocol: MCP over HTTP with SSE responses
+
+--------------------------------------------------------------------------------
+3.3 rag_integration.py (209 lines)
+--------------------------------------------------------------------------------
+
+Classes:
+  - RAGConfig: Configuration dataclass for RAG context building
+  - RAGContextBuilder: Builds RAG-augmented prompts
+
+RAGContextBuilder Methods:
+  - build_prompt(query) -> str: Build RAG-augmented prompt
+  - query_vllm(prompt, max_tokens=512, temperature=0.7) -> str: Query vLLM
+  - ask(query, ...) -> Dict: Complete RAG pipeline
+
+Default Template:
+  <personal_context>
+  {context}
+  </personal_context>
+
+  Based on the above personal context about Gines, respond to the following:
+
+  User: {query}
+  Assistant:
+
+--------------------------------------------------------------------------------
+3.4 utils.py (234 lines)
+--------------------------------------------------------------------------------
+
+Utility Functions:
+  - setup_logging(name, level, log_file, log_dir) -> Logger
+  - format_memory_context(memories, memory_type, max_items, include_scores) -> str
+  - truncate_content(content, max_length=500, suffix="...") -> str
+  - parse_timestamp(timestamp) -> Optional[datetime]
+  - get_env_config() -> Dict: Get environment configuration
+  - validate_memory_type(memory_type) -> bool
+  - validate_knowledge_type(knowledge_type) -> bool
+  - validate_emotional_valence(valence) -> bool
+
+Valid Memory Types: letter, therapy_session, family_meeting, conversation, event,
+                    training_log, reflection
+
+Valid Knowledge Types: belief, value, preference, fact, opinion
+
+Valid Emotional Valences: positive, negative, neutral, reflective, mixed
+
+
+================================================================================
+4. DIRECTORY STRUCTURE: ~/ubik/
+================================================================================
+
+/home/gasu/ubik/
+├── config/
+│   ├── models/
+│   ├── training/
+│   └── network/
+├── data/
+│   ├── dpo_pairs/
+│   ├── raw/
+│   ├── cache/
+│   │   └── huggingface/
+│   └── processed/
+├── logs/
+│   ├── system/
+│   ├── training/
+│   ├── mcp/
+│   └── inference/
+├── models/
+│   ├── checkpoints/
+│   ├── deepseek-awq/
+│   │   └── DeepSeek-R1-Distill-Qwen-14B-AWQ/
+│   └── lora_adapters/
+├── scripts/
+│   ├── setup/
+│   ├── monitoring/
+│   └── maintenance/
+├── somatic/                          <-- Main application code
+│   ├── config/
+│   ├── inference/
+│   ├── logs/
+│   ├── mcp_client/                   <-- MCP client package
+│   │   ├── __init__.py
+│   │   ├── hippocampal_client.py
+│   │   ├── rag_integration.py
+│   │   └── utils.py
+│   ├── shadow_mode/
+│   ├── tests/
+│   └── quick_test.sh
+├── tests/
+│   ├── integration/
+│   ├── benchmarks/
+│   └── unit/
+├── training/
+│   ├── configs/
+│   ├── dpo/
+│   ├── tensorboard/
+│   └── runs/
+├── venv -> /home/gasu/pytorch_env    <-- Symlink to conda env
+├── .git/
+├── .gitignore
+├── README.md
+├── ENVIRONMENT.md
+├── INSTALL.md
+├── PACKAGES.md
+├── PYTORCH_VERIFICATION.md
+├── requirements.txt
+└── requirements-frozen.txt
+
+
+================================================================================
+5. NETWORK CONFIGURATION
+================================================================================
+
+Hippocampal Node (minim4-2025):
+  - IP: 100.103.242.91
+  - MCP Server: port 8080 (primary interface)
+  - ChromaDB: port 8001 (direct access)
+  - Neo4j: port 7687 (direct access)
+
+Somatic Node (adrian-wsl):
+  - vLLM Server: port 8001
+  - Model: DeepSeek-R1-Distill-Qwen-14B-AWQ
+
+
+================================================================================
+                                   END OF REPORT
+================================================================================

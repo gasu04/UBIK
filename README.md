@@ -13,9 +13,9 @@
 
 ## Quick Start
 
-1. Activate environment: `source ~/ubik/venv/bin/activate`
-2. Start inference server: `./scripts/start_inference.sh`
-3. Check health: `python scripts/health_check.py`
+1. Activate environment: `source ~/ubik/scripts/activate_ubik.sh`
+2. Start inference server: `~/ubik/scripts/start_inference.sh`
+3. Check health: `~/ubik/scripts/check_inference.sh`
 
 ## Hardware
 

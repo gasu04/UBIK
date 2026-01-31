@@ -191,22 +191,33 @@ def signal_handler(signum: int, frame) -> None:
     print(f"\n\nReceived {sig_name}, initiating graceful shutdown...")
 
     if _server_process is not None and _server_process.poll() is None:
-        print("Stopping vLLM server...")
+        print("Stopping vLLM server (this may take 30+ seconds for CUDA cleanup)...")
 
         # Send SIGTERM first for graceful shutdown
         _server_process.terminate()
 
         try:
-            # Wait for graceful shutdown
-            _server_process.wait(timeout=15)
-            print("Server stopped gracefully")
+            # vLLM needs significant time to clean up CUDA resources and process groups
+            # 60 seconds is usually sufficient for large models
+            for elapsed in range(60):
+                if _server_process.poll() is not None:
+                    print(f"Server stopped gracefully after {elapsed}s")
+                    break
+                if elapsed % 10 == 0 and elapsed > 0:
+                    print(f"  Still waiting for graceful shutdown... ({elapsed}s)")
+                time.sleep(1)
+            else:
+                # 60 seconds elapsed without exit
+                print("Server didn't stop after 60s, force killing...")
+                _server_process.kill()
+                try:
+                    _server_process.wait(timeout=10)
+                    print("Server force-killed successfully")
+                except subprocess.TimeoutExpired:
+                    print("Warning: Could not confirm process termination")
         except subprocess.TimeoutExpired:
-            print("Server didn't stop gracefully, force killing...")
+            print("Timeout waiting for server, force killing...")
             _server_process.kill()
-            try:
-                _server_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                print("Warning: Could not confirm process termination")
 
     # Clean up GPU memory
     cleanup_gpu_memory(verbose=True)
@@ -564,7 +575,7 @@ def load_config(config_path: str = None) -> dict:
         },
         "server": {
             "host": "0.0.0.0",
-            "port": 8080,
+            "port": 8002,  # Match .env VLLM_PORT for Somatic Node
         },
         "engine": {
             "enable_prefix_caching": True,

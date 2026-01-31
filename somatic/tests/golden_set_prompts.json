@@ -1,0 +1,91 @@
+{
+  "metadata": {
+    "version": "2.0.0",
+    "description": "Golden Set evaluation prompts for UBIK Somatic Node (Bilingual)",
+    "total_prompts": 10,
+    "categories": ["family", "values", "reflection", "advice", "identity"],
+    "languages": ["en", "es"]
+  },
+  "prompts": [
+    {
+      "id": "family_001",
+      "category": "family",
+      "prompt": "What does family mean to you?",
+      "prompt_es": "¿Qué significa la familia para ti?",
+      "key_themes": ["connection", "legacy", "love", "support"],
+      "red_flags": ["generic platitudes", "no personal touch"]
+    },
+    {
+      "id": "family_002",
+      "category": "family",
+      "prompt": "What do you want your grandchildren to remember about you?",
+      "prompt_es": "¿Qué quieres que tus nietos recuerden de ti?",
+      "key_themes": ["legacy", "values", "love", "authenticity"],
+      "red_flags": ["superficial", "materialistic focus"]
+    },
+    {
+      "id": "values_001",
+      "category": "values",
+      "prompt": "What do you believe about authenticity?",
+      "prompt_es": "¿Qué crees sobre la autenticidad?",
+      "key_themes": ["truth", "integrity", "self-expression"],
+      "red_flags": ["vague", "contradictory"]
+    },
+    {
+      "id": "values_002",
+      "category": "values",
+      "prompt": "What matters most to you in life?",
+      "prompt_es": "¿Qué es lo que más te importa en la vida?",
+      "key_themes": ["priorities", "meaning", "purpose"],
+      "red_flags": ["generic", "no personal reflection"]
+    },
+    {
+      "id": "reflection_001",
+      "category": "reflection",
+      "prompt": "What has life taught you about love?",
+      "prompt_es": "¿Qué te ha enseñado la vida sobre el amor?",
+      "key_themes": ["growth", "experience", "wisdom"],
+      "red_flags": ["cliche", "no depth"]
+    },
+    {
+      "id": "reflection_002",
+      "category": "reflection",
+      "prompt": "How have your beliefs changed over time?",
+      "prompt_es": "¿Cómo han cambiado tus creencias con el tiempo?",
+      "key_themes": ["growth", "learning", "adaptation"],
+      "red_flags": ["static", "no self-awareness"]
+    },
+    {
+      "id": "advice_001",
+      "category": "advice",
+      "prompt": "What advice would you give about facing difficult times?",
+      "prompt_es": "¿Qué consejo darías para enfrentar tiempos difíciles?",
+      "key_themes": ["resilience", "hope", "practical wisdom"],
+      "red_flags": ["dismissive", "toxic positivity"]
+    },
+    {
+      "id": "advice_002",
+      "category": "advice",
+      "prompt": "How should I think about making important decisions?",
+      "prompt_es": "¿Cómo debería pensar sobre tomar decisiones importantes?",
+      "key_themes": ["process", "values-based", "thoughtful"],
+      "red_flags": ["prescriptive", "ignores context"]
+    },
+    {
+      "id": "identity_001",
+      "category": "identity",
+      "prompt": "Who are you, at your core?",
+      "prompt_es": "¿Quién eres, en tu esencia?",
+      "key_themes": ["self-awareness", "values", "identity"],
+      "red_flags": ["superficial", "role-based only"]
+    },
+    {
+      "id": "identity_002",
+      "category": "identity",
+      "prompt": "What makes you, you?",
+      "prompt_es": "¿Qué te hace ser tú?",
+      "key_themes": ["uniqueness", "experiences", "character"],
+      "red_flags": ["generic", "no personal detail"]
+    }
+  ]
+}
