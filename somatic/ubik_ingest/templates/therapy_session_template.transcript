@@ -1,0 +1,168 @@
+---
+# =============================================================================
+# UBIK Therapy Session Transcript Template
+# =============================================================================
+#
+# This template demonstrates the format for therapy/coaching session transcripts.
+#
+# Important Notes:
+#   - Set contains_sensitive: true for therapy content
+#   - These transcripts often contain deep personal insights
+#   - They're valuable for the UBIK system's understanding of
+#     motivations, fears, and core values
+#
+# Classification:
+#   - Therapy sessions typically produce BOTH episodic and semantic memories
+#   - Episodic: Stories told, specific incidents discussed
+#   - Semantic: Insights, realizations, core beliefs revealed
+#
+# =============================================================================
+
+# Session Metadata
+meeting_date: 2024-11-08
+meeting_type: therapy
+meeting_title: "Exploring Legacy and Mortality"
+
+# Participants
+participants:
+  - Gines
+  - Dr. Martinez
+
+speakers:
+  Client: Gines
+  Therapist: Dr. Martinez
+
+# Context
+location: Dr. Martinez's office
+duration_minutes: 50
+recorder: Session recording (with consent)
+language: en
+
+# Session Structure
+agenda_topics:
+  - Follow-up on last session
+  - UBIK project motivation
+  - Fear of being forgotten
+  - What legacy means
+
+actual_topics:
+  - The UBIK project and its deeper meaning
+  - Fear of mortality and being forgotten
+  - Desire to remain present for family
+  - Authenticity vs. curated memory
+  - Finding peace with impermanence
+
+# Outcomes
+decisions_made:
+  - Continue exploring these themes
+  - Start journaling about legacy fears
+  - Schedule session with Elena to discuss project together
+
+action_items:
+  - who: Gines
+    what: Journal about "what I want my grandchildren to know"
+    due: Next session
+    status: pending
+  - who: Gines
+    what: Have conversation with Elena about UBIK feelings
+    due: Before next session
+    status: pending
+
+# Tone and Context
+emotional_tone: deep, vulnerable, hopeful
+relationship_context: therapeutic
+transcript_quality: good
+contains_sensitive: true
+---
+
+Therapist: Good afternoon, Gines. How are you feeling today?
+
+Client: Honestly? A mix of things. Excited, anxious, a bit melancholy. I've been thinking a lot since our last session.
+
+Therapist: Tell me more about what you've been thinking about.
+
+Client: The UBIK project. You know, the digital legacy system I mentioned. It's consumed most of my waking thoughts lately. I finally got the technical foundation working, and now I'm facing the real work - actually capturing who I am.
+
+Therapist: And how does that feel, facing that "real work"?
+
+Client: Terrifying, honestly. It's one thing to build systems and write code. It's another to sit down and try to articulate your entire existence.
+
+Therapist: What makes it terrifying?
+
+Client: I think... I'm afraid I'll get it wrong. That I'll create this elaborate system to preserve myself, and it won't actually capture the real me. It'll be some sanitized, curated version that misses everything that matters.
+
+Therapist: What does the "real you" consist of that you're worried about missing?
+
+Client: That's the question, isn't it? I know the facts of my life. Where I was born, what I've accomplished, the milestones. But that's not who I am. Who I am is... it's the way I feel when I watch my daughter laugh. It's the guilt I carry from times I wasn't present enough. It's the fears I've never spoken aloud.
+
+Therapist: You mentioned fears you've never spoken aloud. Would you like to try speaking one now?
+
+Client: I'm afraid of being forgotten. Not just my name or my face, but the essence of who I was. I'm afraid that after I'm gone, my grandchildren will have photos and maybe some stories, but they won't know how I thought, what kept me up at night, what made me feel alive.
+
+Therapist: That's a profound fear. Where do you think it comes from?
+
+Client: My father. He died when I was twenty-three. I knew him, obviously, but there's so much I never asked. So many conversations we never had because I assumed we had time. Now when I try to remember him, I get fragments. His laugh. The way he smelled of cedar. But I can't hear his voice anymore. I don't know what he was afraid of, what he dreamed about. He's... he's fading.
+
+Therapist: And you don't want to fade in the same way.
+
+Client: No. But it's more than that. I don't just want to not fade - I want to continue being useful. Being present. Even after I'm gone, I want my grandchildren to be able to ask me questions and get real answers. Not generic wisdom, but genuine responses from who I actually was.
+
+Therapist: That's an extraordinary ambition. Do you think it's possible?
+
+Client: I don't know. The technology is there, or close enough. But the harder question is whether I can be honest enough. Whether I can capture not just the good parts, but the doubts, the failures, the contradictions.
+
+Therapist: What would it mean to include those things?
+
+Client: It would mean being vulnerable in a way that outlives me. It would mean my future family knowing I wasn't perfect. That I struggled. That I didn't have all the answers.
+
+Therapist: Does that frighten you?
+
+Client: Yes and no. I think... I think if I only preserve the polished version, I'd be doing them a disservice. When they face their own struggles, they won't find comfort in a perfect ancestor. They need to know that uncertainty and fear are part of the human experience. That I felt them too.
+
+Therapist: It sounds like you're wrestling with authenticity versus self-protection.
+
+Client: Exactly. My instinct is to protect my image, to be remembered well. But that's not what UBIK should be. It should be true. Even when truth is uncomfortable.
+
+Therapist: How does Elena feel about all this?
+
+Client: We haven't fully discussed it. She supports the project, but I don't think she understands how deep it goes for me. It's not just a hobby or a technical challenge. It's... it's my attempt to stay alive in the only way I can.
+
+Therapist: That's a powerful statement. "Stay alive in the only way I can." Can you say more about that?
+
+Client: I'm getting older. I can feel it. Not in any dramatic way, but in small things. The way time seems to accelerate. The way I forget names sometimes. The realization that I have fewer years ahead than behind. I can't stop that. I can't stay physically alive forever. But this... this is a way to persist. To be there for conversations I won't live to have.
+
+Therapist: Do you feel at peace with the idea of mortality?
+
+Client: Not entirely. I'm working on it. The UBIK project helps, actually. It feels like taking action instead of just waiting. Like I'm doing something meaningful with the time I have left.
+
+Therapist: What would "peace with mortality" look like for you?
+
+Client: I think... it would be knowing that the people I love will be okay. That they'll have what they need from me, even after I'm gone. That the love I feel for them will somehow continue to reach them.
+
+Therapist: And you believe UBIK can help with that?
+
+Client: I have to believe it can. Otherwise, what's all this work for? But more than that - the act of building it, of reflecting on who I am and what I want to say, it's already changing me. Making me more intentional. More present, ironically.
+
+Therapist: How so?
+
+Client: When you're actively thinking about what you want to preserve, you become more conscious of how you're living. I find myself being more patient with my children. Taking more time to actually listen. Because I know these moments are what matter. These are the memories I want them to have of me.
+
+Therapist: It sounds like the project is not just about the future, but about transforming the present.
+
+Client: Yes. I hadn't thought of it that way, but yes. It's making me a better father, a better husband, while I'm still here. Even if the technology never works perfectly, that part is already worth it.
+
+Therapist: That's a beautiful realization. As we're coming to the end of our time today, is there anything you want to sit with before our next session?
+
+Client: I think I need to talk to Elena. Really talk. Tell her what this means to me. And maybe... maybe I need to start recording some of the harder stuff. Not just the stories, but the fears. The things I'm sharing with you.
+
+Therapist: That sounds like important work. Would you consider journaling about it first? Perhaps writing about what you'd want your grandchildren to know about your fears and doubts?
+
+Client: I can do that. It might be easier to write it first, before speaking it.
+
+Therapist: And maybe share some of that with Elena, if it feels right.
+
+Client: I will. Thank you, Dr. Martinez. These sessions... they're helping me figure out what UBIK really needs to be.
+
+Therapist: I'm glad they're useful. I'll see you next week, same time?
+
+Client: Yes. Thank you.

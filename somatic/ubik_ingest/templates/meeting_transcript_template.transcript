@@ -1,0 +1,239 @@
+---
+# =============================================================================
+# UBIK Family Meeting Transcript Template
+# =============================================================================
+#
+# This template demonstrates the full format for family meeting transcripts.
+#
+# YAML Front Matter Requirements:
+#   - meeting_date: ISO format (YYYY-MM-DD) or "Month DD, YYYY"
+#   - meeting_type: family_meeting, therapy, conversation, interview
+#   - participants: List of all people present
+#   - speakers: Mapping from transcript labels to actual names
+#   - All other fields are optional but recommended
+#
+# Transcript Body Formats (after closing ---):
+#   * Otter.ai: "Speaker 1  0:00\ntext"
+#   * Standard: "Name: text"
+#   * Markdown: "**Name**: text"
+#
+# =============================================================================
+
+# Meeting Metadata
+meeting_date: 2024-12-15
+meeting_type: family_meeting
+meeting_title: "Holiday Planning & Family Updates"
+
+# Participants and Speaker Mapping
+participants:
+  - Gines
+  - Elena
+  - Adrian
+  - Sofia
+
+speakers:
+  Speaker 1: Gines
+  Speaker 2: Elena
+  Speaker 3: Adrian
+  Speaker 4: Sofia
+
+# Context
+location: Living room, family home
+duration_minutes: 45
+recorder: Adrian
+language: en
+
+# Meeting Structure
+agenda_topics:
+  - Holiday travel plans
+  - College application updates
+  - UBIK project status
+  - Family calendar coordination
+
+actual_topics:
+  - Holiday travel to Lake House
+  - Sofia's early admission results
+  - Dad's digital legacy project
+  - Spring break planning
+
+# Outcomes
+decisions_made:
+  - Travel to Lake House December 23-27
+  - Host New Year's Eve dinner at home
+  - Support Sofia's gap semester idea
+  - Schedule monthly UBIK recording sessions
+
+action_items:
+  - who: Elena
+    what: Book Lake House and coordinate with Maria
+    due: December 18
+    status: pending
+  - who: Adrian
+    what: Set up recording equipment for UBIK sessions
+    due: December 20
+    status: pending
+  - who: Sofia
+    what: Research gap semester programs
+    due: January 15
+    status: pending
+  - who: Gines
+    what: Prepare first UBIK session topics
+    due: December 22
+    status: pending
+
+# Tone and Context
+emotional_tone: warm, optimistic
+relationship_context: immediate family
+transcript_quality: good
+contains_sensitive: false
+---
+
+Speaker 1  0:00
+Alright everyone, thanks for making time for this. I know we're all busy with the holidays coming up, but I wanted to make sure we're all on the same page about a few things.
+
+Speaker 2  0:12
+Of course. Should we start with the holiday plans? That's probably the most time-sensitive.
+
+Speaker 1  0:18
+Good idea. So, I talked to your Aunt Maria yesterday, and she's confirmed the Lake House is available from the 23rd through the 27th. What does everyone think?
+
+Speaker 3  0:30
+That works for me. I can drive up on the 23rd after my last final.
+
+Speaker 4  0:35
+Same here. I'm done with exams on the 21st, so I'm flexible. Actually, Dad, can I bring Maya? Her family is traveling and she'd be alone otherwise.
+
+Speaker 1  0:45
+Of course, mija. Maya is always welcome. Elena?
+
+Speaker 2  0:50
+That's perfect. I'll coordinate with Maria on the food. She mentioned wanting to do Christmas Eve dinner together, the whole extended family.
+
+Speaker 1  1:02
+Wonderful. Now, Sofia, I know you've been stressed about college decisions. Any updates you want to share?
+
+Speaker 4  1:10
+Actually, yes. I got my early admission letter from Berkeley yesterday.
+
+Speaker 2  1:15
+What?! Sofia! Why didn't you tell us immediately?
+
+Speaker 4  1:20
+I wanted to wait until we were all together. I got in, Mom. Full scholarship to the engineering program.
+
+Speaker 1  1:28
+That's incredible! I'm so proud of you. Come here.
+
+Speaker 3  1:35
+Congrats, sis. Though I'm now officially the underachieving sibling.
+
+Speaker 4  1:40
+Shut up, you're at Stanford. But actually, there's something else. I've been thinking about taking a gap semester first. Maybe doing some volunteer work abroad.
+
+Speaker 2  1:52
+A gap semester? That's... unexpected. What brought this on?
+
+Speaker 4  2:00
+I don't know, I just feel like I've been on this conveyor belt my whole life. School, activities, college apps. I want to actually experience something before diving into another four years.
+
+Speaker 1  2:12
+I think that's a very mature perspective. When I was your age, I wish I had taken time to explore before making big decisions.
+
+Speaker 2  2:22
+We should discuss this more, but I'm open to it. As long as you have a real plan, not just "traveling around."
+
+Speaker 4  2:30
+I'm looking at some structured programs. Engineers Without Borders has a semester in Peru that looks amazing.
+
+Speaker 1  2:38
+Research it properly and present us with a real proposal. We'll support whatever you decide.
+
+Speaker 3  2:45
+Speaking of projects, Dad, how's the UBIK thing going? You mentioned you were making progress.
+
+Speaker 1  2:52
+Ah, yes. Good transition. So, I've been working with Adrian on setting up the technical infrastructure. We have the memory system running, the transcription working. Now I need to actually start recording content.
+
+Speaker 2  3:08
+The stories and values you want to preserve?
+
+Speaker 1  3:12
+Exactly. I was thinking we could do regular recording sessions. Maybe once a month, I tell a story or discuss a topic, and we capture it all for the system.
+
+Speaker 3  3:25
+I can help with the technical side. Set up proper audio, maybe even video if you want.
+
+Speaker 1  3:32
+That would be wonderful. I want you all involved in this, actually. Not just as technical support, but as participants. There are family stories I only know parts of. Your grandmother's journey here, how your mother and I met, those are memories that belong to all of us.
+
+Speaker 2  3:50
+I'd like that. There's so much I never asked my parents before it was too late.
+
+Speaker 1  4:00
+That's exactly why I'm doing this. I don't want you kids to have those same regrets. And I want Sofia and Marco's children to know who we were, not just from photos but from our actual voices, our actual thoughts.
+
+Speaker 4  4:15
+It's kind of beautiful, Dad. Like a time capsule but alive.
+
+Speaker 1  4:22
+That's exactly what it is. A living time capsule. So, can we commit to a first session over the holidays? Maybe the day after Christmas?
+
+Speaker 3  4:32
+I'll have everything set up by then.
+
+Speaker 2  4:35
+What topic do you want to start with?
+
+Speaker 1  4:40
+I was thinking about how our family came to this country. The story of your great-grandparents. It's the foundation of everything we are.
+
+Speaker 4  4:50
+I'd love to hear that. I only know bits and pieces.
+
+Speaker 1  4:55
+Then it's settled. December 26th, we do our first official UBIK family recording session.
+
+Speaker 2  5:02
+Should we talk about New Year's Eve while we're at it?
+
+Speaker 1  5:06
+Good point. I was thinking we host everyone here. Keep it intimate, just family and close friends.
+
+Speaker 3  5:15
+Works for me. I can set up some music and stuff.
+
+Speaker 2  5:18
+I'll handle the food. Sofia, will Maya still be with us?
+
+Speaker 4  5:22
+Probably, yeah. Her parents don't get back until the 3rd.
+
+Speaker 1  5:28
+Perfect. Alright, I think we've covered everything on the agenda. Anything else anyone wants to bring up?
+
+Speaker 3  5:35
+One quick thing - Spring break. Some friends are planning a ski trip to Colorado. Can I go?
+
+Speaker 2  5:42
+When is it exactly?
+
+Speaker 3  5:45
+March 15th to 22nd. It's during Stanford's break.
+
+Speaker 1  5:50
+We don't have any conflicts that I know of. As long as it's with responsible people and you're safe.
+
+Speaker 2  5:58
+Let's talk details later, but preliminary yes.
+
+Speaker 1  6:02
+Alright everyone. Good meeting. I love you all. Now let's order some pizza.
+
+Speaker 4  6:08
+Finally! I'm starving.
+
+Speaker 2  6:10
+I'll order from Antonio's. Everyone want the usual?
+
+Speaker 3  6:15
+Yes please!
