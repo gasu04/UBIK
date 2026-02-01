@@ -162,13 +162,16 @@ class DatabaseManager:
         connection pooling. The client is reused across requests.
         """
         if self._chroma_client is None:
+            chroma_token = os.getenv("CHROMADB_TOKEN", "")
             self._chroma_client = chromadb.HttpClient(
                 host=os.getenv("CHROMADB_HOST", "localhost"),
                 port=int(os.getenv("CHROMADB_PORT", 8001)),
-                headers={"Authorization": f"Bearer {os.getenv('CHROMADB_TOKEN', '')}"},
                 settings=chromadb.Settings(
                     anonymized_telemetry=False,
                     chroma_client_auth_provider="chromadb.auth.token_authn.TokenAuthClientProvider",
+                    chroma_client_auth_credentials=chroma_token,
+                ) if chroma_token else chromadb.Settings(
+                    anonymized_telemetry=False,
                 )
             )
             logger.info(
