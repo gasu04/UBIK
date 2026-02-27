@@ -8,18 +8,18 @@
 #
 # Works on both nodes:
 #   Hippocampal  macOS   arm64   venv at {UBIK_ROOT}/hippocampal/venv
-#   Somatic      Linux   x86_64  conda env  pytorch_env
+#   Somatic      Linux   x86_64  venv at {UBIK_ROOT}/venv
 #
 # Usage:
 #   cd {UBIK_ROOT}
 #   bash maestro/setup_maestro.sh
 #
 # Environment overrides (all optional):
-#   UBIK_ROOT            Override default project root path
-#   UBIK_NODE_TYPE       Force "hippocampal" or "somatic" (skip auto-detect)
+#   UBIK_ROOT              Override default project root path
+#   UBIK_NODE_TYPE         Force "hippocampal" or "somatic" (skip auto-detect)
 #   HIPPOCAMPAL_VENV_PATH  Override venv directory on Hippocampal
-#   SOMATIC_CONDA_ENV    Override conda environment name on Somatic
-#   MAESTRO_LOG_DIR      Override log directory
+#   SOMATIC_VENV_PATH      Override venv directory on Somatic
+#   MAESTRO_LOG_DIR        Override log directory
 # =============================================================================
 
 set -euo pipefail
@@ -132,21 +132,22 @@ if [[ "$NODE_TYPE" == "hippocampal" ]]; then
     _run_python() { "$PYTHON_BIN" "$@"; }
 
 else
-    CONDA_ENV="${SOMATIC_CONDA_ENV:-pytorch_env}"
-
-    # Verify conda is available
-    if ! command -v conda &>/dev/null; then
-        _red "  ERROR: conda not found in PATH."
-        _yellow "  Source conda init or set CONDA_EXE before running."
+    VENV_PATH="${SOMATIC_VENV_PATH:-$UBIK_ROOT/venv}"
+    if [[ ! -d "$VENV_PATH" ]]; then
+        _red "  ERROR: venv not found: $VENV_PATH"
+        _yellow "  Create it with: python3 -m venv $VENV_PATH"
+        _yellow "  Or set SOMATIC_VENV_PATH to an existing virtualenv."
         exit 1
     fi
+    PYTHON_BIN="$VENV_PATH/bin/python"
+    PIP_BIN="$VENV_PATH/bin/pip"
 
-    echo "  conda env : $CONDA_ENV"
+    echo "  venv      : $VENV_PATH"
     echo "  Installing requirements …"
-    conda run -n "$CONDA_ENV" pip install --quiet --upgrade pip
-    conda run -n "$CONDA_ENV" pip install --quiet -r "$REQUIREMENTS"
+    "$PIP_BIN" install --quiet --upgrade pip
+    "$PIP_BIN" install --quiet -r "$REQUIREMENTS"
 
-    _run_python() { conda run -n "$CONDA_ENV" python "$@"; }
+    _run_python() { "$PYTHON_BIN" "$@"; }
 fi
 
 _green "  Dependencies installed."
@@ -262,7 +263,7 @@ if [[ "$NODE_TYPE" == "hippocampal" ]]; then
     ALIAS_PYTHON="\"$VENV_PATH/bin/python\""
     SHELL_RC="$HOME/.zshrc"
 else
-    ALIAS_PYTHON="conda run -n $CONDA_ENV python"
+    ALIAS_PYTHON="\"$VENV_PATH/bin/python\""
     SHELL_RC="$HOME/.bashrc"
 fi
 

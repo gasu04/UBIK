@@ -23,7 +23,7 @@ Maestro monitors, starts, and shuts down services across the two-node cluster â€
 | Node | OS | Python |
 |------|----|--------|
 | Hippocampal | macOS (arm64) | venv at `{UBIK_ROOT}/hippocampal/venv` |
-| Somatic | Linux / WSL2 (x86_64) | conda env `pytorch_env` |
+| Somatic | Linux / WSL2 (x86_64) | venv at `{UBIK_ROOT}/venv` |
 
 ### Deploy (run on each node)
 
@@ -50,7 +50,7 @@ source ~/.zshrc
 
 **Somatic (WSL2, bash):**
 ```bash
-echo "alias maestro='cd /home/gasu/ubik && conda run -n pytorch_env python -m maestro'" >> ~/.bashrc
+echo "alias maestro='cd /home/gasu/ubik && \"/home/gasu/ubik/venv/bin/python\" -m maestro'" >> ~/.bashrc
 source ~/.bashrc
 ```
 
@@ -414,17 +414,21 @@ HIPPOCAMPAL_VENV_PATH=/path/to/other/venv bash maestro/setup_maestro.sh
 
 ---
 
-### conda not found (Somatic)
+### venv not found (Somatic)
 
 ```
-ERROR: conda not found in PATH.
+ERROR: venv not found: /home/gasu/ubik/venv
 ```
 
-Source conda init or activate the base environment first:
+Create the virtualenv first:
 ```bash
-source ~/miniconda3/etc/profile.d/conda.sh
-conda activate base
+python3 -m venv /home/gasu/ubik/venv
 bash maestro/setup_maestro.sh
+```
+
+Or point to an existing venv:
+```bash
+SOMATIC_VENV_PATH=/path/to/your/venv bash maestro/setup_maestro.sh
 ```
 
 ---
@@ -467,14 +471,14 @@ cd "/Volumes/990PRO 4T/UBIK" && python -m maestro start --timeout 120
 
 ### `python -m maestro` not found / wrong Python
 
-Make sure you're using the venv Python (Hippocampal) or conda Python (Somatic):
+Make sure you're using the venv Python on both nodes:
 
 ```bash
 # Hippocampal
 "/Volumes/990PRO 4T/UBIK/hippocampal/venv/bin/python" -m maestro status
 
 # Somatic
-conda run -n pytorch_env python -m maestro status
+/home/gasu/ubik/venv/bin/python -m maestro status
 ```
 
 Or use the shell alias added by `setup_maestro.sh`.

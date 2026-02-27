@@ -131,7 +131,7 @@ async def check_chromadb(
                     details=details,
                     error=(
                         f"Missing collections: {missing} "
-                        "— run setup_chromadb.py"
+                        "-- run setup_chromadb.py"
                     ),
                 )
 
