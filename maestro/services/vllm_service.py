@@ -6,20 +6,24 @@ Probes and manages the vLLM inference server on the Somatic node.
 
 probe:  HTTP GET to ``http://{host}:8002/health`` — 200 means the server
         process is accepting requests.
-start:  Launches ``conda run -n pytorch_env vllm serve <model_path>
-        --port 8002`` detached in a new session, then waits for a healthy
-        probe.  Model loading can take several minutes, so max_wait_s=120s.
+start:  Launches vllm serve in the configured Python environment. Supports
+        both conda environments and standard venvs:
+        - Conda: ``conda run -n pytorch_env vllm serve ...``
+        - Venv:  ``bash -c "source venv/bin/activate && vllm serve ..."``
+        Model loading can take several minutes, so max_wait_s=120s.
 stop:   SIGTERM to whatever process is listening on port 8002.
 
 vLLM runs ONLY on the Somatic node.  Never call start() on the
 Hippocampal node.
 
 Author: UBIK Project
-Version: 0.2.0
+Version: 0.3.0
 """
 
 import asyncio
 import logging
+import os
+import shutil
 import time
 from pathlib import Path
 from typing import Optional
@@ -36,8 +40,62 @@ _DEFAULT_CONDA_ENV = "pytorch_env"
 _DEFAULT_MAX_WAIT_S = 120.0
 
 
+def _find_conda() -> Optional[str]:
+    """Locate the conda executable.
+
+    Checks CONDA_EXE, PATH, then common installation locations.
+
+    Returns:
+        Path to conda executable, or None if not found.
+    """
+    conda_exe = os.environ.get("CONDA_EXE")
+    if conda_exe and Path(conda_exe).exists():
+        return conda_exe
+
+    if shutil.which("conda"):
+        return "conda"
+
+    candidates = [
+        Path.home() / "miniconda3" / "bin" / "conda",
+        Path.home() / "anaconda3" / "bin" / "conda",
+        Path.home() / "opt" / "miniconda3" / "bin" / "conda",
+        Path.home() / "opt" / "anaconda3" / "bin" / "conda",
+        Path("/opt/conda/bin/conda"),
+        Path("/usr/local/conda/bin/conda"),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return str(candidate)
+
+    return None
+
+
+def _detect_venv_path() -> Optional[Path]:
+    """Detect active virtualenv from VIRTUAL_ENV environment variable.
+
+    Returns:
+        Path to the venv directory, or None if not in a venv.
+    """
+    venv = os.environ.get("VIRTUAL_ENV")
+    if venv:
+        path = Path(venv)
+        if path.exists() and (path / "bin" / "activate").exists():
+            return path
+    return None
+
+
 class VllmService(UbikService):
-    """vLLM server health probe and lifecycle manager."""
+    """vLLM server health probe and lifecycle manager.
+
+    Supports two Python environment types:
+      - **Conda**: Uses ``conda run -n <env> vllm serve ...``
+      - **Venv**: Uses ``bash -c "source <path>/bin/activate && vllm serve ..."``
+
+    Environment selection priority:
+      1. Explicit ``venv_path`` parameter
+      2. ``VIRTUAL_ENV`` environment variable (auto-detected)
+      3. Conda with ``conda_env`` name (requires conda to be installed)
+    """
 
     def __init__(
         self,
@@ -45,6 +103,7 @@ class VllmService(UbikService):
         port: int = _DEFAULT_PORT,
         model_path: Optional[str] = None,
         conda_env: str = _DEFAULT_CONDA_ENV,
+        venv_path: Optional[Path] = None,
         max_wait_s: float = _DEFAULT_MAX_WAIT_S,
     ) -> None:
         if model_path is None:
@@ -53,6 +112,7 @@ class VllmService(UbikService):
         self._port = port
         self._model_path = model_path
         self._conda_env = conda_env
+        self._venv_path = venv_path
         self._max_wait_s = max_wait_s
 
     @property
@@ -114,10 +174,9 @@ class VllmService(UbikService):
         Pre-flight checks:
           - Verifies this is the Somatic node.
 
-        Starts ``conda run -n <env> vllm serve <model_path> --port <port>``
-        in a new process session (detached), then polls ``probe()`` every
-        3 seconds until the server is healthy or ``max_wait_s`` is exceeded.
-        Model loading typically takes 60-120 seconds.
+        Starts vLLM in the appropriate Python environment (venv or conda),
+        then polls ``probe()`` every 3 seconds until the server is healthy
+        or ``max_wait_s`` is exceeded. Model loading typically takes 60-120s.
 
         Args:
             ubik_root: Unused; present for interface consistency.
@@ -136,19 +195,48 @@ class VllmService(UbikService):
             )
             return False
 
-        logger.info(
-            "vllm: launching vllm serve %s --port %d (conda env: %s)",
-            self._model_path, self._port, self._conda_env,
-        )
+        # Determine which environment to use: venv or conda
+        venv_path = self._venv_path or _detect_venv_path()
+        conda = _find_conda()
+
         try:
-            await asyncio.create_subprocess_exec(
-                "conda", "run", "-n", self._conda_env,
-                "vllm", "serve", self._model_path,
-                "--port", str(self._port),
-                stdout=asyncio.subprocess.DEVNULL,
-                stderr=asyncio.subprocess.DEVNULL,
-                start_new_session=True,
-            )
+            if venv_path:
+                # Use standard virtualenv
+                activate = venv_path / "bin" / "activate"
+                cmd = (
+                    f"source {activate} && "
+                    f"vllm serve {self._model_path} --port {self._port}"
+                )
+                logger.info(
+                    "vllm: launching vllm serve %s --port %d (venv: %s)",
+                    self._model_path, self._port, venv_path,
+                )
+                await asyncio.create_subprocess_exec(
+                    "bash", "-c", cmd,
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            elif conda:
+                # Use conda environment
+                logger.info(
+                    "vllm: launching vllm serve %s --port %d (conda env: %s)",
+                    self._model_path, self._port, self._conda_env,
+                )
+                await asyncio.create_subprocess_exec(
+                    conda, "run", "-n", self._conda_env,
+                    "vllm", "serve", self._model_path,
+                    "--port", str(self._port),
+                    stdout=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+            else:
+                logger.error(
+                    "vllm: no Python environment available "
+                    "(neither venv nor conda found)"
+                )
+                return False
         except Exception as exc:
             logger.warning("vllm: start command failed: %s", exc)
             return False
