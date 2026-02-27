@@ -10,19 +10,23 @@ start:  Launches vllm serve in the configured Python environment. Supports
         both conda environments and standard venvs:
         - Conda: ``conda run -n pytorch_env vllm serve ...``
         - Venv:  ``bash -c "source venv/bin/activate && vllm serve ..."``
-        Model loading can take several minutes, so max_wait_s=120s.
+        Flags are read from config/models/vllm_config.yaml (dtype, quantization,
+        gpu_memory_utilization, etc.). RTX 5090 / Blackwell env vars are set
+        automatically (VLLM_FLASH_ATTN_VERSION=2, etc.).
+        Model loading typically takes 30-120s, so max_wait_s=120s.
 stop:   SIGTERM to whatever process is listening on port 8002.
 
 vLLM runs ONLY on the Somatic node.  Never call start() on the
 Hippocampal node.
 
 Author: UBIK Project
-Version: 0.3.0
+Version: 0.4.0
 """
 
 import asyncio
 import logging
 import os
+import shlex
 import shutil
 import time
 from pathlib import Path
@@ -71,17 +75,120 @@ def _find_conda() -> Optional[str]:
 
 
 def _detect_venv_path() -> Optional[Path]:
-    """Detect active virtualenv from VIRTUAL_ENV environment variable.
+    """Locate the Python venv that has vLLM installed.
+
+    Resolution order:
+      1. ``VLLM_VENV_PATH`` environment variable (explicit override).
+      2. Known somatic ML venv candidates (e.g. ``~/pytorch_env``).
+      3. ``VIRTUAL_ENV`` environment variable — skipped if the venv does
+         not contain a ``vllm`` binary (avoids picking up the maestro
+         management venv which does not run inference workloads).
 
     Returns:
-        Path to the venv directory, or None if not in a venv.
+        Path to the venv directory, or None if no suitable venv is found.
     """
+    # 1. Explicit override
+    explicit = os.environ.get("VLLM_VENV_PATH")
+    if explicit:
+        path = Path(explicit)
+        if path.exists() and (path / "bin" / "activate").exists():
+            return path
+
+    # 2. Known somatic ML venv candidates (preferred over VIRTUAL_ENV)
+    candidates = [
+        Path.home() / "pytorch_env",
+        Path("/home/gasu/pytorch_env"),
+    ]
+    for candidate in candidates:
+        if (
+            candidate.exists()
+            and (candidate / "bin" / "activate").exists()
+            and (candidate / "bin" / "vllm").exists()
+        ):
+            return candidate
+
+    # 3. Fall back to VIRTUAL_ENV only if that venv has vllm
     venv = os.environ.get("VIRTUAL_ENV")
     if venv:
         path = Path(venv)
-        if path.exists() and (path / "bin" / "activate").exists():
+        if (
+            path.exists()
+            and (path / "bin" / "activate").exists()
+            and (path / "bin" / "vllm").exists()
+        ):
             return path
+
     return None
+
+
+def _build_vllm_serve_args(ubik_root: Path) -> list[str]:
+    """Build extra CLI flags for ``vllm serve`` from vllm_config.yaml.
+
+    Reads ``{ubik_root}/config/models/vllm_config.yaml`` and returns a list
+    of argument strings suitable for appending to the ``vllm serve`` command.
+    Falls back to hardcoded defaults matching the DeepSeek-R1 AWQ model when
+    the config file is absent or unreadable.
+
+    Args:
+        ubik_root: Absolute path to the UBIK project root on this node.
+
+    Returns:
+        List of CLI argument strings (e.g. ``["--dtype", "float16", ...]``).
+    """
+    model_cfg: dict = {
+        "dtype": "float16",
+        "quantization": "awq_marlin",
+        "tensor_parallel_size": 1,
+        "gpu_memory_utilization": 0.90,
+        "max_model_len": 98304,
+        "trust_remote_code": True,
+    }
+    engine_cfg: dict = {
+        "enable_prefix_caching": True,
+        "enable_chunked_prefill": True,
+        "max_num_seqs": 128,
+    }
+
+    config_path = ubik_root / "config" / "models" / "vllm_config.yaml"
+    if config_path.exists():
+        try:
+            import yaml
+            with open(config_path, encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+            model_cfg.update(raw.get("model", {}))
+            engine_cfg.update(raw.get("engine", {}))
+        except Exception as exc:
+            logger.warning(
+                "vllm: failed to read %s: %s — using defaults", config_path, exc
+            )
+
+    flags: list[str] = [
+        "--host", "0.0.0.0",
+        "--dtype", str(model_cfg["dtype"]),
+        "--tensor-parallel-size", str(int(model_cfg["tensor_parallel_size"])),
+        "--gpu-memory-utilization", str(float(model_cfg["gpu_memory_utilization"])),
+        "--max-model-len", str(int(model_cfg["max_model_len"])),
+        "--max-num-seqs", str(int(engine_cfg["max_num_seqs"])),
+    ]
+    if model_cfg.get("quantization"):
+        flags += ["--quantization", str(model_cfg["quantization"])]
+    if model_cfg.get("trust_remote_code"):
+        flags.append("--trust-remote-code")
+    if engine_cfg.get("enable_prefix_caching"):
+        flags.append("--enable-prefix-caching")
+    if engine_cfg.get("enable_chunked_prefill"):
+        flags.append("--enable-chunked-prefill")
+
+    return flags
+
+
+# Environment variables required for RTX 5090 / Blackwell (SM120) compatibility.
+# FA3 does not yet support SM120; FA2 must be forced.
+_BLACKWELL_ENV: dict[str, str] = {
+    "VLLM_FLASH_ATTN_VERSION": "2",
+    "PYTORCH_ALLOC_CONF": "expandable_segments:True",
+    "CUDA_MODULE_LOADING": "LAZY",
+}
 
 
 class VllmService(UbikService):
@@ -175,11 +282,14 @@ class VllmService(UbikService):
           - Verifies this is the Somatic node.
 
         Starts vLLM in the appropriate Python environment (venv or conda),
-        then polls ``probe()`` every 3 seconds until the server is healthy
-        or ``max_wait_s`` is exceeded. Model loading typically takes 60-120s.
+        passing the full set of model/engine flags from vllm_config.yaml and
+        setting RTX 5090 / Blackwell compatibility environment variables.
+        Polls ``probe()`` every 3 seconds until the server is healthy or
+        ``max_wait_s`` is exceeded. Model loading typically takes 30-120s.
 
         Args:
-            ubik_root: Unused; present for interface consistency.
+            ubik_root: Path to the UBIK project root; used to locate
+                ``config/models/vllm_config.yaml``.
 
         Returns:
             ``True`` when vLLM is confirmed healthy; ``False`` on error or
@@ -195,6 +305,14 @@ class VllmService(UbikService):
             )
             return False
 
+        # Build model/engine flags from config (with AWQ-safe defaults)
+        extra_flags = _build_vllm_serve_args(ubik_root)
+
+        # Subprocess environment: inherit current env, then overlay Blackwell vars
+        env = dict(os.environ)
+        for key, val in _BLACKWELL_ENV.items():
+            env.setdefault(key, val)
+
         # Determine which environment to use: venv or conda
         venv_path = self._venv_path or _detect_venv_path()
         conda = _find_conda()
@@ -203,16 +321,19 @@ class VllmService(UbikService):
             if venv_path:
                 # Use standard virtualenv
                 activate = venv_path / "bin" / "activate"
-                cmd = (
-                    f"source {activate} && "
-                    f"vllm serve {self._model_path} --port {self._port}"
-                )
+                vllm_cmd = shlex.join([
+                    "vllm", "serve", self._model_path,
+                    "--port", str(self._port),
+                    *extra_flags,
+                ])
+                cmd = f"source {shlex.quote(str(activate))} && {vllm_cmd}"
                 logger.info(
                     "vllm: launching vllm serve %s --port %d (venv: %s)",
                     self._model_path, self._port, venv_path,
                 )
                 await asyncio.create_subprocess_exec(
                     "bash", "-c", cmd,
+                    env=env,
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                     start_new_session=True,
@@ -227,6 +348,8 @@ class VllmService(UbikService):
                     conda, "run", "-n", self._conda_env,
                     "vllm", "serve", self._model_path,
                     "--port", str(self._port),
+                    *extra_flags,
+                    env=env,
                     stdout=asyncio.subprocess.DEVNULL,
                     stderr=asyncio.subprocess.DEVNULL,
                     start_new_session=True,
