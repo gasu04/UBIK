@@ -82,16 +82,20 @@ _LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
 def _cluster_exit_code(cluster: ClusterHealth) -> int:
     """Map cluster overall status to a shell exit code.
 
-    Task spec: 0 = all healthy, 1 = some services down, 2 = errors.
-    This function covers the first two cases; callers use 2 for exceptions.
-
     Args:
         cluster: Aggregated health snapshot.
 
     Returns:
-        0 when overall status is HEALTHY; 1 otherwise.
+        0 when all services are HEALTHY.
+        1 when at least one service is DEGRADED (but none UNHEALTHY).
+        2 when at least one service is UNHEALTHY.
     """
-    return 0 if cluster.overall_status == ServiceStatus.HEALTHY else 1
+    status = cluster.overall_status
+    if status == ServiceStatus.HEALTHY:
+        return 0
+    if status == ServiceStatus.UNHEALTHY:
+        return 2
+    return 1  # DEGRADED
 
 
 # ---------------------------------------------------------------------------
@@ -670,7 +674,7 @@ def watch_cmd(
     ),
 )
 @click.option(
-    "--force",
+    "--emergency",
     "emergency",
     is_flag=True,
     default=False,
@@ -690,7 +694,7 @@ def shutdown_cmd(dry_run: bool, emergency: bool) -> None:
     Examples:
         maestro shutdown
         maestro shutdown --dry-run
-        maestro shutdown --force
+        maestro shutdown --emergency
     """
     from maestro.platform_detect import detect_node
     from maestro.services import ServiceRegistry
