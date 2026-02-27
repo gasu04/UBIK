@@ -91,7 +91,7 @@ async def check_mcp(
             status=ServiceStatus.UNHEALTHY,
             latency_ms=latency_ms,
             details=details,
-            error="Connection refused — is the MCP server running?",
+            error="Connection refused -- is the MCP server running?",
         )
     except Exception as exc:
         latency_ms = (time.perf_counter() - start) * 1000

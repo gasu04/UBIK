@@ -65,7 +65,7 @@ async def check_neo4j(
         return ServiceResult(
             service_name="neo4j",
             status=ServiceStatus.UNHEALTHY,
-            error="neo4j package not installed — run: pip install neo4j",
+            error="neo4j package not installed -- run: pip install neo4j",
         )
 
     bolt_url = cfg.neo4j_bolt_url
@@ -101,7 +101,7 @@ async def check_neo4j(
                 status=ServiceStatus.DEGRADED,
                 latency_ms=latency_ms,
                 details=details,
-                error="Schema not initialised — run init_neo4j_schema.py",
+                error="Schema not initialised -- run init_neo4j_schema.py",
             )
 
         return ServiceResult(

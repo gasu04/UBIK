@@ -158,7 +158,7 @@ async def check_tailscale(
                 details=details,
                 error=(
                     f"Somatic node ({somatic_ip}) not found in Tailscale mesh "
-                    "— is the Somatic machine connected?"
+                    "-- is the Somatic machine connected?"
                 ),
             )
 

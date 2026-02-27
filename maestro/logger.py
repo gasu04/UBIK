@@ -28,8 +28,10 @@ Author: UBIK Project
 Version: 0.1.0
 """
 
+import io
 import logging
 import logging.handlers
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -136,7 +138,17 @@ def configure_logging(
         root.addHandler(file_handler)
 
     if not has_stream:
-        console_handler = logging.StreamHandler()
+        # Use a UTF-8 stream so non-ASCII characters in log messages (e.g.
+        # Unicode box-drawing chars) never raise UnicodeEncodeError on
+        # ASCII-locale Linux systems (LANG=C).
+        raw = getattr(sys.stderr, "buffer", None)
+        if raw is not None:
+            stream: io.TextIOBase = io.TextIOWrapper(
+                raw, encoding="utf-8", errors="backslashreplace", line_buffering=True
+            )
+        else:
+            stream = sys.stderr
+        console_handler = logging.StreamHandler(stream)
         console_handler.setFormatter(console_formatter)
         console_handler.setLevel(con_level)
         root.addHandler(console_handler)
