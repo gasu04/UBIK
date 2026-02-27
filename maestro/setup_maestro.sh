@@ -132,7 +132,7 @@ if [[ "$NODE_TYPE" == "hippocampal" ]]; then
     _run_python() { "$PYTHON_BIN" "$@"; }
 
 else
-    VENV_PATH="${SOMATIC_VENV_PATH:-$UBIK_ROOT/venv}"
+    VENV_PATH="${SOMATIC_VENV_PATH:-$HOME/pytorch_env}"
     if [[ ! -d "$VENV_PATH" ]]; then
         _red "  ERROR: venv not found: $VENV_PATH"
         _yellow "  Create it with: python3 -m venv $VENV_PATH"
