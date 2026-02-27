@@ -33,7 +33,8 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from maestro.config import AppConfig
+from maestro.config import AppConfig, HippocampalConfig, SomaticConfig
+from maestro.platform_detect import NodeType, detect_node
 from maestro.services.chromadb_check import check_chromadb
 from maestro.services.docker_check import check_docker
 from maestro.services.mcp_check import check_mcp
@@ -43,6 +44,28 @@ from maestro.services.tailscale_check import check_tailscale
 from maestro.services.vllm_check import check_vllm
 
 logger = logging.getLogger(__name__)
+
+
+def _localise_configs(
+    cfg: AppConfig,
+) -> tuple[HippocampalConfig, SomaticConfig]:
+    """Return (hippocampal_cfg, somatic_cfg) with localhost substituted for
+    whichever node this process is running on.
+
+    When running on the Hippocampal node, hippocampal services are probed via
+    localhost instead of the Tailscale IP.  When running on the Somatic node,
+    vLLM is probed via localhost.  On an unknown node both IPs are kept as-is.
+    """
+    h = cfg.hippocampal
+    s = cfg.somatic
+    node = detect_node()
+    if node.node_type == NodeType.HIPPOCAMPAL:
+        h = h.model_copy(update={"tailscale_ip": "localhost"})
+        logger.debug("health_runner: on hippocampal — probing local services via localhost")
+    elif node.node_type == NodeType.SOMATIC:
+        s = s.model_copy(update={"tailscale_ip": "localhost"})
+        logger.debug("health_runner: on somatic — probing vLLM via localhost")
+    return h, s
 
 
 def _timeout_result(service_name: str, timeout: float) -> ServiceResult:
@@ -135,8 +158,7 @@ async def run_all_checks(
         >>> print(cluster.overall_status)
         ServiceStatus.HEALTHY
     """
-    h = cfg.hippocampal
-    s = cfg.somatic
+    h, s = _localise_configs(cfg)
 
     checks = [
         _guarded(check_neo4j(h, timeout=timeout), "neo4j", timeout),
@@ -144,12 +166,15 @@ async def run_all_checks(
         _guarded(check_mcp(h, timeout=timeout), "mcp", timeout),
         _guarded(check_vllm(s, timeout=timeout), "vllm", timeout),
         _guarded(check_tailscale(h, s, timeout=timeout), "tailscale", timeout),
-        _guarded(check_docker(timeout=timeout), "docker", timeout),
     ]
 
     results: list[ServiceResult] = await asyncio.gather(*checks)
 
     services = {r.service_name: r for r in results}
+
+    # Docker health is inferred from neo4j + chromadb results (no SSH/remote API).
+    docker_result = await check_docker(services["neo4j"], services["chromadb"])
+    services["docker"] = docker_result
 
     healthy = [n for n, r in services.items() if r.is_healthy]
     unhealthy = [n for n, r in services.items() if not r.is_healthy]
@@ -216,7 +241,7 @@ async def run_selected_checks(
             f"Valid choices: {list(ALL_SERVICE_NAMES)}"
         )
 
-    h, s = cfg.hippocampal, cfg.somatic
+    h, s = _localise_configs(cfg)
 
     # Build coroutines only for requested services (avoids "never awaited" warnings).
     check_map: dict[str, object] = {}
@@ -230,8 +255,7 @@ async def run_selected_checks(
         check_map["vllm"] = check_vllm(s, timeout=timeout)
     if "tailscale" in services:
         check_map["tailscale"] = check_tailscale(h, s, timeout=timeout)
-    if "docker" in services:
-        check_map["docker"] = check_docker(timeout=timeout)
+    # docker is derived after gather — handled below
 
     names = list(check_map.keys())
     guarded = [
@@ -239,15 +263,27 @@ async def run_selected_checks(
         for name, coro in check_map.items()
     ]
     results: list[ServiceResult] = await asyncio.gather(*guarded)
+    svc_map: dict[str, ServiceResult] = {r.service_name: r for r in results}
+
+    # Derive docker from neo4j + chromadb if both were requested.
+    if "docker" in services:
+        if "neo4j" in svc_map and "chromadb" in svc_map:
+            svc_map["docker"] = await check_docker(svc_map["neo4j"], svc_map["chromadb"])
+        else:
+            svc_map["docker"] = ServiceResult(
+                service_name="docker",
+                status=ServiceStatus.DEGRADED,
+                error="docker check requires neo4j and chromadb to also be checked",
+            )
 
     logger.info(
         "Selected check complete (%s): %d/%d healthy",
         sorted(services),
-        sum(1 for r in results if r.is_healthy),
-        len(results),
+        sum(1 for r in svc_map.values() if r.is_healthy),
+        len(svc_map),
     )
 
     return ClusterHealth(
-        services={r.service_name: r for r in results},
+        services=svc_map,
         checked_at=datetime.now(timezone.utc),
     )

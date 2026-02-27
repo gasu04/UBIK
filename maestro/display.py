@@ -61,7 +61,7 @@ _SERVICE_NODES: dict[str, str] = {
     "mcp": "hippocampal",
     "vllm": "somatic",
     "tailscale": "mesh",
-    "docker": "local",
+    "docker": "hippocampal",
 }
 
 # Canonical display order for services in the table.
@@ -171,8 +171,9 @@ def format_details(result: ServiceResult) -> str:
         running = sum(1 for st in containers.values() if st == "running")
         total_c = len(containers)
         color = "green" if running == total_c else "yellow"
-        names_str = ", ".join(containers.keys())
-        return f"[{color}]{running}/{total_c}[/{color}] running · {names_str}"
+        inferred = d.get("inferred", False)
+        suffix = " [dim](inferred)[/dim]" if inferred else ""
+        return f"[{color}]{running}/{total_c}[/{color}] running{suffix}"
 
     # Generic fallback
     if result.error:

@@ -1,134 +1,86 @@
 #!/usr/bin/env python3
 """
-Maestro — Docker Container Health Check
+Maestro — Docker Container Health Check (Hippocampal Node)
 
-Verifies that the Docker daemon is running and that all UBIK containers
-are in the ``running`` state.  Uses ``asyncio.to_thread`` to avoid
-blocking the event loop on subprocess calls.
+Infers whether the UBIK Docker containers on the Hippocampal node are
+running by examining the results of the neo4j and chromadb service checks.
+No direct Docker CLI or remote API access is required.
 
-Containers monitored:
-    ubik-neo4j    — Neo4j graph database
-    ubik-chromadb — ChromaDB vector store
+Inference logic:
+    A service being HEALTHY proves its container is running.
+    A service being UNHEALTHY is ambiguous (auth error ≠ container down),
+    so we report DEGRADED rather than UNHEALTHY in that case.
+
+    ubik-neo4j    — inferred from neo4j ServiceResult
+    ubik-chromadb — inferred from chromadb ServiceResult
 
 Result semantics:
-    HEALTHY   — Docker daemon up and all containers running.
-    DEGRADED  — Docker daemon up but one or more containers stopped/absent.
-    UNHEALTHY — Docker daemon not running or not installed.
+    HEALTHY  — both neo4j and chromadb reported HEALTHY
+               (containers confirmed running).
+    DEGRADED — one or both services unhealthy; containers may be
+               running but service is misconfigured, or container
+               is actually stopped.
+    UNHEALTHY — should not occur via inference; reserved for future
+                direct checks.
 
 Author: UBIK Project
-Version: 0.1.0
+Version: 0.3.0
 """
 
-import asyncio
-import logging
-import subprocess
 import time
 from typing import Any
 
 from maestro.services.models import ServiceResult, ServiceStatus
 
-logger = logging.getLogger(__name__)
-
-# Containers that must be running for UBIK to operate.
-_REQUIRED_CONTAINERS: list[str] = ["ubik-neo4j", "ubik-chromadb"]
-
-
-def _check_docker_sync(timeout: float) -> dict[str, Any]:
-    """Run Docker status checks synchronously.
-
-    Args:
-        timeout: Per-subprocess call timeout in seconds.
-
-    Returns:
-        Dict with keys:
-            ``daemon_ok`` (bool), ``containers`` (dict[name, status str]).
-
-    Raises:
-        FileNotFoundError: Docker CLI not found.
-    """
-    # Verify Docker daemon is reachable.
-    daemon_result = subprocess.run(
-        ["docker", "info"],
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
-    if daemon_result.returncode != 0:
-        return {"daemon_ok": False, "containers": {}}
-
-    containers: dict[str, str] = {}
-    for name in _REQUIRED_CONTAINERS:
-        inspect = subprocess.run(
-            ["docker", "inspect", "-f", "{{.State.Status}}", name],
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-        if inspect.returncode == 0:
-            containers[name] = inspect.stdout.strip()
-        else:
-            containers[name] = "not found"
-
-    return {"daemon_ok": True, "containers": containers}
+# Map from container name to the service result that witnesses it.
+_CONTAINER_SERVICE_MAP: dict[str, str] = {
+    "ubik-neo4j": "neo4j",
+    "ubik-chromadb": "chromadb",
+}
 
 
 async def check_docker(
-    *,
-    timeout: float = 10.0,
+    neo4j_result: ServiceResult,
+    chromadb_result: ServiceResult,
 ) -> ServiceResult:
-    """Probe Docker daemon and UBIK container status.
+    """Infer Docker container health from neo4j and chromadb service results.
 
-    Runs synchronous Docker CLI calls in a thread to keep the event loop
-    free.
+    Since SSH and the Docker remote API are not available from the Somatic
+    node, container liveness is inferred: a HEALTHY service probe proves
+    its container is running; an UNHEALTHY probe is treated as ambiguous.
 
     Args:
-        timeout: Maximum seconds for each subprocess call.
+        neo4j_result: Already-computed result from ``check_neo4j``.
+        chromadb_result: Already-computed result from ``check_chromadb``.
 
     Returns:
         :class:`~maestro.services.models.ServiceResult` with:
-            - ``details["daemon_ok"]``: whether Docker daemon responded.
             - ``details["containers"]``: mapping of container name →
-              status string (e.g. ``"running"``, ``"exited"``,
-              ``"not found"``).
+              ``"running"`` (confirmed) or ``"unknown"`` (ambiguous).
+            - ``details["inferred"]``: always ``True``.
     """
-    details: dict[str, Any] = {}
     start = time.perf_counter()
 
-    try:
-        result: dict[str, Any] = await asyncio.to_thread(
-            _check_docker_sync, timeout
-        )
-        latency_ms = (time.perf_counter() - start) * 1000
+    service_results = {
+        "neo4j": neo4j_result,
+        "chromadb": chromadb_result,
+    }
 
-        if not result["daemon_ok"]:
-            details["daemon_ok"] = False
-            return ServiceResult(
-                service_name="docker",
-                status=ServiceStatus.UNHEALTHY,
-                latency_ms=latency_ms,
-                details=details,
-                error="Docker daemon is not running",
-            )
+    containers: dict[str, str] = {}
+    for container, svc in _CONTAINER_SERVICE_MAP.items():
+        result = service_results[svc]
+        containers[container] = "running" if result.is_healthy else "unknown"
 
-        containers: dict[str, str] = result["containers"]
-        details["daemon_ok"] = True
-        details["containers"] = containers
+    details: dict[str, Any] = {
+        "containers": containers,
+        "inferred": True,
+    }
 
-        not_running = [
-            name
-            for name, status in containers.items()
-            if status != "running"
-        ]
+    confirmed_running = [c for c, st in containers.items() if st == "running"]
+    unknown = [c for c, st in containers.items() if st == "unknown"]
+    latency_ms = (time.perf_counter() - start) * 1000
 
-        if not_running:
-            return ServiceResult(
-                service_name="docker",
-                status=ServiceStatus.DEGRADED,
-                latency_ms=latency_ms,
-                details=details,
-                error=f"Containers not running: {not_running}",
-            )
-
+    if len(confirmed_running) == len(containers):
         return ServiceResult(
             service_name="docker",
             status=ServiceStatus.HEALTHY,
@@ -136,32 +88,11 @@ async def check_docker(
             details=details,
         )
 
-    except FileNotFoundError:
-        latency_ms = (time.perf_counter() - start) * 1000
-        logger.warning("docker binary not found")
-        return ServiceResult(
-            service_name="docker",
-            status=ServiceStatus.UNHEALTHY,
-            latency_ms=latency_ms,
-            details=details,
-            error="Docker is not installed",
-        )
-    except subprocess.TimeoutExpired:
-        latency_ms = (time.perf_counter() - start) * 1000
-        return ServiceResult(
-            service_name="docker",
-            status=ServiceStatus.UNHEALTHY,
-            latency_ms=latency_ms,
-            details=details,
-            error=f"Docker check timed out after {timeout}s",
-        )
-    except Exception as exc:
-        latency_ms = (time.perf_counter() - start) * 1000
-        logger.warning("docker check failed: %s", exc)
-        return ServiceResult(
-            service_name="docker",
-            status=ServiceStatus.UNHEALTHY,
-            latency_ms=latency_ms,
-            details=details,
-            error=str(exc),
-        )
+    missing_str = ", ".join(unknown)
+    return ServiceResult(
+        service_name="docker",
+        status=ServiceStatus.DEGRADED,
+        latency_ms=latency_ms,
+        details=details,
+        error=f"Cannot confirm containers running: {missing_str}",
+    )

@@ -36,6 +36,7 @@ import time
 from typing import Any
 
 from maestro.config import HippocampalConfig, SomaticConfig
+from maestro.platform_detect import detect_node, get_remote_node_ip
 from maestro.services.models import ServiceResult, ServiceStatus
 
 logger = logging.getLogger(__name__)
@@ -113,8 +114,16 @@ async def check_tailscale(
             - ``details["somatic_online"]``: peer online status.
             - ``details["peer_count"]``: total peers visible in mesh.
     """
-    somatic_ip = somatic.tailscale_ip
-    details: dict[str, Any] = {"somatic_ip": somatic_ip}
+    # Determine which node is "remote" from this machine's perspective.
+    # When running on Somatic, look for Hippocampal in peers (and vice versa).
+    local_node = detect_node()
+    try:
+        remote_ip = get_remote_node_ip(local_node)
+    except ValueError:
+        # UNKNOWN node type — fall back to checking for Somatic as originally designed
+        remote_ip = somatic.tailscale_ip
+
+    details: dict[str, Any] = {"somatic_ip": somatic.tailscale_ip, "remote_ip": remote_ip}
     start = time.perf_counter()
 
     try:
@@ -139,17 +148,17 @@ async def check_tailscale(
                 error="Local Tailscale node is offline",
             )
 
-        # Somatic peer lookup by IP
+        # Remote peer lookup by IP (Hippocampal when on Somatic, and vice versa)
         peers: dict[str, Any] = status.get("Peer", {})
         details["peer_count"] = len(peers)
 
-        somatic_peer: dict[str, Any] | None = None
+        remote_peer: dict[str, Any] | None = None
         for peer in peers.values():
-            if somatic_ip in peer.get("TailscaleIPs", []):
-                somatic_peer = peer
+            if remote_ip in peer.get("TailscaleIPs", []):
+                remote_peer = peer
                 break
 
-        if somatic_peer is None:
+        if remote_peer is None:
             details["somatic_online"] = False
             return ServiceResult(
                 service_name="tailscale",
@@ -157,24 +166,24 @@ async def check_tailscale(
                 latency_ms=latency_ms,
                 details=details,
                 error=(
-                    f"Somatic node ({somatic_ip}) not found in Tailscale mesh "
-                    "-- is the Somatic machine connected?"
+                    f"Remote node ({remote_ip}) not found in Tailscale mesh "
+                    "-- is the other machine connected?"
                 ),
             )
 
-        somatic_online: bool = bool(somatic_peer.get("Online", False))
-        somatic_hostname: str = somatic_peer.get("HostName", "unknown")
-        details["somatic_online"] = somatic_online
-        details["somatic_hostname"] = somatic_hostname
+        remote_online: bool = bool(remote_peer.get("Online", False))
+        remote_hostname: str = remote_peer.get("HostName", "unknown")
+        details["somatic_online"] = remote_online
+        details["somatic_hostname"] = remote_hostname
 
-        if not somatic_online:
+        if not remote_online:
             return ServiceResult(
                 service_name="tailscale",
                 status=ServiceStatus.DEGRADED,
                 latency_ms=latency_ms,
                 details=details,
                 error=(
-                    f"Somatic node ({somatic_hostname} / {somatic_ip}) "
+                    f"Remote node ({remote_hostname} / {remote_ip}) "
                     "is offline in Tailscale"
                 ),
             )
