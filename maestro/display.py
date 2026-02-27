@@ -155,7 +155,11 @@ def format_details(result: ServiceResult) -> str:
         if ids:
             short = ids[0].split("/")[-1][:32]
             return f"[green]{n}[/green] model · [dim]{short}[/dim]"
-        return "[yellow]server up · no models loaded[/yellow]"
+        if "models_loaded" in d:
+            # Server responded to /health but no model is loaded yet
+            return "[yellow]server up · no models loaded[/yellow]"
+        # Connection refused or other network error — server is not running
+        return "[red]unreachable[/red]"
 
     if name == "tailscale":
         self_on: bool = d.get("self_online", False)
