@@ -317,6 +317,15 @@ class VllmService(UbikService):
         venv_path = self._venv_path or _detect_venv_path()
         conda = _find_conda()
 
+        # Log file for vLLM startup output — avoids DEVNULL which can cause
+        # the APIServer process to crash in some asyncio/WSL2 environments.
+        log_path = Path("/tmp/vllm_startup.log")
+
+        try:
+            log_fh = open(log_path, "a")  # noqa: WPS515
+        except OSError:
+            log_fh = None  # fall back silently
+
         try:
             if venv_path:
                 # Use standard virtualenv
@@ -328,21 +337,21 @@ class VllmService(UbikService):
                 ])
                 cmd = f"source {shlex.quote(str(activate))} && {vllm_cmd}"
                 logger.info(
-                    "vllm: launching vllm serve %s --port %d (venv: %s)",
-                    self._model_path, self._port, venv_path,
+                    "vllm: launching vllm serve %s --port %d (venv: %s, log: %s)",
+                    self._model_path, self._port, venv_path, log_path,
                 )
                 await asyncio.create_subprocess_exec(
                     "bash", "-c", cmd,
                     env=env,
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
+                    stdout=log_fh or asyncio.subprocess.DEVNULL,
+                    stderr=log_fh or asyncio.subprocess.DEVNULL,
                     start_new_session=True,
                 )
             elif conda:
                 # Use conda environment
                 logger.info(
-                    "vllm: launching vllm serve %s --port %d (conda env: %s)",
-                    self._model_path, self._port, self._conda_env,
+                    "vllm: launching vllm serve %s --port %d (conda env: %s, log: %s)",
+                    self._model_path, self._port, self._conda_env, log_path,
                 )
                 await asyncio.create_subprocess_exec(
                     conda, "run", "-n", self._conda_env,
@@ -350,8 +359,8 @@ class VllmService(UbikService):
                     "--port", str(self._port),
                     *extra_flags,
                     env=env,
-                    stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
+                    stdout=log_fh or asyncio.subprocess.DEVNULL,
+                    stderr=log_fh or asyncio.subprocess.DEVNULL,
                     start_new_session=True,
                 )
             else:
@@ -363,6 +372,9 @@ class VllmService(UbikService):
         except Exception as exc:
             logger.warning("vllm: start command failed: %s", exc)
             return False
+        finally:
+            if log_fh:
+                log_fh.close()
 
         return await self._wait_for_healthy("localhost")
 
