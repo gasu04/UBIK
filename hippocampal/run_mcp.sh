@@ -3,7 +3,8 @@
 #
 # Usage:
 #   ./run_mcp.sh           # Run in foreground
-#   ./run_mcp.sh -d        # Run in background (daemon mode)
+#   ./run_mcp.sh start     # Run in background (daemon mode)
+#   ./run_mcp.sh -d        # Run in background (daemon mode, alias)
 #   ./run_mcp.sh stop      # Stop the background server (and any orphans)
 #   ./run_mcp.sh restart   # Stop and start in background
 #   ./run_mcp.sh status    # Check if server is running
@@ -168,7 +169,7 @@ case "$1" in
         fi
         exit 0
         ;;
-    -d|--daemon)
+    start|-d|--daemon)
         start_daemon
         exit 0
         ;;
@@ -188,7 +189,7 @@ case "$1" in
         python mcp_server.py
         ;;
     *)
-        echo "Usage: $0 [-d|--daemon|stop|restart|status|logs]"
+        echo "Usage: $0 [start|-d|--daemon|stop|restart|status|logs]"
         exit 1
         ;;
 esac

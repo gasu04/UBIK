@@ -28,6 +28,7 @@ from .config import (
 )
 from .daemon import MaestroDaemon
 from .dashboard import Dashboard, run_dashboard
+from .metrics import MetricsCollector, UsageMetrics
 from .shutdown import ShutdownController
 from .log import MaestroLogger
 from .logger import configure_logging, get_logger, log_cluster_health
@@ -52,7 +53,7 @@ from .services import (
     run_selected_checks,
 )
 
-__version__ = "0.11.0"
+__version__ = "0.12.0"
 
 __all__ = [
     # Config
@@ -63,6 +64,9 @@ __all__ = [
     "get_config",
     # Daemon
     "MaestroDaemon",
+    # Metrics
+    "MetricsCollector",
+    "UsageMetrics",
     # Shutdown
     "ShutdownController",
     # Dashboard

@@ -460,3 +460,278 @@ class TestMakeDashboard:
         # All service names should appear somewhere in the rendered output
         for svc in ("neo4j", "chromadb", "mcp", "vllm", "tailscale", "docker"):
             assert svc in output
+
+
+# ---------------------------------------------------------------------------
+# status command (mirrors check command; both share the same logic)
+# ---------------------------------------------------------------------------
+
+class TestStatusCommand:
+    def test_exit_0_when_all_healthy(self, app_config):
+        runner = CliRunner()
+        cluster = _make_cluster()
+        with (
+            patch(_PATCH_CONFIG, return_value=app_config),
+            patch(_PATCH_RUN, new=AsyncMock(return_value=cluster)),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_LOG_HEALTH),
+        ):
+            result = runner.invoke(cli, ["status"])
+        assert result.exit_code == 0
+
+    def test_exit_2_when_unhealthy(self, app_config):
+        runner = CliRunner()
+        cluster = _make_cluster(neo4j=ServiceStatus.UNHEALTHY)
+        with (
+            patch(_PATCH_CONFIG, return_value=app_config),
+            patch(_PATCH_RUN, new=AsyncMock(return_value=cluster)),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_LOG_HEALTH),
+        ):
+            result = runner.invoke(cli, ["status"])
+        assert result.exit_code == 2
+
+    def test_json_flag_produces_valid_json(self, app_config):
+        runner = CliRunner()
+        cluster = _make_cluster()
+        with (
+            patch(_PATCH_CONFIG, return_value=app_config),
+            patch(_PATCH_RUN, new=AsyncMock(return_value=cluster)),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_LOG_HEALTH),
+        ):
+            result = runner.invoke(cli, ["status", "--json"])
+        assert result.exit_code == 0
+        import json
+        data = json.loads(result.output)
+        assert data["overall_status"] == "healthy"
+
+    def test_config_error_exits_2(self):
+        runner = CliRunner()
+        with patch(_PATCH_CONFIG, side_effect=RuntimeError("drive not mounted")):
+            result = runner.invoke(cli, ["status"])
+        assert result.exit_code == 2
+        assert "Config error" in result.output
+
+    def test_service_filter_accepted(self, app_config):
+        runner = CliRunner()
+        cluster = ClusterHealth(
+            services={"neo4j": _result("neo4j", ServiceStatus.HEALTHY)}
+        )
+        mock_run = AsyncMock(return_value=cluster)
+        with (
+            patch(_PATCH_CONFIG, return_value=app_config),
+            patch(_PATCH_RUN, new=mock_run),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_LOG_HEALTH),
+        ):
+            runner.invoke(cli, ["status", "--service", "neo4j"])
+        assert mock_run.call_args[0][1] == {"neo4j"}
+
+
+# ---------------------------------------------------------------------------
+# metrics command
+# ---------------------------------------------------------------------------
+
+_PATCH_METRICS_CLS = "maestro.metrics.MetricsCollector"
+_PATCH_ORCH_CLS = "maestro.orchestrator.Orchestrator"
+_PATCH_REGISTRY_CLS = "maestro.services.ServiceRegistry"
+_PATCH_DETECT_NODE = "maestro.platform_detect.detect_node"
+
+
+class TestMetricsCommand:
+    def _mock_collector(self, fake_metrics=None, report="UBIK Metrics\nsome data"):
+        from maestro.metrics import UsageMetrics
+        from datetime import datetime, timezone
+
+        if fake_metrics is None:
+            fake_metrics = UsageMetrics(timestamp=datetime.now(timezone.utc))
+
+        mock_cls = MagicMock()
+        mock_inst = MagicMock()
+        mock_inst.collect = AsyncMock(return_value=fake_metrics)
+        mock_inst.format_report = MagicMock(return_value=report)
+        mock_cls.return_value = mock_inst
+        return mock_cls
+
+    def test_metrics_prints_report(self, app_config):
+        runner = CliRunner()
+        mock_cls = self._mock_collector()
+        with (
+            patch(_PATCH_CONFIG, return_value=app_config),
+            patch(_PATCH_METRICS_CLS, new=mock_cls),
+            patch(_PATCH_ORCH_CLS),
+            patch(_PATCH_REGISTRY_CLS),
+            patch(_PATCH_DETECT_NODE),
+        ):
+            result = runner.invoke(cli, ["metrics"])
+        assert result.exit_code == 0
+        assert "UBIK Metrics" in result.output
+
+    def test_config_error_exits_2(self):
+        runner = CliRunner()
+        with patch(_PATCH_CONFIG, side_effect=RuntimeError("no config")):
+            result = runner.invoke(cli, ["metrics"])
+        assert result.exit_code == 2
+
+    def test_collect_exception_exits_2(self, app_config):
+        runner = CliRunner()
+        mock_cls = MagicMock()
+        mock_inst = MagicMock()
+        mock_inst.collect = AsyncMock(side_effect=RuntimeError("service down"))
+        mock_cls.return_value = mock_inst
+        with (
+            patch(_PATCH_CONFIG, return_value=app_config),
+            patch(_PATCH_METRICS_CLS, new=mock_cls),
+            patch(_PATCH_ORCH_CLS),
+            patch(_PATCH_REGISTRY_CLS),
+            patch(_PATCH_DETECT_NODE),
+        ):
+            result = runner.invoke(cli, ["metrics"])
+        assert result.exit_code == 2
+
+
+# ---------------------------------------------------------------------------
+# health command
+# ---------------------------------------------------------------------------
+
+class TestHealthCommand:
+    def _setup(self, app_config, cluster, fake_metrics=None, report="metrics line"):
+        """Return context manager stack for health command tests."""
+        from maestro.metrics import UsageMetrics
+        from datetime import datetime, timezone
+
+        if fake_metrics is None:
+            fake_metrics = UsageMetrics(timestamp=datetime.now(timezone.utc))
+
+        mock_mc_cls = MagicMock()
+        mock_mc = MagicMock()
+        mock_mc.collect = AsyncMock(return_value=fake_metrics)
+        mock_mc.format_report = MagicMock(return_value=report)
+        mock_mc_cls.return_value = mock_mc
+
+        return (mock_mc_cls, mock_mc)
+
+    def test_exit_0_when_all_healthy(self, app_config):
+        runner = CliRunner()
+        cluster = _make_cluster()
+        mock_mc_cls, _ = self._setup(app_config, cluster)
+        with (
+            patch(_PATCH_CONFIG, return_value=app_config),
+            patch(_PATCH_RUN_ALL, new=AsyncMock(return_value=cluster)),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_LOG_HEALTH),
+            patch(_PATCH_METRICS_CLS, new=mock_mc_cls),
+            patch(_PATCH_ORCH_CLS),
+            patch(_PATCH_REGISTRY_CLS),
+            patch(_PATCH_DETECT_NODE),
+        ):
+            result = runner.invoke(cli, ["health"])
+        assert result.exit_code == 0
+
+    def test_exit_2_when_unhealthy(self, app_config):
+        runner = CliRunner()
+        cluster = _make_cluster(vllm=ServiceStatus.UNHEALTHY)
+        mock_mc_cls, _ = self._setup(app_config, cluster)
+        with (
+            patch(_PATCH_CONFIG, return_value=app_config),
+            patch(_PATCH_RUN_ALL, new=AsyncMock(return_value=cluster)),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_LOG_HEALTH),
+            patch(_PATCH_METRICS_CLS, new=mock_mc_cls),
+            patch(_PATCH_ORCH_CLS),
+            patch(_PATCH_REGISTRY_CLS),
+            patch(_PATCH_DETECT_NODE),
+        ):
+            result = runner.invoke(cli, ["health"])
+        assert result.exit_code == 2
+
+    def test_json_flag_combined_output(self, app_config):
+        import json
+        runner = CliRunner()
+        cluster = _make_cluster()
+        mock_mc_cls, _ = self._setup(app_config, cluster)
+        with (
+            patch(_PATCH_CONFIG, return_value=app_config),
+            patch(_PATCH_RUN_ALL, new=AsyncMock(return_value=cluster)),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_LOG_HEALTH),
+            patch(_PATCH_METRICS_CLS, new=mock_mc_cls),
+            patch(_PATCH_ORCH_CLS),
+            patch(_PATCH_REGISTRY_CLS),
+            patch(_PATCH_DETECT_NODE),
+        ):
+            result = runner.invoke(cli, ["health", "--json"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert "status" in data
+        assert "metrics" in data
+        assert data["status"]["overall_status"] == "healthy"
+
+    def test_config_error_exits_2(self):
+        runner = CliRunner()
+        with patch(_PATCH_CONFIG, side_effect=RuntimeError("bad config")):
+            result = runner.invoke(cli, ["health"])
+        assert result.exit_code == 2
+
+    def test_metrics_failure_shown_as_unavailable(self, app_config):
+        """When metrics collect raises, report shows 'Metrics unavailable'."""
+        runner = CliRunner()
+        cluster = _make_cluster()
+
+        mock_mc_cls = MagicMock()
+        mock_mc = MagicMock()
+        mock_mc.collect = AsyncMock(side_effect=RuntimeError("metrics boom"))
+        mock_mc_cls.return_value = mock_mc
+
+        with (
+            patch(_PATCH_CONFIG, return_value=app_config),
+            patch(_PATCH_RUN_ALL, new=AsyncMock(return_value=cluster)),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_LOG_HEALTH),
+            patch(_PATCH_METRICS_CLS, new=mock_mc_cls),
+            patch(_PATCH_ORCH_CLS),
+            patch(_PATCH_REGISTRY_CLS),
+            patch(_PATCH_DETECT_NODE),
+        ):
+            result = runner.invoke(cli, ["health"])
+        # Status still succeeds (cluster is healthy)
+        assert result.exit_code == 0
+        assert "unavailable" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# logs command
+# ---------------------------------------------------------------------------
+
+class TestLogsCommand:
+    def test_missing_log_exits_0_with_message(self, app_config, tmp_path):
+        runner = CliRunner()
+        # app_config.log_dir points at tmp_path which has no maestro.log
+        with patch(_PATCH_CONFIG, return_value=app_config):
+            result = runner.invoke(cli, ["logs"])
+        assert result.exit_code == 0
+        assert "not found" in result.output.lower() or "run" in result.output.lower()
+
+    def test_shows_last_n_lines(self, app_config, tmp_path):
+        runner = CliRunner()
+        log_file = app_config.log_dir / "maestro.log"
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        # Write 10 numbered log entries (prefix avoids collision with path text)
+        log_file.write_text("\n".join(f"ENTRY_{i:03d}" for i in range(1, 11)))
+
+        with patch(_PATCH_CONFIG, return_value=app_config):
+            result = runner.invoke(cli, ["logs", "--lines", "3"])
+        assert result.exit_code == 0
+        # Last 3 lines should appear
+        assert "ENTRY_008" in result.output
+        assert "ENTRY_009" in result.output
+        assert "ENTRY_010" in result.output
+        # Earlier lines should not appear
+        assert "ENTRY_001" not in result.output
+
+    def test_config_error_exits_2(self):
+        runner = CliRunner()
+        with patch(_PATCH_CONFIG, side_effect=RuntimeError("cfg fail")):
+            result = runner.invoke(cli, ["logs"])
+        assert result.exit_code == 2
