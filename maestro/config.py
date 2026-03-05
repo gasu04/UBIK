@@ -255,6 +255,7 @@ class SomaticConfig(BaseSettings):
         "/home/gasu/ubik/models/deepseek-awq/DeepSeek-R1-Distill-Qwen-14B-AWQ",
         validation_alias="VLLM_MODEL_PATH",
     )
+    whisperx_port: int = Field(9100, validation_alias="WHISPERX_PORT")
 
     model_config = SettingsConfigDict(
         env_prefix="SOMATIC_",
@@ -278,6 +279,12 @@ class SomaticConfig(BaseSettings):
     def vllm_openai_url(self) -> str:
         """vLLM OpenAI-compatible API endpoint (``/v1``)."""
         return f"http://{self.tailscale_ip}:{self.vllm_port}/v1"
+
+    @computed_field  # type: ignore[misc]
+    @property
+    def whisperx_url(self) -> str:
+        """WhisperX transcription service URL (``http://<ip>:<port>``)."""
+        return f"http://{self.tailscale_ip}:{self.whisperx_port}"
 
 
 # ---------------------------------------------------------------------------

@@ -42,6 +42,7 @@ from maestro.services.models import ClusterHealth, ServiceResult, ServiceStatus
 from maestro.services.neo4j_check import check_neo4j
 from maestro.services.tailscale_check import check_tailscale
 from maestro.services.vllm_check import check_vllm
+from maestro.services.whisperx_check import check_whisperx
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +166,7 @@ async def run_all_checks(
         _guarded(check_chromadb(h, timeout=timeout), "chromadb", timeout),
         _guarded(check_mcp(h, timeout=timeout), "mcp", timeout),
         _guarded(check_vllm(s, timeout=timeout), "vllm", timeout),
+        _guarded(check_whisperx(s, timeout=timeout), "whisperx", timeout),
         _guarded(check_tailscale(h, s, timeout=timeout), "tailscale", timeout),
     ]
 
@@ -197,6 +199,7 @@ ALL_SERVICE_NAMES: tuple[str, ...] = (
     "chromadb",
     "mcp",
     "vllm",
+    "whisperx",
     "tailscale",
     "docker",
 )
@@ -253,6 +256,8 @@ async def run_selected_checks(
         check_map["mcp"] = check_mcp(h, timeout=timeout)
     if "vllm" in services:
         check_map["vllm"] = check_vllm(s, timeout=timeout)
+    if "whisperx" in services:
+        check_map["whisperx"] = check_whisperx(s, timeout=timeout)
     if "tailscale" in services:
         check_map["tailscale"] = check_tailscale(h, s, timeout=timeout)
     # docker is derived after gather — handled below

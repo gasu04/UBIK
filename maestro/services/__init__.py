@@ -29,6 +29,7 @@ Public API:
         ChromaDbService   — ChromaDB vector store (Hippocampal)
         McpServerService  — FastMCP server (Hippocampal)
         VllmService       — vLLM inference server (Somatic)
+        WhisperXService   — WhisperX transcription server (Somatic)
         ServiceRegistry   — Registry with topological startup ordering
 
 Usage:
@@ -69,6 +70,8 @@ from .venv_service import (
 )
 from .vllm_check import check_vllm
 from .vllm_service import VllmService
+from .whisperx_check import check_whisperx
+from .whisperx_service import WhisperXService
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +121,9 @@ class ServiceRegistry:
         self.register(VllmService(
             port=self._cfg.somatic.vllm_port,
             model_path=self._cfg.somatic.vllm_model_path,
+        ))
+        self.register(WhisperXService(
+            port=self._cfg.somatic.whisperx_port,
         ))
 
     @property
@@ -224,6 +230,8 @@ __all__ = [
     "Neo4jService",
     "ServiceRegistry",
     "VllmService",
+    "WhisperXService",
+    "check_whisperx",
     # Venv service
     "check_venv_health",
     "detect_active_venv",
