@@ -41,7 +41,7 @@ import shutil
 import tempfile
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -58,6 +58,7 @@ from .models import (
 )
 from .processors import ProcessorConfig, ProcessorRegistry
 from .sources import GoogleDriveConfig, GoogleDriveSource
+from .tracker import FileMover, IngestionManifest, IngestionRecord, compute_file_hash
 from .transcript_processor import (
     TranscriptProcessor,
     transcript_to_memory_candidates,
@@ -68,6 +69,9 @@ __all__ = [
     'PipelineConfig',
     'StorageStats',
 ]
+
+# Pipeline version — used in IngestionRecord for traceability
+_PIPELINE_VERSION = "1.1.0"
 
 logger = logging.getLogger(__name__)
 
@@ -154,6 +158,8 @@ class IngestPipeline:
         chunk_config: Optional[ChunkConfig] = None,
         classifier_config: Optional[ClassifierConfig] = None,
         config: Optional[PipelineConfig] = None,
+        tracker: Optional[IngestionManifest] = None,
+        file_mover: Optional[FileMover] = None,
     ):
         """
         Initialize the ingestion pipeline.
@@ -165,6 +171,11 @@ class IngestPipeline:
             chunk_config: Chunking configuration
             classifier_config: Classification configuration
             config: Full pipeline configuration (overrides other params)
+            tracker: Optional IngestionManifest for dedup and audit logging.
+                     When provided, already-ingested files are skipped.
+            file_mover: Optional FileMover for move-after-ingest.
+                        When provided, successfully processed files are
+                        moved to the Ingested_data archive.
         """
         # Use config or build from params
         if config:
@@ -178,6 +189,8 @@ class IngestPipeline:
             )
 
         self.mcp_client = mcp_client
+        self.tracker = tracker
+        self.file_mover = file_mover
 
         # Initialize processor config with whisper model
         processor_config = self.config.processor_config or ProcessorConfig()
@@ -274,23 +287,45 @@ class IngestPipeline:
         Ingest a single file through the complete pipeline.
 
         Steps:
-        1. Create IngestItem from path
-        2. Process with appropriate processor
-        3. Chunk the content
-        4. Classify each chunk
-        5. Store memories (if storage_mode enabled)
-        6. Execute Neo4j operations (for transcripts)
+        1. Deduplication check (if tracker configured)
+        2. Create IngestItem from path
+        3. Process with appropriate processor
+        4. Chunk the content
+        5. Classify each chunk
+        6. Store memories (if storage_mode enabled)
+        7. Execute Neo4j operations (for transcripts)
+        8. Move file to archive (if file_mover configured)
+        9. Record ingestion to manifest (if tracker configured)
 
         Args:
             file_path: Path to file to ingest
 
         Returns:
-            IngestResult with processing statistics
+            IngestResult with processing statistics.
+            Returns a skipped_duplicate result if tracker detects the file
+            has already been ingested.
         """
         start_time = time.time()
         file_path = Path(file_path).expanduser().resolve()
 
         logger.info(f"Ingesting file: {file_path.name}")
+
+        # ------------------------------------------------------------------
+        # Deduplication check (compute hash once; reuse for record building)
+        # ------------------------------------------------------------------
+        file_hash: Optional[str] = None
+        if self.tracker is not None:
+            try:
+                file_hash, already_ingested = self.tracker.check_file(file_path)
+                if already_ingested:
+                    logger.info(f"Skipping already-ingested: {file_path.name}")
+                    return IngestResult.skipped_duplicate_result(
+                        source_file=file_path.name
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Dedup check failed for {file_path.name}: {e} — processing anyway"
+                )
 
         try:
             # Create IngestItem
@@ -333,6 +368,7 @@ class IngestPipeline:
                 source_file=file_path.name,
                 candidates=candidates,
                 processing_time_ms=processing_time,
+                memory_ids=storage_stats.memory_ids,
             )
 
             logger.info(
@@ -340,6 +376,73 @@ class IngestPipeline:
                 f"{result.episodic_count} episodic, "
                 f"{result.semantic_count} semantic"
             )
+
+            # ------------------------------------------------------------------
+            # Post-processing: move file, then record ingestion
+            # ------------------------------------------------------------------
+            if self.tracker is not None and result.success:
+                dest_path = ""
+
+                # Move file BEFORE recording so destination_path is accurate
+                if self.file_mover is not None:
+                    try:
+                        moved_to = self.file_mover.move(
+                            file_path,
+                            source_directory=file_path.parent.name,
+                        )
+                        dest_path = str(moved_to)
+                        logger.info(f"Moved {file_path.name} -> {moved_to}")
+                    except Exception as move_err:
+                        # Log but don't fail — the memory is already stored
+                        logger.error(
+                            f"Failed to move {file_path.name}: {move_err} "
+                            f"(memory was stored; file remains at original path)"
+                        )
+
+                # Determine storage status
+                if not self.config.storage_mode:
+                    storage_status = "dry_run"
+                elif storage_stats.failed > 0 and storage_stats.stored > 0:
+                    storage_status = "partial"
+                elif storage_stats.failed > 0 and storage_stats.stored == 0:
+                    storage_status = "failed"
+                else:
+                    storage_status = "stored"
+
+                # Compute hash if not already done (tracker may have been None earlier)
+                if file_hash is None:
+                    try:
+                        # File may have been moved; use dest_path if available
+                        hash_source = Path(dest_path) if dest_path else file_path
+                        file_hash = compute_file_hash(hash_source)
+                    except Exception:
+                        file_hash = ""
+
+                error_msg: Optional[str] = None
+                if storage_stats.errors:
+                    error_msg = "; ".join(storage_stats.errors[:3])
+
+                record = IngestionRecord(
+                    file_path=str(file_path),
+                    file_name=file_path.name,
+                    file_hash=file_hash,
+                    file_size_bytes=item.file_size_bytes,
+                    ingested_at=datetime.now(timezone.utc).isoformat(),
+                    source_directory=file_path.parent.name,
+                    destination_path=dest_path,
+                    content_type=item.content_type.value,
+                    chunks_generated=result.chunks_generated,
+                    episodic_memories=result.episodic_count,
+                    semantic_memories=result.semantic_count,
+                    skipped_memories=result.skipped_count,
+                    processing_time_ms=result.processing_time_ms,
+                    hippocampal_connected=self._connected,
+                    storage_status=storage_status,
+                    pipeline_version=_PIPELINE_VERSION,
+                    error=error_msg,
+                    memory_ids=storage_stats.memory_ids,
+                )
+                self.tracker.record_ingestion(record)
 
             return result
 
@@ -701,7 +804,7 @@ class IngestPipeline:
                 if result.get("status") == "error":
                     logger.warning(f"Semantic storage error: {result.get('message')}")
                     return None
-                return result.get("memory_id") or result.get("id")
+                return result.get("knowledge_id") or result.get("memory_id") or result.get("id")
 
             return None
 

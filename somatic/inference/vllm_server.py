@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/gasu/pytorch_env/bin/python
 """
 Ubik vLLM Inference Server - AWQ Quantized Model
 

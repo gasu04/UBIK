@@ -23,3 +23,6 @@ venv/
 
 # Database data (managed separately)
 data/
+
+# Model weights
+models/

@@ -441,6 +441,8 @@ class IngestResult:
         episodic_count: Number of episodic memories
         semantic_count: Number of semantic memories
         skipped_count: Number of skipped chunks
+        skipped_duplicate: True if file was skipped due to deduplication
+        memory_ids: ChromaDB document IDs returned by storage
     """
     source_file: str
     success: bool
@@ -451,6 +453,8 @@ class IngestResult:
     semantic_count: int = 0
     skipped_count: int = 0
     error: Optional[str] = None
+    skipped_duplicate: bool = False
+    memory_ids: List[str] = field(default_factory=list)
 
     @classmethod
     def failure(cls, source_file: str, error: str) -> "IngestResult":
@@ -462,11 +466,21 @@ class IngestResult:
         )
 
     @classmethod
+    def skipped_duplicate_result(cls, source_file: str) -> "IngestResult":
+        """Create a result for a file skipped due to content deduplication."""
+        return cls(
+            source_file=source_file,
+            success=True,
+            skipped_duplicate=True,
+        )
+
+    @classmethod
     def from_candidates(
         cls,
         source_file: str,
         candidates: List[MemoryCandidate],
-        processing_time_ms: float
+        processing_time_ms: float,
+        memory_ids: Optional[List[str]] = None,
     ) -> "IngestResult":
         """Create a success result from memory candidates."""
         episodic = sum(1 for c in candidates if c.memory_type == MemoryType.EPISODIC)
@@ -482,6 +496,7 @@ class IngestResult:
             episodic_count=episodic,
             semantic_count=semantic,
             skipped_count=skipped,
+            memory_ids=memory_ids or [],
         )
 
 
@@ -493,13 +508,15 @@ class BatchIngestResult:
     Summarizes outcomes across multiple files.
 
     Attributes:
-        total_files: Number of files processed
-        successful: Number of successful ingestions
+        total_files: Number of files encountered (including skipped duplicates)
+        successful: Number of successfully processed files
         failed: Number of failed ingestions
+        skipped_already_ingested: Files skipped because content hash matched
+            an existing manifest record
         total_memories: Total memories generated
         total_episodic: Total episodic memories
         total_semantic: Total semantic memories
-        total_skipped: Total skipped chunks
+        total_skipped: Total skipped chunks (SKIP classification)
         total_time_ms: Total processing time
         results: Individual results by file
         errors: Error messages by file
@@ -507,6 +524,7 @@ class BatchIngestResult:
     total_files: int = 0
     successful: int = 0
     failed: int = 0
+    skipped_already_ingested: int = 0
     total_memories: int = 0
     total_episodic: int = 0
     total_semantic: int = 0
@@ -520,7 +538,9 @@ class BatchIngestResult:
         self.total_files += 1
         self.results[result.source_file] = result
 
-        if result.success:
+        if result.skipped_duplicate:
+            self.skipped_already_ingested += 1
+        elif result.success:
             self.successful += 1
             self.total_memories += len(result.memory_candidates)
             self.total_episodic += result.episodic_count
@@ -534,21 +554,29 @@ class BatchIngestResult:
 
     @property
     def success_rate(self) -> float:
-        """Calculate success rate as percentage."""
-        if self.total_files == 0:
+        """Calculate success rate as percentage (excludes duplicate skips)."""
+        processed = self.successful + self.failed
+        if processed == 0:
             return 0.0
-        return (self.successful / self.total_files) * 100
+        return (self.successful / processed) * 100
 
     def summary(self) -> str:
         """Generate human-readable summary."""
-        return (
-            f"Batch Ingestion Complete\n"
-            f"{'=' * 40}\n"
+        lines = [
+            "Batch Ingestion Complete",
+            "=" * 40,
             f"Files: {self.successful}/{self.total_files} successful "
-            f"({self.success_rate:.1f}%)\n"
-            f"Memories: {self.total_memories} total\n"
-            f"  - Episodic: {self.total_episodic}\n"
-            f"  - Semantic: {self.total_semantic}\n"
-            f"  - Skipped: {self.total_skipped}\n"
-            f"Time: {self.total_time_ms:.1f}ms"
-        )
+            f"({self.success_rate:.1f}%)",
+        ]
+        if self.skipped_already_ingested:
+            lines.append(
+                f"  - Skipped (already ingested): {self.skipped_already_ingested}"
+            )
+        lines += [
+            f"Memories: {self.total_memories} total",
+            f"  - Episodic: {self.total_episodic}",
+            f"  - Semantic: {self.total_semantic}",
+            f"  - Skipped chunks: {self.total_skipped}",
+            f"Time: {self.total_time_ms:.1f}ms",
+        ]
+        return "\n".join(lines)

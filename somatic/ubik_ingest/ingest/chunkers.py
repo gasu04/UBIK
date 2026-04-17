@@ -44,7 +44,7 @@ __all__ = [
 # Regex patterns for content boundaries
 SECTION_PATTERN = re.compile(r'\n(#{1,3}\s+.+)\n')
 PARAGRAPH_PATTERN = re.compile(r'\n\s*\n')
-SENTENCE_PATTERN = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
+SENTENCE_PATTERN = re.compile(r'(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÜÑ])')
 LIST_ITEM_PATTERN = re.compile(r'^\s*[-*•]\s+', re.MULTILINE)
 NUMBERED_LIST_PATTERN = re.compile(r'^\s*\d+[.)]\s+', re.MULTILINE)
 QUOTE_PATTERN = re.compile(r'^>\s+', re.MULTILINE)

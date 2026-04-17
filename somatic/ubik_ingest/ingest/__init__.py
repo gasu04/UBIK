@@ -12,6 +12,8 @@ Modules:
     transcript_processor: Meeting/therapy transcript handling
     sources: Cloud storage integrations (Google Drive)
     pipeline: Main ingestion orchestrator
+    tracker: File tracking, deduplication, move-after-ingest
+    log_writer: Structured audit log (CSV + error JSONL)
 
 Usage:
     from ingest import IngestPipeline
@@ -24,8 +26,10 @@ Usage:
 CLI:
     python -m ingest local ~/Documents --dry-run
     python -m ingest file ~/letter.pdf --verbose
+    python -m ingest status --recent 10
+    python -m ingest verify
 
-Version: 1.0.0
+Version: 1.1.0
 """
 
 from .models import (
@@ -83,7 +87,18 @@ from .pipeline import (
     PipelineConfig,
 )
 
-__version__ = '1.0.0'
+from .tracker import (
+    IngestionManifest,
+    IngestionRecord,
+    FileMover,
+    compute_file_hash,
+)
+
+from .log_writer import (
+    IngestionLogWriter,
+)
+
+__version__ = '1.1.0'
 __all__ = [
     # Models
     'ContentType',
@@ -126,4 +141,11 @@ __all__ = [
     # Pipeline
     'IngestPipeline',
     'PipelineConfig',
+    # Tracker
+    'IngestionManifest',
+    'IngestionRecord',
+    'FileMover',
+    'compute_file_hash',
+    # Log writer
+    'IngestionLogWriter',
 ]

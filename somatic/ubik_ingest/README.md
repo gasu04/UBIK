@@ -464,10 +464,158 @@ python -m pytest tests/test_mcp_integration.py -v
 python -m pytest tests/ --cov=ingest --cov-report=html
 ```
 
+## File Tracking & Audit Trail
+
+Version 1.1.0 adds hash-based deduplication, move-after-ingest, and a
+searchable audit log to the pipeline.
+
+### How It Works
+
+Every time a file is ingested, the pipeline:
+
+1. **Computes a SHA-256 hash** of the file content.
+2. **Checks the manifest** (`~/ubik/Ingested_data/ingestion_log/ingestion_manifest.jsonl`).
+   If a record with the same hash exists, the file is **skipped**.
+3. **Processes and stores** the file normally if it is new.
+4. **Moves the file** from the source directory to the archive.
+5. **Appends a record** to the JSONL manifest and CSV mirror.
+
+Hash-based dedup means: if you modify a file and put it back in the source
+directory, it **will** be re-ingested (new hash). If you copy an identical
+file under a different name, it will be **skipped** (same hash).
+
+### Directory Structure After Ingestion
+
+```
+~/ubik/data/source_materials/
+├── therapy/         <- empty (files moved)
+└── letters/         <- empty
+
+~/ubik/Ingested_data/
+├── therapy_ingested/
+│   └── therapy_2026-02-16.transcript
+├── letters_ingested/
+│   └── letter_to_sofia.md
+└── ingestion_log/
+    ├── ingestion_manifest.jsonl   <- append-only audit log
+    ├── ingestion_manifest.csv     <- human-readable (opens in Excel/Sheets)
+    └── ingestion_errors.jsonl     <- error-only records for quick diagnosis
+```
+
+### Checking Status
+
+```bash
+# Show overall stats + all records
+python -m ingest.cli status
+
+# Show last 10 ingestions
+python -m ingest.cli status --recent 10
+
+# Show only errors
+python -m ingest.cli status --errors
+
+# Search by filename substring
+python -m ingest.cli status --search therapy
+```
+
+### Re-Ingesting Files
+
+Use the `reingest` command to queue files for reprocessing on the next run.
+The file is copied back to its original source directory and a tombstone
+record is appended to the manifest.
+
+```bash
+# Re-ingest a specific file
+python -m ingest.cli reingest --file therapy_2026-02-16.transcript
+
+# Re-ingest all files from a source directory
+python -m ingest.cli reingest --source-dir therapy
+
+# Re-ingest everything
+python -m ingest.cli reingest --all
+
+# Preview without making changes
+python -m ingest.cli reingest --all --dry-run
+```
+
+> **Warning:** Re-ingestion creates **duplicate memories** in ChromaDB.
+> A separate `purge` command (future) will be needed to remove old records
+> if duplicates are undesired.
+
+### Verifying Integrity
+
+```bash
+# Verify all tracked files (checks existence + hash)
+python -m ingest.cli verify
+
+# Verify only files from a specific source
+python -m ingest.cli verify --source-dir therapy
+```
+
+The `verify` command checks that every file in the manifest still exists
+at its recorded `destination_path` and that the SHA-256 hash matches.
+Reports: OK, Missing, Corrupted.
+
+### Log File Formats
+
+**`ingestion_manifest.jsonl`** — one JSON object per line:
+
+```json
+{"file_name": "therapy_2026-02-16.transcript", "file_hash": "a1b2c3...",
+ "ingested_at": "2026-03-04T20:30:00Z", "chunks_generated": 12,
+ "episodic_memories": 12, "semantic_memories": 0, "storage_status": "stored"}
+```
+
+**`ingestion_manifest.csv`** — columns:
+`ingested_at, file_name, content_type, chunks_generated, episodic_memories,
+semantic_memories, skipped_memories, storage_status, processing_time_ms,
+source_directory, destination_path, file_size_bytes, hippocampal_connected,
+pipeline_version, file_hash, file_path, error, memory_ids`
+
+**`ingestion_errors.jsonl`** — same format as manifest, only error entries.
+
+### Disabling Tracking
+
+Tracking is enabled by default. To run without it (fully backward compatible):
+
+```bash
+python -m ingest.cli local ~/docs/ --no-track
+```
+
+Or in dry-run mode (tracking is automatically disabled, but a preview is shown):
+
+```bash
+python -m ingest.cli local ~/docs/ --dry-run
+```
+
+### Python API
+
+```python
+from ingest import IngestPipeline, PipelineConfig
+from ingest import IngestionManifest, FileMover
+from pathlib import Path
+
+manifest = IngestionManifest(log_dir=Path("~/ubik/Ingested_data/ingestion_log"))
+mover = FileMover(base_ingested_dir=Path("~/ubik/Ingested_data"))
+
+config = PipelineConfig(storage_mode=False)
+async with IngestPipeline(
+    config=config,
+    tracker=manifest,
+    file_mover=mover,
+) as pipeline:
+    batch = await pipeline.ingest_directory(Path("~/ubik/data/source_materials/therapy"))
+    print(batch.summary())
+
+stats = manifest.get_stats()
+print(f"Total ingested: {stats['unique_files']} files")
+```
+
 ## Version History
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 1.1.0 | 2026-03 | File tracking, dedup, move-after-ingest, status/reingest/verify CLI |
 | 1.0.0 | 2024-12 | Initial release |
 
 ## License

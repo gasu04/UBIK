@@ -554,11 +554,11 @@ class SpeakerTurnParser:
                 re.MULTILINE | re.DOTALL
             ),
         ),
-        # Markdown bold: "**Name**: text"
+        # Markdown bold: "**Name**: text" or "**Name:** text"
         (
             "markdown",
             re.compile(
-                r'^\*\*([^*]+)\*\*:\s*(.+?)(?=\n\*\*[^*]+\*\*:|\Z)',
+                r'^\*\*([^*:]+):?\*\*:?\s*(.+?)(?=\n\*\*[^*:]+:?\*\*|\Z)',
                 re.MULTILINE | re.DOTALL
             ),
         ),
@@ -992,16 +992,23 @@ def transcript_to_memory_candidates(
         if metadata and metadata.decisions_made:
             importance = min(importance + 0.1, 1.0)
 
+        # Upgrade to semantic if chunk contains insight patterns
+        memory_type = base_memory_type
+        knowledge_type = None
+        if contains_insights and _is_insight_chunk(chunk.text):
+            memory_type = MemoryType.SEMANTIC
+            knowledge_type = "belief"
+
         candidate = MemoryCandidate(
             content=chunk.text,
-            memory_type=base_memory_type,
+            memory_type=memory_type,
             confidence=0.85,
             category=meeting_type,
             themes=themes or ["conversation"],
             event_type="conversation",
             participants=chunk.speakers_in_chunk,
             emotional_valence=emotional_valence,
-            knowledge_type=None,
+            knowledge_type=knowledge_type,
             stability="stable",
             source_file=processed.source_item.original_filename,
             source_chunk_index=chunk.index,
@@ -1014,11 +1021,60 @@ def transcript_to_memory_candidates(
     return candidates
 
 
+def _is_insight_chunk(text: str) -> bool:
+    """
+    Detect whether a transcript chunk contains semantic insights.
+
+    Looks for generalisation and learning markers in Spanish and English.
+    Returns True if 2+ distinct markers are found.
+    """
+    markers = [
+        # Spanish
+        "he aprendido", "he descubierto", "me doy cuenta", "me dí cuenta",
+        "siempre he", "nunca he", "en general", "lo que aprend",
+        "lo que descubrí", "lo que he aprendido", "me ayuda mucho",
+        "me parece que", "creo que es importante", "lo importante es",
+        "la clave es", "lo que funciona", "me ha enseñado", "aprendí que",
+        "descubrí que", "me di cuenta de que", "lo que noto es",
+        "una cosa que", "lo que pasa es que siempre", "en mi experiencia",
+        "a lo largo", "con el tiempo", "eso me enseñó", "lo que veo es",
+        # English
+        "i've learned", "i have learned", "i always", "i never",
+        "i realize", "i realise", "i've discovered", "in general",
+        "what i've found", "what works for me", "the key is",
+        "what matters is", "i've come to", "over time", "in my experience",
+        "i tend to", "i've noticed",
+    ]
+    text_lower = text.lower()
+    hits = sum(1 for m in markers if m in text_lower)
+    return hits >= 2
+
+
 def _map_tone_to_valence(tone: str) -> str:
     """Map emotional tone to valence category."""
-    positive_tones = ["happy", "joyful", "hopeful", "grateful", "loving", "warm"]
-    negative_tones = ["sad", "angry", "frustrated", "anxious", "tense", "difficult"]
-    reflective_tones = ["thoughtful", "contemplative", "serious", "deep"]
+    positive_tones = [
+        # English
+        "happy", "joyful", "hopeful", "grateful", "loving", "warm",
+        # Spanish
+        "feliz", "alegre", "esperanzador", "esperanzadora", "agradecido",
+        "agradecida", "amoroso", "amorosa", "cálido", "cálida", "contento",
+        "contenta", "satisfecho", "satisfecha", "entusiasmado", "entusiasmada",
+    ]
+    negative_tones = [
+        # English
+        "sad", "angry", "frustrated", "anxious", "tense", "difficult",
+        # Spanish
+        "triste", "enojado", "enojada", "frustrado", "frustrada", "ansioso",
+        "ansiosa", "tenso", "tensa", "difícil", "angustiado", "angustiada",
+        "preocupado", "preocupada", "asustado", "asustada",
+    ]
+    reflective_tones = [
+        # English
+        "thoughtful", "contemplative", "serious", "deep",
+        # Spanish
+        "reflexivo", "reflexiva", "contemplativo", "contemplativa", "serio",
+        "seria", "profundo", "profunda", "pensativo", "pensativa",
+    ]
 
     tone_lower = tone.lower()
 

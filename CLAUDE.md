@@ -1,996 +1,457 @@
-# Claude.md - Global Coding Standards
+# CLAUDE.md — UBIK Coding Standards
 
-**Version:** 2.0.0  
-**Derived From:** UBIK Digital Legacy Project  
-**Purpose:** Persistent coding rules for all Claude-code sessions
+**Version:** 3.1.0 **Supersedes:** 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
 
 ---
 
 ## Core Philosophy
 
-> **"Build systems that survive their creators."**
+**"Build systems that survive their creators."**
 
-Every piece of code should embody:
-- **Resilience** - Graceful degradation over catastrophic failure
-- **Clarity** - Code that explains itself
-- **Portability** - Run anywhere, depend on nothing specific
-- **Maintainability** - Future developers are users too
+Four qualities matter above all:
+
+- **Resilience** — graceful degradation over catastrophic failure
+- **Clarity** — code that explains itself
+- **Portability** — run anywhere, depend on nothing specific
+- **Maintainability** — future readers (including you in six months) are users too
+
+---
+
+## How to Use This Document
+
+This file has three layers, and they have an explicit order of precedence:
+
+1. **Mandatory Baseline (Part 2)** — non-negotiable rules, each marked \[MANDATORY\]. These exist because UBIK has already been hurt by violating them. If a rule here conflicts with an apparent simplification, the rule wins.
+2. **Operating Principles (Part 1)** — govern *how* Claude approaches work within that baseline. When the baseline doesn't explicitly require something, these principles apply.
+3. **Reference Material (Parts 3–4)** — concrete values (ports, paths, file layouts) and session-management tips.
+
+**Precedence rule:** When Part 1 and Part 2 appear to conflict, Part 2 wins. Example: Simplicity First's "no error handling for impossible scenarios" does not override the Mandatory Baseline requirement to wrap every external service call with a circuit breaker. Likewise, Surgical Changes' "don't touch adjacent code" does not excuse leaving a module without a docstring when §2.5 requires one.
+
+**Honest tradeoff:** §2.5 (documentation) and §2.6 (testing) are strict. They will sometimes feel heavier than §1.2 Simplicity First would call for. Simplicity First governs the *implementation* — the code you write to solve the problem. Documentation and test thoroughness are part of the baseline and override simplicity when they conflict. This is deliberate: thorough docstrings and tests are the lowest-risk way for a less-experienced coder to catch mistakes before they ship.
 
 ---
 
 ## Table of Contents
 
-1. [Project Structure](#1-project-structure)
-2. [Configuration Management](#2-configuration-management)
-3. [Resilience Patterns](#3-resilience-patterns)
-4. [Runtime Optimization](#4-runtime-optimization)
-5. [Documentation Standards](#5-documentation-standards)
-6. [Code Organization](#6-code-organization)
-7. [Error Handling](#7-error-handling)
-8. [Testing Requirements](#8-testing-requirements)
-9. [Cross-Platform Considerations](#9-cross-platform-considerations)
-10. [Security Practices](#10-security-practices)
+- [Part 1 — The Four Operating Principles](#part-1--the-four-operating-principles)
+  - [1.1 Think Before Coding](#11-think-before-coding)
+  - [1.2 Simplicity First](#12-simplicity-first)
+  - [1.3 Surgical Changes](#13-surgical-changes)
+  - [1.4 Goal-Driven Execution](#14-goal-driven-execution)
+- [Part 2 — Mandatory Baseline](#part-2--mandatory-baseline)
+  - [2.1 Configuration](#21-configuration-mandatory)
+  - [2.2 Async-First](#22-async-first-mandatory)
+  - [2.3 Resilience](#23-resilience-mandatory)
+  - [2.4 Privacy Logging](#24-privacy-logging-mandatory)
+  - [2.5 Documentation](#25-documentation-mandatory)
+  - [2.6 Testing](#26-testing-mandatory)
+  - [2.7 Security](#27-security-mandatory)
+  - [2.8 Code Organization](#28-code-organization-mandatory)
+- [Part 3 — UBIK Reference](#part-3--ubik-reference)
+- [Part 4 — Session Management](#part-4--session-management)
+- [Appendix A — Quick Reference Checklists](#appendix-a--quick-reference-checklists)
+- [Appendix B — What Changed from v2.0](#appendix-b--what-changed-from-v20)
 
 ---
 
-## 1. Project Structure
+## Part 1 — The Four Operating Principles
 
-### 1.1 Standard Directory Layout
+These govern Claude's process for any task not otherwise specified by Part 2.
+
+### 1.1 Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before writing implementation:
+
+- State assumptions explicitly. If uncertain, ask.
+- If multiple reasonable interpretations exist, present them — don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop and name what's unclear. Ask.
+
+**Why this matters for UBIK:** architecture decisions here have 20-year consequences. A wrong interpretation compounds.
+
+### 1.2 Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked — unless required by Part 2.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If 200 lines could be 50, rewrite it.
+
+Ask: *"Would a senior engineer say this is overcomplicated?"* If yes, simplify.
+
+### 1.3 Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+
+- Don't "improve" adjacent code, comments, or formatting — unless Part 2 explicitly requires it (e.g., §2.5 module docstrings must be added if missing).
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it — don't delete it.
+
+When your changes create orphans:
+
+- Remove imports, variables, or functions that *your* changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+**The test:** every changed line should trace directly to the user's request, or to a Part 2 mandate.
+
+### 1.4 Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform imperative tasks into verifiable goals:
+
+| Instead of... | Transform to... |
+|:---:|:---:|
+| "Add validation" | "Write tests for invalid inputs, then make them pass" |
+| "Fix the bug" | "Write a test that reproduces it, then make it pass" |
+| "Refactor X" | "Ensure tests pass before and after" |
+
+For multi-step tasks, state a brief plan before acting:
+
+1. \[Step\] → verify: \[check\]
+2. \[Step\] → verify: \[check\]
+3. \[Step\] → verify: \[check\]
+
+Strong success criteria let Claude loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+## Part 2 — Mandatory Baseline
+
+Every rule in this part is \[MANDATORY\]. They hold regardless of task size or apparent simplicity.
+
+### 2.1 Configuration \[MANDATORY\]
+
+**No hardcoded values in application code. Ever.**
+
+- All network addresses (IPs, hostnames) come from environment variables or a typed settings object.
+- All ports come from environment variables.
+- All credentials come from environment variables or a secrets manager.
+- All timeouts, retry counts, and thresholds come from configuration.
+
+Required artifacts in every subproject:
+
+- `.env.example` — template listing every variable, with safe defaults and comments
+- `.env` — actual values (gitignored)
+- `settings.py` (or equivalent) — typed configuration loader (Pydantic BaseSettings or `@dataclass` with `field(default_factory=...)`)
+
+**Self-test:** `grep -rE "\b100\.[0-9]+\.[0-9]+\.[0-9]+\b" <source_dir>/*.py` should return nothing from application code. Hardcoded Tailscale IPs are the specific bug this rule exists to prevent — Phase 3 v2.1 flagged this as mandatory after finding them in production code.
+
+### 2.2 Async-First \[MANDATORY\]
+
+When calling external services (vLLM, MCP, databases, HTTP APIs) from async code:
+
+- Use **async clients**: `AsyncOpenAI` (not `OpenAI`), `httpx.AsyncClient` (not `httpx.Client`), `asyncpg` (not `psycopg2`). Never the sync variant inside an async function — it blocks the event loop and freezes the entire service.
+- On connection error: **explicitly `aclose()`** the client and recreate it. Never reuse a client that may have corrupted connection state. A boolean flag (`_connected = False`) is not sufficient.
+- Use `@asynccontextmanager` for any resource with a lifecycle (connections, sessions, transactions).
+
+**Self-test for non-blocking:** if an external call takes 2 seconds, an unrelated background coroutine must continue making progress during that window. If a counter incremented every 100ms doesn't advance, you're blocking. See `~/ubik/somatic/tests/test_async_not_blocking.py` for the canonical pattern.
+
+### 2.3 Resilience \[MANDATORY\]
+
+Every external service call must be wrapped with:
+
+1. **Circuit Breaker with Probe Latch** — in HALF_OPEN state, exactly one probe request is allowed through. All others are rejected until the probe resolves. Naïve circuit breakers that let all HALF_OPEN traffic through cause thundering-herd failures.
+2. **Retry with exponential backoff + jitter** — `delay = min(base * 2^attempt, max) + random_jitter`. The jitter is not optional; it prevents synchronized retry storms.
+3. **Proper time source** — `time.monotonic()` for elapsed-time measurements, never `time.time()` (which can jump backward on NTP sync).
+4. **Thread safety** — circuit breakers shared across coroutines need `asyncio.Lock`.
+5. **Connection invalidation on error** — see §2.2.
+6. **Health checks** — every service exposes a health endpoint reporting per-component status (healthy / degraded / unhealthy) with a timestamp.
+
+**Reference implementation:** `~/ubik/somatic/mcp_client/` is the source of truth. The files below contain the canonical, tested versions. Do not reimplement these from memory — import them.
+
+| Concern | Module |
+|:---:|:---:|
+| Circuit breaker (Probe Latch) | `mcp_client/circuit_breaker.py` |
+| Retry + backoff + jitter | `mcp_client/resilience.py` |
+| Connection lifecycle | `mcp_client/connection.py` |
+| Composed client | `mcp_client/client.py` (HippocampalClientV2) |
+
+If Claude is asked to "add a circuit breaker" or "implement retry" in a new module, the correct move is: import from the existing module. Do not write a new one.
+
+### 2.4 Privacy Logging \[MANDATORY\]
+
+UBIK handles personal memory content — letters, therapy sessions, family conversations, journal entries. This data must never appear in logs. Logs may be persisted indefinitely, shipped to monitoring systems, and viewed by debugging tools.
+
+**Never log:**
+
+- Memory content (episodic or semantic)
+- Query text from the user
+- Context strings passed to the model
+- Full prompts or full model responses
+
+**Do log:**
+
+- Memory IDs (e.g., `ep_20240115_103000_123456`)
+- Similarity / relevance scores
+- Retrieval counts
+- Timing metrics (milliseconds)
+- Error types and classes — not error details that may embed content
+- Token counts
+
+Use a JSON formatter that actively redacts known-sensitive field names (`content`, `text`, `query`, `context`, `prompt`, `response`). See `~/ubik/somatic/logging_config.py` for the canonical `SafeJSONFormatter`.
+
+**Self-test before merging:** run a sample query through the pipeline with logging at DEBUG, then grep the log file for any memory content or query text. Any hit is a bug.
+
+### 2.5 Documentation \[MANDATORY\]
+
+Every module must have a header docstring covering:
+
+- What this module does
+- How it fits into the larger system
+- Key classes / functions it provides
+- A usage example
+- Dependencies (with version constraints where they matter)
+- **Tier classification:** Tier 1 (silent-failure-critical, 100% coverage) or Tier 2 (standard, 80% coverage). For Tier 1, state *why* in one sentence. See §2.6 and §3.4.1.
+
+Every public function, method, and class must have a full Google-style docstring:
+
+- **Args:** each argument with type and meaning
+- **Returns:** what comes back
+- **Raises:** each exception that can propagate
+- **Example:** at least one concrete invocation, for public API functions
+- **Note:** any non-obvious behavior (caching, side effects, thread safety)
+
+Private helpers (leading underscore) may use a one-line docstring if their behavior is self-evident from the signature and their caller is in the same module.
+
+### 2.6 Testing \[MANDATORY\]
+
+**Tier-based coverage — defined by failure mode, not module importance.**
+
+- **Tier 1 (100% coverage):** code whose *silent* failure causes harm that can't be rolled back. Tests must specifically probe the quiet failure modes, not just the loud ones. See §3.4.1 for the canonical Tier 1 registry.
+- **Tier 2 (80% minimum):** everything else. Loud failures (exceptions, None returns, failing health checks) are their own warning system; tests cover happy path plus obvious error branches.
+
+**The operational test:** *"If this fails silently at 2am, can I tell? And can I undo the damage?"* If the answer is no-and-no, it's Tier 1. If failure is noisy or recoverable, it's Tier 2. Don't let Tier 1 sprawl — scope creep here is how test maintenance becomes a drag on shipping.
+
+**Other requirements:**
+
+- **Error handling:** explicitly tested — if a code path raises, there must be a test that exercises that raise
+- **Async tests:** use pytest-asyncio with properly scoped fixtures
+- **Naming:** `test_<function>_<scenario>_<expected>()` — descriptive names serve as documentation
+
+Test structure:
+
+```
+tests/
+├── unit/           # fast, isolated, no network
+├── integration/    # cross-module, may touch local services
+├── e2e/            # full pipeline tests
+├── fixtures/       # sample data, mock responses
+└── conftest.py
+```
+
+### 2.7 Security \[MANDATORY\]
+
+- **Secrets** via environment variables or a secrets manager. Never in source control.
+- **Input validation** via Pydantic models or equivalent. Never trust caller-supplied strings.
+- **Dependency scanning** in CI (`pip-audit` or `safety`).
+- **Pinned versions** in production (`requirements.lock` from `pip freeze`).
+- **Non-root users** in containers.
+- **No sensitive data** in URL parameters, query strings, or filenames.
+
+### 2.8 Code Organization \[MANDATORY\]
+
+- **Single responsibility:** one class / function, one reason to change.
+- **Dependency injection:** construct dependencies outside the class that uses them. Never `self.db = PostgresDatabase()` inside `__init__`.
+- **Type hints everywhere:** all function signatures, all class attributes, all return types. mypy must pass in CI.
+- **Custom exception hierarchy:** rooted at a project-specific base (e.g., `UbikError`). Never raise bare `Exception`. Never catch bare `Exception` except at top-level request handlers.
+- **Explicit exports:** every `__init__.py` defines `__all__` and exports the public API.
+
+---
+
+## Part 3 — UBIK Reference
+
+### 3.1 Ports & Hosts — Canonical Assignments
+
+These are the final values from Phase 3 v2.1. In code they are loaded from env vars; this table is for human reference only.
+
+| Service | Node | Port | Env Var | Notes |
+|:---:|:---:|:---:|:---:|:---:|
+| ChromaDB | Hippocampal | 8001 | `HIPPOCAMPAL_CHROMA_PORT` | Vector store |
+| MCP Server | Hippocampal | 8080 | `HIPPOCAMPAL_MCP_PORT` | Memory tool interface |
+| Neo4j Bolt | Hippocampal | 7687 | — | Graph protocol |
+| Neo4j HTTP | Hippocampal | 7474 | — | Browser UI |
+| vLLM Server | Somatic | **8002** | `VLLM_PORT` | OpenAI-compatible; **moved from 8001 to resolve conflict with ChromaDB** |
+
+Node addresses come from Tailscale. Use hostnames (`ubik-hippocampal`, `ubik-somatic`) in config, not IPs. If Tailscale hostnames are unavailable, use `TAILSCALE_HIPPOCAMPAL_IP` and `TAILSCALE_SOMATIC_IP` env vars — never literal `100.x.x.x` in code.
+
+### 3.2 Project Structure
 
 ```
 project_root/
-├── config/                    # All configuration files
-│   ├── .env.example          # Template (ALWAYS include)
-│   ├── .env                  # Actual config (gitignored)
-│   └── settings.py           # Configuration loader
-├── src/                      # Source code (or use descriptive names)
-│   ├── __init__.py          # Package exports
-│   ├── core/                 # Core business logic
-│   ├── services/             # External service integrations
-│   └── utils/                # Shared utilities
-├── tests/
-│   ├── unit/                 # Unit tests
-│   ├── integration/          # Integration tests
-│   └── fixtures/             # Test data
-├── scripts/                  # Operational scripts
-│   ├── setup.sh             # Environment setup
-│   ├── health_check.py      # Health monitoring
-│   └── run_service.sh       # Service launcher
-├── docs/                     # Documentation
-│   ├── architecture.md      # System design
-│   ├── api.md               # API reference
-│   └── deployment.md        # Deployment guide
-├── logs/                     # Log output (gitignored)
-├── data/                     # Data storage (gitignored)
-├── docker-compose.yml        # Container orchestration
-├── requirements.txt          # Python dependencies
-├── pyproject.toml           # Modern Python config
-├── README.md                 # Project overview
-└── Claude.md                 # AI assistant rules
+├── config/              # .env, .env.example, settings.py
+├── src/ or <module>/    # source code
+├── tests/               # unit/, integration/, e2e/, fixtures/
+├── scripts/             # setup.sh, health_check.py, run_service.sh
+├── docs/                # architecture.md, api.md, deployment.md
+├── logs/                # gitignored
+├── data/                # gitignored
+├── requirements.txt
+├── pyproject.toml
+├── README.md
+└── CLAUDE.md            # this file
 ```
 
-### 1.2 Naming Conventions
+### 3.3 Naming Conventions
 
 | Type | Convention | Example |
-|------|------------|---------|
+|:---:|:---:|:---:|
 | Files | snake_case | `mcp_client.py` |
 | Classes | PascalCase | `HippocampalClient` |
 | Functions | snake_case | `get_rag_context()` |
 | Constants | SCREAMING_SNAKE | `MAX_RETRIES = 3` |
-| Private | Leading underscore | `_internal_state` |
-| Config | SCREAMING_SNAKE in .env | `HIPPOCAMPAL_HOST` |
+| Private members | Leading underscore | `_internal_state` |
+| Config vars (.env) | SCREAMING_SNAKE | `HIPPOCAMPAL_HOST` |
 
-### 1.3 Package Exports
+### 3.4 Where the Canonical Code Lives
 
-**Always define explicit exports in `__init__.py`:**
+Do not reimplement these. Import them.
 
-```python
-"""
-Package Name - Brief Description
+| Concern | Location |
+|:---:|:---:|
+| Circuit Breaker (Probe Latch) | `~/ubik/somatic/mcp_client/circuit_breaker.py` |
+| Retry + backoff + jitter | `~/ubik/somatic/mcp_client/resilience.py` |
+| Connection lifecycle | `~/ubik/somatic/mcp_client/connection.py` |
+| Unified MCP client | `~/ubik/somatic/mcp_client/client.py` |
+| Safe JSON logger | `~/ubik/somatic/logging_config.py` |
+| Settings loader (Pydantic) | `~/ubik/somatic/config/settings.py` |
+| Non-blocking self-test | `~/ubik/somatic/tests/test_async_not_blocking.py` |
 
-Detailed description of what this package provides.
-"""
+#### 3.4.1 Tier 1 Critical-Path Registry
 
-from .module_a import ClassA, function_a
-from .module_b import ClassB, ClassBConfig
+These modules share one property: **failure is silent, and damage compounds before anyone notices.** They require 100% coverage per §2.6, and tests must deliberately probe the quiet failure modes — not just confirm the happy path works.
 
-__all__ = [
-    'ClassA',
-    'function_a',
-    'ClassB',
-    'ClassBConfig',
-]
+| # | Concern | Location | Why Tier 1 (silent-failure mode) |
+|:---:|:---:|:---:|:---:|
+| 1 | Memory writes (`store_episodic`, `store_semantic`, `update_identity_graph`) | `~/ubik/hippocampal/mcp_server.py` | Corrupted or mis-tagged writes can't be rolled back; bad data compounds in retrieval forever |
+| 2 | Reasoning-chain stripping (`strip_reasoning`) | `~/ubik/somatic/prompts/parser.py` | A silent leak contaminates voice output without anyone noticing until a family member reads it |
+| 3 | Voice Freeze state machine (`freeze_semantic`, `unfreeze_semantic`) | `~/ubik/hippocampal/mcp_server.py` | A silent unfreeze during post-training writes poisons the trained voice and is invisible in logs |
+| 4 | Privacy redaction (`SafeJSONFormatter`) | `~/ubik/somatic/logging_config.py` | Silent failure = memory content lands in persisted logs; discovered only by manual audit |
+| 5 | Ingestion deduplication (source-document-ID) | *(planned — tag location once built on Hippocampal Node)* | Silent duplicates skew retrieval probabilities; bias discovered years later, if at all |
+| 6 | Circuit Breaker Probe Latch (`allow_request`) | `~/ubik/somatic/mcp_client/circuit_breaker.py` | Silent loss of the one-probe invariant = thundering herd when the Hippocampal Node recovers |
 
-__version__ = '1.0.0'
-```
+**Adding a new Tier 1 entry:** the proposing module's header docstring must declare the tier (§2.5), state the silent-failure reason in one sentence, and there must be at least one test that deliberately triggers the silent failure mode (not just the loud one). Changes to this registry require updating CLAUDE.md itself — it is load-bearing.
 
----
+**Removing an entry:** only if the underlying failure mode has been made loud (e.g., the code now raises, fails a health check, or is monitored by an alert). Shrinking the registry through re-engineering the code is encouraged. Shrinking it by weakening the definition of "critical" is not.
 
-## 2. Configuration Management
+### 3.5 Cross-Platform & Docker
 
-### 2.1 Environment-Based Configuration
-
-**Always use dataclasses with factory defaults:**
-
-```python
-from dataclasses import dataclass, field
-from typing import Optional
-import os
-
-@dataclass
-class ServiceConfig:
-    """Configuration for external service."""
-    host: str = field(default_factory=lambda: os.getenv("SERVICE_HOST", "localhost"))
-    port: int = field(default_factory=lambda: int(os.getenv("SERVICE_PORT", "8080")))
-    timeout: float = field(default_factory=lambda: float(os.getenv("SERVICE_TIMEOUT", "30.0")))
-    max_retries: int = field(default_factory=lambda: int(os.getenv("MAX_RETRIES", "3")))
-    
-    @property
-    def base_url(self) -> str:
-        """Computed property for full URL."""
-        return f"http://{self.host}:{self.port}"
-    
-    def validate(self) -> bool:
-        """Validate configuration values."""
-        if self.port < 1 or self.port > 65535:
-            raise ValueError(f"Invalid port: {self.port}")
-        if self.timeout <= 0:
-            raise ValueError(f"Timeout must be positive: {self.timeout}")
-        return True
-```
-
-### 2.2 Configuration Hierarchy
-
-Load configuration in this order (later overrides earlier):
-
-1. **Hardcoded defaults** - In dataclass field defaults
-2. **Config files** - `.env` or `config.yaml`
-3. **Environment variables** - `os.getenv()`
-4. **Command line arguments** - For runtime overrides
-
-### 2.3 Required .env.example
-
-**Every project MUST have a `.env.example`:**
-
-```bash
-# =============================================================================
-# Project Name - Configuration
-# =============================================================================
-
-# -----------------------------------------------------------------------------
-# Service Connection
-# -----------------------------------------------------------------------------
-SERVICE_HOST=localhost
-SERVICE_PORT=8080
-SERVICE_TIMEOUT=30.0
-
-# -----------------------------------------------------------------------------
-# Performance Tuning
-# -----------------------------------------------------------------------------
-MAX_RETRIES=3
-RETRY_BASE_DELAY=1.0
-CIRCUIT_BREAKER_THRESHOLD=5
-
-# -----------------------------------------------------------------------------
-# Logging
-# -----------------------------------------------------------------------------
-LOG_LEVEL=INFO
-LOG_DIR=./logs
-LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
-```
+- Use `pathlib.Path` for all filesystem paths. Never string concatenation, never hardcoded `/home/gasu/...` or `C:\Users\...`.
+- Detect OS via `platform.system()` when platform-specific logic is unavoidable. UBIK runs on macOS (Hippocampal, Mac Mini M4) and Linux/WSL2 (Somatic).
+- Docker: multi-stage builds, non-root user, explicit `HEALTHCHECK` directive, pinned base image digest.
 
 ---
 
-## 3. Resilience Patterns
+## Part 4 — Session Management
 
-### 3.1 Circuit Breaker Pattern
+### 4.1 Model Selection
 
-**Implement for all external service calls:**
+CLAUDE.md is re-read from disk at the start of every session.
 
-```python
-from enum import Enum
-from dataclasses import dataclass, field
-from typing import Optional
-import time
+| Task type | Model |
+|:---:|:---:|
+| Bug fixes, unit tests, documentation | Sonnet 4.6 |
+| Refactoring core architecture, complex race conditions | Opus 4.6 |
 
-class CircuitState(Enum):
-    CLOSED = "closed"       # Normal operation
-    OPEN = "open"           # Failing, reject requests
-    HALF_OPEN = "half_open" # Testing recovery
+Override per-session: `/model <alias|name>` (e.g., `/model opus`).
 
-@dataclass
-class CircuitBreaker:
-    """Prevent cascade failures to external services."""
-    threshold: int = 5          # Failures before opening
-    timeout: float = 60.0       # Seconds before half-open
-    
-    _failure_count: int = field(default=0, init=False)
-    _last_failure_time: Optional[float] = field(default=None, init=False)
-    _state: CircuitState = field(default=CircuitState.CLOSED, init=False)
-    
-    @property
-    def state(self) -> CircuitState:
-        if self._state == CircuitState.OPEN:
-            if self._last_failure_time and \
-               time.time() - self._last_failure_time > self.timeout:
-                self._state = CircuitState.HALF_OPEN
-        return self._state
-    
-    def record_success(self):
-        self._failure_count = 0
-        if self._state == CircuitState.HALF_OPEN:
-            self._state = CircuitState.CLOSED
-    
-    def record_failure(self):
-        self._failure_count += 1
-        self._last_failure_time = time.time()
-        if self._failure_count >= self.threshold:
-            self._state = CircuitState.OPEN
-    
-    def allow_request(self) -> bool:
-        return self.state != CircuitState.OPEN
-```
+### 4.2 Configuration Priority
 
-### 3.2 Retry with Exponential Backoff
+Highest to lowest:
 
-**Standard retry pattern for transient failures:**
+1. Session command — `/model <alias|name>`
+2. CLI flag — `claude --model <alias|name>`
+3. Environment variable — `ANTHROPIC_MODEL`
+4. Settings file — `~/.claude/settings.json` → `"model": "..."`
 
-```python
-import asyncio
-from typing import TypeVar, Callable, Any
+### 4.3 Context Window
 
-T = TypeVar('T')
+Run `/compact` every 20–30 turns to keep context lean.
 
-async def retry_with_backoff(
-    func: Callable[..., T],
-    *args,
-    max_retries: int = 3,
-    base_delay: float = 1.0,
-    max_delay: float = 30.0,
-    **kwargs
-) -> T:
-    """
-    Retry a function with exponential backoff.
-    
-    Args:
-        func: Function to retry
-        max_retries: Maximum retry attempts
-        base_delay: Initial delay in seconds
-        max_delay: Maximum delay cap
-        
-    Returns:
-        Function result
-        
-    Raises:
-        Last exception after all retries exhausted
-    """
-    last_exception = None
-    
-    for attempt in range(max_retries + 1):
-        try:
-            return await func(*args, **kwargs)
-        except Exception as e:
-            last_exception = e
-            
-            if attempt < max_retries:
-                delay = min(base_delay * (2 ** attempt), max_delay)
-                logger.warning(
-                    f"Attempt {attempt + 1}/{max_retries + 1} failed: {e}. "
-                    f"Retrying in {delay:.1f}s"
-                )
-                await asyncio.sleep(delay)
-    
-    raise last_exception
-```
+`/compact` affects: the current session's conversation history (summarized and compressed).
 
-### 3.3 Health Check Pattern
+`/compact` does **not** affect:
 
-**Every service MUST expose health status:**
-
-```python
-from dataclasses import dataclass
-from typing import Dict, Any
-from datetime import datetime
-
-@dataclass
-class HealthStatus:
-    status: str  # "healthy", "degraded", "unhealthy"
-    timestamp: str
-    components: Dict[str, Dict[str, Any]]
-    
-    @classmethod
-    def check_all(cls, checks: Dict[str, Callable]) -> "HealthStatus":
-        """Run all health checks and aggregate results."""
-        components = {}
-        
-        for name, check_func in checks.items():
-            try:
-                result = check_func()
-                components[name] = {"status": "healthy", **result}
-            except Exception as e:
-                components[name] = {"status": "unhealthy", "error": str(e)}
-        
-        all_healthy = all(c.get("status") == "healthy" for c in components.values())
-        
-        return cls(
-            status="healthy" if all_healthy else "degraded",
-            timestamp=datetime.now().isoformat(),
-            components=components
-        )
-```
+- `CLAUDE.md` — always re-read fresh from disk at session start
+- `~/.claude/projects/*/memory/` — file-based, persist independently
+- File edits already written to disk
 
 ---
 
-## 4. Runtime Optimization
+## Appendix A — Quick Reference Checklists
 
-### 4.1 Lazy Loading
+### File Creation
 
-**Never initialize expensive resources until needed:**
-
-```python
-class ServiceClient:
-    """Client with lazy-loaded connections."""
-    
-    def __init__(self, config: ServiceConfig):
-        self.config = config
-        self._connection: Optional[Connection] = None  # Lazy
-        self._cache: Optional[Cache] = None            # Lazy
-    
-    @property
-    def connection(self) -> Connection:
-        """Lazy-load database connection."""
-        if self._connection is None:
-            self._connection = Connection(self.config.connection_string)
-            logger.info("Database connection initialized")
-        return self._connection
-    
-    @property
-    def cache(self) -> Cache:
-        """Lazy-load cache client."""
-        if self._cache is None:
-            self._cache = Cache(self.config.cache_url)
-        return self._cache
-```
-
-### 4.2 Connection Pooling
-
-**Always pool connections for external services:**
-
-```python
-import httpx
-
-# HTTP Connection Pool
-http_client = httpx.AsyncClient(
-    timeout=httpx.Timeout(30.0),
-    limits=httpx.Limits(
-        max_connections=100,
-        max_keepalive_connections=20,
-        keepalive_expiry=30.0
-    )
-)
-
-# Database Connection Pool (example with asyncpg)
-pool = await asyncpg.create_pool(
-    dsn=config.database_url,
-    min_size=5,
-    max_size=20,
-    command_timeout=30
-)
-```
-
-### 4.3 Context Managers for Resources
-
-**Always use context managers for resource lifecycle:**
-
-```python
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def service_session():
-    """Managed session for service client."""
-    client = ServiceClient()
-    try:
-        await client.connect()
-        yield client
-    finally:
-        await client.disconnect()
-
-# Usage
-async with service_session() as client:
-    result = await client.query("...")
-```
-
-### 4.4 Caching Strategy
-
-```python
-from functools import lru_cache
-from datetime import datetime, timedelta
-
-# Simple in-memory cache for expensive computations
-@lru_cache(maxsize=128)
-def compute_expensive_result(input_hash: str) -> Result:
-    """Cached computation."""
-    return expensive_operation(input_hash)
-
-# Time-based cache
-class TTLCache:
-    """Simple TTL cache for configuration values."""
-    
-    def __init__(self, ttl_seconds: int = 300):
-        self._cache: Dict[str, tuple] = {}
-        self._ttl = timedelta(seconds=ttl_seconds)
-    
-    def get(self, key: str) -> Optional[Any]:
-        if key in self._cache:
-            value, timestamp = self._cache[key]
-            if datetime.now() - timestamp < self._ttl:
-                return value
-            del self._cache[key]
-        return None
-    
-    def set(self, key: str, value: Any):
-        self._cache[key] = (value, datetime.now())
-```
-
----
-
-## 5. Documentation Standards
-
-### 5.1 Module Docstrings
-
-**Every module MUST have a header docstring:**
-
-```python
-#!/usr/bin/env python3
-"""
-Module Name - Brief Description
-
-Extended description explaining:
-- What this module does
-- How it fits into the larger system
-- Key classes/functions it provides
-- Important design decisions
-
-Usage:
-    from module import MainClass
-    
-    client = MainClass(config)
-    result = await client.operation()
-
-Dependencies:
-    - external_package>=1.0.0
-    - another_package>=2.0.0
-
-Author: Project Team
-Version: 1.0.0
-"""
-```
-
-### 5.2 Function/Method Docstrings
-
-**Use Google-style docstrings:**
-
-```python
-async def process_query(
-    query: str,
-    context: Optional[str] = None,
-    max_results: int = 10
-) -> List[Result]:
-    """
-    Process a semantic query against the knowledge base.
-    
-    Performs vector similarity search and returns ranked results
-    with relevance scores.
-    
-    Args:
-        query: The search query text
-        context: Optional context to narrow search scope
-        max_results: Maximum number of results to return (1-100)
-        
-    Returns:
-        List of Result objects ordered by relevance score,
-        each containing:
-            - id: Unique result identifier
-            - content: Matched content text
-            - score: Relevance score (0.0-1.0)
-            - metadata: Additional result metadata
-            
-    Raises:
-        ConnectionError: If database is unreachable
-        ValidationError: If query is empty or max_results invalid
-        
-    Example:
-        >>> results = await process_query("family values", max_results=5)
-        >>> for r in results:
-        ...     print(f"{r.score:.2f}: {r.content[:50]}")
-        0.95: Family has always been at the center of my life...
-        
-    Note:
-        Results are cached for 5 minutes. Use force_refresh=True
-        to bypass cache.
-    """
-```
-
-### 5.3 Class Docstrings
-
-```python
-class RAGService:
-    """
-    Unified RAG service for memory-augmented generation.
-    
-    Orchestrates the complete pipeline:
-    1. Retrieve relevant memories from knowledge store
-    2. Select appropriate prompt template
-    3. Generate response via LLM
-    4. Post-process for quality output
-    
-    Attributes:
-        config: Service configuration
-        prompt_manager: Manages prompt templates
-        circuit_breaker: Prevents cascade failures
-        
-    Example:
-        service = RAGService(config)
-        response = await service.ask("What matters most?")
-        print(response.text)
-        
-    Thread Safety:
-        This class is thread-safe. Multiple coroutines can
-        share a single instance.
-        
-    See Also:
-        - HippocampalClient: Memory retrieval client
-        - VoicePromptManager: Prompt template management
-    """
-```
-
-### 5.4 Architecture Documentation
-
-**Include ASCII diagrams in architecture docs:**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    System Architecture                       │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌──────────────┐         ┌──────────────┐                 │
-│  │   Client     │◄───────►│   Gateway    │                 │
-│  │   Layer      │  HTTP   │   Service    │                 │
-│  └──────────────┘         └──────┬───────┘                 │
-│                                  │                          │
-│                    ┌─────────────┼─────────────┐           │
-│                    ▼             ▼             ▼           │
-│             ┌──────────┐  ┌──────────┐  ┌──────────┐      │
-│             │ Service  │  │ Service  │  │ Service  │      │
-│             │    A     │  │    B     │  │    C     │      │
-│             └────┬─────┘  └────┬─────┘  └────┬─────┘      │
-│                  │             │             │             │
-│                  └─────────────┼─────────────┘             │
-│                                ▼                            │
-│                         ┌──────────┐                       │
-│                         │ Database │                       │
-│                         │  Layer   │                       │
-│                         └──────────┘                       │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 6. Code Organization
-
-### 6.1 Single Responsibility
-
-**Each class/function should do ONE thing:**
-
-```python
-# BAD - Multiple responsibilities
-class DataManager:
-    def fetch_data(self): ...
-    def transform_data(self): ...
-    def store_data(self): ...
-    def send_notification(self): ...
-
-# GOOD - Separated concerns
-class DataFetcher:
-    def fetch(self) -> RawData: ...
-
-class DataTransformer:
-    def transform(self, raw: RawData) -> ProcessedData: ...
-
-class DataStore:
-    def save(self, data: ProcessedData) -> str: ...
-
-class NotificationService:
-    def notify(self, event: Event) -> None: ...
-```
-
-### 6.2 Dependency Injection
-
-**Inject dependencies, don't hardcode them:**
-
-```python
-# BAD - Hardcoded dependency
-class ReportGenerator:
-    def __init__(self):
-        self.db = PostgresDatabase()  # Hardcoded!
-    
-# GOOD - Injected dependency
-class ReportGenerator:
-    def __init__(self, database: Database):
-        self.db = database
-        
-# Usage
-db = PostgresDatabase(config)
-generator = ReportGenerator(database=db)
-
-# Testing
-mock_db = MockDatabase()
-test_generator = ReportGenerator(database=mock_db)
-```
-
-### 6.3 Type Hints
-
-**Use type hints EVERYWHERE:**
-
-```python
-from typing import Optional, List, Dict, Any, TypeVar, Generic
-from dataclasses import dataclass
-
-T = TypeVar('T')
-
-@dataclass
-class Result(Generic[T]):
-    """Generic result container."""
-    data: T
-    success: bool
-    error: Optional[str] = None
-
-async def fetch_items(
-    ids: List[str],
-    filters: Optional[Dict[str, Any]] = None,
-    limit: int = 100
-) -> Result[List[Item]]:
-    """Fetch items with full type safety."""
-    ...
-```
-
----
-
-## 7. Error Handling
-
-### 7.1 Custom Exception Hierarchy
-
-**Define project-specific exceptions:**
-
-```python
-class ProjectError(Exception):
-    """Base exception for all project errors."""
-    pass
-
-class ConfigurationError(ProjectError):
-    """Invalid or missing configuration."""
-    pass
-
-class ConnectionError(ProjectError):
-    """Failed to connect to external service."""
-    def __init__(self, service: str, reason: str):
-        self.service = service
-        self.reason = reason
-        super().__init__(f"Connection to {service} failed: {reason}")
-
-class ValidationError(ProjectError):
-    """Input validation failed."""
-    def __init__(self, field: str, message: str):
-        self.field = field
-        self.message = message
-        super().__init__(f"Validation error on '{field}': {message}")
-```
-
-### 7.2 Error Handling Pattern
-
-```python
-async def safe_operation(input_data: InputData) -> Result:
-    """
-    Perform operation with comprehensive error handling.
-    
-    Returns Result object instead of raising exceptions
-    for expected error conditions.
-    """
-    # Validation
-    try:
-        validated = validate(input_data)
-    except ValidationError as e:
-        return Result(success=False, error=f"Validation failed: {e}")
-    
-    # Operation
-    try:
-        result = await perform_operation(validated)
-        return Result(success=True, data=result)
-    except ConnectionError as e:
-        logger.error(f"Connection error: {e}")
-        return Result(success=False, error="Service temporarily unavailable")
-    except Exception as e:
-        logger.exception(f"Unexpected error: {e}")
-        # Re-raise unexpected errors
-        raise
-```
-
-### 7.3 Logging Standards
-
-```python
-import logging
-import structlog
-
-# Configure structured logging
-structlog.configure(
-    processors=[
-        structlog.stdlib.filter_by_level,
-        structlog.stdlib.add_logger_name,
-        structlog.stdlib.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
-        structlog.processors.JSONRenderer()
-    ],
-    wrapper_class=structlog.stdlib.BoundLogger,
-    context_class=dict,
-    logger_factory=structlog.stdlib.LoggerFactory(),
-)
-
-logger = structlog.get_logger(__name__)
-
-# Usage - always include context
-logger.info("Operation started", 
-            operation="fetch_data", 
-            user_id=user_id,
-            request_id=request_id)
-
-logger.error("Operation failed",
-             operation="fetch_data",
-             error=str(e),
-             duration_ms=elapsed)
-```
-
----
-
-## 8. Testing Requirements
-
-### 8.1 Test Structure
-
-```
-tests/
-├── unit/
-│   ├── test_models.py
-│   ├── test_services.py
-│   └── test_utils.py
-├── integration/
-│   ├── test_database.py
-│   ├── test_api.py
-│   └── test_external_services.py
-├── e2e/
-│   └── test_full_pipeline.py
-├── fixtures/
-│   ├── sample_data.json
-│   └── mock_responses.py
-└── conftest.py
-```
-
-### 8.2 Test Naming Convention
-
-```python
-def test_<function>_<scenario>_<expected_result>():
-    """Descriptive test names."""
-    pass
-
-# Examples
-def test_validate_input_empty_string_raises_validation_error():
-    ...
-
-def test_fetch_data_network_timeout_returns_empty_result():
-    ...
-
-def test_process_query_valid_input_returns_ranked_results():
-    ...
-```
-
-### 8.3 Async Test Pattern
-
-```python
-import pytest
-import pytest_asyncio
-
-@pytest.fixture
-async def client():
-    """Async fixture for test client."""
-    client = ServiceClient(test_config)
-    await client.connect()
-    yield client
-    await client.disconnect()
-
-@pytest.mark.asyncio
-async def test_query_returns_results(client):
-    """Test async operation."""
-    results = await client.query("test query")
-    assert len(results) > 0
-    assert all(hasattr(r, 'score') for r in results)
-```
-
-### 8.4 Coverage Requirements
-
-- **Minimum coverage:** 80%
-- **Critical paths:** 100%
-- **Error handling:** Explicitly tested
-
----
-
-## 9. Cross-Platform Considerations
-
-### 9.1 Path Handling
-
-```python
-from pathlib import Path
-
-# GOOD - Cross-platform paths
-config_dir = Path.home() / "project" / "config"
-data_file = config_dir / "data.json"
-
-# Check existence
-if data_file.exists():
-    content = data_file.read_text()
-
-# BAD - Hardcoded paths
-config_dir = "/home/user/project/config"  # Linux only!
-```
-
-### 9.2 Environment Detection
-
-```python
-import sys
-import platform
-
-def get_platform_info() -> Dict[str, str]:
-    """Get current platform information."""
-    return {
-        "os": platform.system(),          # 'Linux', 'Darwin', 'Windows'
-        "arch": platform.machine(),       # 'x86_64', 'arm64'
-        "python": platform.python_version(),
-        "node": platform.node()
-    }
-
-def get_default_data_dir() -> Path:
-    """Get platform-appropriate data directory."""
-    system = platform.system()
-    
-    if system == "Darwin":  # macOS
-        return Path.home() / "Library" / "Application Support" / "ProjectName"
-    elif system == "Windows":
-        return Path(os.environ.get("APPDATA", "")) / "ProjectName"
-    else:  # Linux/Unix
-        return Path.home() / ".local" / "share" / "projectname"
-```
-
-### 9.3 Docker Best Practices
-
-```dockerfile
-# Use multi-stage builds
-FROM python:3.11-slim as builder
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-FROM python:3.11-slim as runtime
-
-# Non-root user
-RUN useradd -m -u 1000 appuser
-USER appuser
-
-WORKDIR /app
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
-COPY --chown=appuser:appuser . .
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8080/health')"
-
-EXPOSE 8080
-CMD ["python", "-m", "service"]
-```
-
----
-
-## 10. Security Practices
-
-### 10.1 Secrets Management
-
-```python
-# NEVER hardcode secrets
-# BAD
-API_KEY = "sk-abc123..."
-
-# GOOD - Environment variable
-API_KEY = os.getenv("API_KEY")
-if not API_KEY:
-    raise ConfigurationError("API_KEY environment variable required")
-
-# BETTER - Secrets manager
-from secrets_manager import get_secret
-API_KEY = get_secret("project/api_key")
-```
-
-### 10.2 Input Validation
-
-```python
-from pydantic import BaseModel, validator, constr
-
-class UserInput(BaseModel):
-    """Validated user input."""
-    query: constr(min_length=1, max_length=1000)
-    limit: int = 10
-    
-    @validator('limit')
-    def limit_must_be_reasonable(cls, v):
-        if not 1 <= v <= 100:
-            raise ValueError('limit must be between 1 and 100')
-        return v
-    
-    @validator('query')
-    def query_must_be_safe(cls, v):
-        # Prevent injection attacks
-        dangerous_patterns = ['<script>', 'DROP TABLE', '--']
-        for pattern in dangerous_patterns:
-            if pattern.lower() in v.lower():
-                raise ValueError('Invalid characters in query')
-        return v.strip()
-```
-
-### 10.3 Dependency Security
-
-```bash
-# In CI/CD pipeline
-pip install safety
-safety check -r requirements.txt
-
-# Pin exact versions in production
-pip freeze > requirements.lock
-```
-
----
-
-## Quick Reference Card
-
-### File Creation Checklist
-- [ ] Module docstring with purpose, usage, dependencies
-- [ ] Type hints on all functions
-- [ ] Dataclass for configuration
+- [ ] Module docstring (purpose, usage, dependencies)
+- [ ] Type hints on every function signature
+- [ ] Configuration loaded from env (no hardcoded values)
 - [ ] Custom exceptions for error cases
-- [ ] Context manager for resources
-- [ ] Health check endpoint
-- [ ] Unit tests file created
+- [ ] Context manager for any resource with a lifecycle
+- [ ] Health check exposed (if a service)
+- [ ] Test file created alongside
 
-### Code Review Checklist
-- [ ] No hardcoded values (use config)
-- [ ] Error handling is comprehensive
-- [ ] Logging is contextual
-- [ ] Resources are properly closed
-- [ ] Type hints are accurate
-- [ ] Docstrings are complete
-- [ ] Tests cover edge cases
+### Code Review
 
-### Performance Checklist
-- [ ] Lazy loading for expensive resources
-- [ ] Connection pooling enabled
-- [ ] Appropriate caching in place
-- [ ] Circuit breaker for external calls
-- [ ] Async where beneficial
+- [ ] No hardcoded values (grep confirms)
+- [ ] Async client used inside async functions (`AsyncOpenAI`, `httpx.AsyncClient`)
+- [ ] Circuit breaker + retry wrap every external call
+- [ ] Logs contain no memory content, queries, or context strings
+- [ ] Resources explicitly `aclose()`'d on error
+- [ ] Type hints accurate, mypy passes
+- [ ] Docstrings complete (Args / Returns / Raises)
+- [ ] Tests cover error paths, not just happy path
+
+### Performance
+
+- [ ] Lazy loading for expensive resources (`@property` pattern)
+- [ ] Connection pooling enabled (`httpx.Limits`, `asyncpg.create_pool`)
+- [ ] Caching present where warranted (`@lru_cache`, TTL cache)
+- [ ] Circuit breaker on every external call
+- [ ] `AsyncOpenAI` (not `OpenAI`) in async paths
 - [ ] No N+1 query patterns
+
+### Before Declaring a Feature Done
+
+- [ ] All tests pass (`pytest`)
+- [ ] mypy passes
+- [ ] ruff + black pass
+- [ ] Logs reviewed at DEBUG level — no sensitive fields leak
+- [ ] Success criteria from the original request all verified (§1.4)
+- [ ] CLAUDE.md consulted for anything that might apply
+
+---
+
+## Appendix B — What Changed from v2.0
+
+| Area | v2.0 | v3.0 |
+|:---:|:---:|:---:|
+| Circuit breaker example code | Original (broken: no Probe Latch, time.time(), no lock) | Removed; points to `mcp_client/circuit_breaker.py` as source of truth |
+| Retry code | No jitter | Jitter is now an explicit mandatory element (§2.3) |
+| Async vs sync clients | Not addressed | §2.2 mandates AsyncOpenAI, aclose() on error |
+| Logging privacy | Generic structured logging | §2.4 explicitly prohibits logging memory content |
+| Hardcoded IPs | Implicit | §2.1 explicitly forbids; grep-testable self-test |
+| Karpathy Principles | §11 (appended) | Part 1 (structural); precedence rule kept and tightened |
+| Code examples | ~800 lines of inline Python | Removed; canonical implementations referenced |
+| Testing strictness | 80% coverage / 100% critical | Retained — explicit conflict note with Simplicity First |
+| Docstring strictness | Full Google style everywhere | Retained — with a carve-out for trivial private helpers |
+| Length | ~1,200 lines | ~380 lines |
 
 ---
 
 ## Version History
 
 | Version | Date | Changes |
-|---------|------|---------|
-| 2.0.0 | 2025-01 | Derived from UBIK project learnings |
+|:---:|:---:|:---:|
+| 3.1.0 | 2026-04 | §2.6 rewritten around tier-based coverage defined by failure mode, not module importance; §3.4.1 Tier 1 Critical-Path Registry added (6 initial entries); §2.5 requires module docstrings to declare tier classification |
+| 3.0.0 | 2026-04 | Full restructure: four principles woven structurally (not appended); resilience mandates aligned with Phase 3 v2.1 (Probe Latch circuit breaker, jitter, async-first, connection hygiene); privacy logging rule added; verbose code examples removed in favor of canonical module references; ~70% shorter |
+| 2.0.0 | 2025-01 | Derived from UBIK project learnings; Karpathy Principles appended as §11 |
 | 1.0.0 | 2024-01 | Initial release |
 
 ---

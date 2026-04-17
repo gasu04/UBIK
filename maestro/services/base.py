@@ -202,6 +202,19 @@ class UbikService(ABC):
     def depends_on(self) -> list[str]:
         """Names of services that must be started before this one."""
 
+    # ── Auto-start behaviour ───────────────────────────────────────────────
+
+    @property
+    def auto_start(self) -> bool:
+        """Whether this service is included in ``maestro start``.
+
+        Override with ``False`` for services that must be started manually
+        (e.g. GPU-exclusive services that cannot coexist with another
+        running service).  Such services are still shown in ``status`` but
+        are never automatically started by :meth:`ensure_all_running`.
+        """
+        return True
+
     # ── Lifecycle methods (must be overridden) ─────────────────────────────
 
     @abstractmethod

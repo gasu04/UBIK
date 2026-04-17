@@ -49,16 +49,20 @@ __all__ = [
 EPISODIC_PATTERNS = {
     # Letter patterns
     "letter_opening": re.compile(
-        r'\b(Dear|Dearest|My dear|To my)\b',
+        r'\b(Dear|Dearest|My dear|To my|'
+        r'Querido|Querida|Mi querido|Mi querida|A mi)\b',
         re.IGNORECASE
     ),
     "letter_closing": re.compile(
         r'\b(Love,|With love,|Yours truly,|Sincerely,|Your loving|'
-        r'All my love,|Forever yours,|With all my heart)\b',
+        r'All my love,|Forever yours,|With all my heart|'
+        r'Con amor,|Con cariño,|Tuyo,|Tuya,|Con todo mi amor,|'
+        r'Para siempre tuyo,|Para siempre tuya,|Con todo mi cariño)\b',
         re.IGNORECASE
     ),
     "salutation": re.compile(
-        r'\b(Dear\s+\w+|Hi\s+\w+|Hello\s+\w+)\b',
+        r'\b(Dear\s+\w+|Hi\s+\w+|Hello\s+\w+|'
+        r'Querido\s+\w+|Querida\s+\w+|Hola\s+\w+)\b',
         re.IGNORECASE
     ),
 
@@ -68,12 +72,18 @@ EPISODIC_PATTERNS = {
         r'This (morning|afternoon|evening)|On (Monday|Tuesday|Wednesday|'
         r'Thursday|Friday|Saturday|Sunday)|In (January|February|March|'
         r'April|May|June|July|August|September|October|November|December)|'
+        r'Hoy|Ayer|Mañana|La semana pasada|El mes pasado|El año pasado|'
+        r'Esta (mañana|tarde|noche)|El (lunes|martes|miércoles|jueves|'
+        r'viernes|sábado|domingo)|En (enero|febrero|marzo|abril|mayo|'
+        r'junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|'
         r'\d{1,2}/\d{1,2}/\d{2,4}|\d{4})\b',
         re.IGNORECASE
     ),
     "temporal_marker": re.compile(
         r'\b(When I was|Back in|During|At the time|That day|'
-        r'That night|One day|Once upon|I remember when)\b',
+        r'That night|One day|Once upon|I remember when|'
+        r'Cuando era|De vuelta en|Durante|En ese momento|Ese día|'
+        r'Esa noche|Un día|Una vez|Recuerdo cuando|Hace años|Hace tiempo)\b',
         re.IGNORECASE
     ),
 
@@ -81,20 +91,26 @@ EPISODIC_PATTERNS = {
     "past_narrative": re.compile(
         r'\b(I (went|saw|heard|felt|met|visited|attended|experienced|'
         r'discovered|learned|realized|decided|chose|made|took|gave|'
-        r'told|asked|said|thought|knew|understood|remembered))\b',
+        r'told|asked|said|thought|knew|understood|remembered)|'
+        r'(fui|vi|escuché|sentí|conocí|visité|asistí|experimenté|'
+        r'descubrí|aprendí|me di cuenta|decidí|elegí|hice|tomé|di|'
+        r'dije|pregunté|pensé|supe|entendí|recordé))\b',
         re.IGNORECASE
     ),
 
     # Dialogue markers
     "dialogue": re.compile(
-        r'("[^"]+"|\'[^\']+\'|\bsaid\b|\basked\b|\breplied\b|\btold me\b)',
+        r'("[^"]+"|\'[^\']+\'|\bsaid\b|\basked\b|\breplied\b|\btold me\b|'
+        r'\bdijo\b|\bpreguntó\b|\brespondió\b|\bme dijo\b)',
         re.IGNORECASE
     ),
 
     # Therapy/session patterns
     "therapy": re.compile(
         r'\b(therapy|session|therapist|counselor|talked about|'
-        r'we discussed|worked through|breakthrough)\b',
+        r'we discussed|worked through|breakthrough|'
+        r'terapia|sesión|terapeuta|consejero|consejera|hablamos de|'
+        r'discutimos|trabajamos|avance|avanzamos)\b',
         re.IGNORECASE
     ),
 
@@ -102,14 +118,19 @@ EPISODIC_PATTERNS = {
     "event": re.compile(
         r'\b(wedding|funeral|birthday|anniversary|graduation|'
         r'ceremony|celebration|party|reunion|vacation|trip|'
-        r'hospital|surgery|diagnosis|meeting|interview)\b',
+        r'hospital|surgery|diagnosis|meeting|interview|'
+        r'boda|funeral|cumpleaños|aniversario|graduación|'
+        r'ceremonia|celebración|fiesta|reunión|vacaciones|viaje|'
+        r'hospital|cirugía|diagnóstico|cita|entrevista)\b',
         re.IGNORECASE
     ),
 
     # Specific memories
     "memory_marker": re.compile(
         r'\b(I remember|I recall|I\'ll never forget|'
-        r'It was the first time|That was when|The moment)\b',
+        r'It was the first time|That was when|The moment|'
+        r'Recuerdo|Me acuerdo|Nunca olvidaré|'
+        r'Fue la primera vez|Fue cuando|El momento en que)\b',
         re.IGNORECASE
     ),
 }
@@ -119,35 +140,44 @@ SEMANTIC_PATTERNS = {
     # Belief statements
     "belief": re.compile(
         r'\b(I believe|I think|My view is|In my opinion|'
-        r'I\'m convinced|I hold that|My belief is)\b',
+        r'I\'m convinced|I hold that|My belief is|'
+        r'Creo|Creo que|Pienso|Mi opinión es|En mi opinión|'
+        r'Estoy convencido|Estoy convencida|Para mí)\b',
         re.IGNORECASE
     ),
 
     # Value statements
     "value": re.compile(
         r'\b(I value|My (core )?values?|What matters most|'
-        r'Most important to me|I prioritize|I treasure)\b',
+        r'Most important to me|I prioritize|I treasure|'
+        r'Valoro|Mis valores|Lo que más importa|'
+        r'Lo más importante para mí|Priorizo|Aprecio)\b',
         re.IGNORECASE
     ),
 
     # Preference patterns
     "preference": re.compile(
         r'\b(I prefer|I always|I never|I tend to|'
-        r'My preference|I choose to|I make it a point)\b',
+        r'My preference|I choose to|I make it a point|'
+        r'Prefiero|Siempre|Nunca|Tiendo a|Mi preferencia|Elijo)\b',
         re.IGNORECASE
     ),
 
     # Philosophical statements
     "philosophy": re.compile(
         r'\b(The meaning of|The purpose of|Life is|'
-        r'Truth is|Reality is|What defines|The essence of)\b',
+        r'Truth is|Reality is|What defines|The essence of|'
+        r'El significado de|El propósito de|La vida es|'
+        r'La verdad es|La realidad es|Lo que define|La esencia de)\b',
         re.IGNORECASE
     ),
 
     # Self-definition
     "self_definition": re.compile(
         r'\b(I am (a |the kind of )?person who|My identity|'
-        r'At my core|Who I am|What makes me)\b',
+        r'At my core|Who I am|What makes me|'
+        r'Soy (el tipo de )?persona que|Mi identidad|'
+        r'En mi núcleo|Quien soy|Lo que me hace)\b',
         re.IGNORECASE
     ),
 
@@ -155,7 +185,10 @@ SEMANTIC_PATTERNS = {
     "principle": re.compile(
         r'\b(One should|It\'s important to|The key is|'
         r'The secret to|A person should|We must|'
-        r'It matters that|What counts is)\b',
+        r'It matters that|What counts is|'
+        r'Se debe|Es importante|La clave es|'
+        r'El secreto para|Una persona debe|Debemos|'
+        r'Lo que importa es|Lo que cuenta es)\b',
         re.IGNORECASE
     ),
 
@@ -163,14 +196,20 @@ SEMANTIC_PATTERNS = {
     "character": re.compile(
         r'\b(I\'m (generally |usually |naturally )?(patient|kind|'
         r'honest|loyal|determined|curious|creative|compassionate|'
-        r'resilient|optimistic|practical))\b',
+        r'resilient|optimistic|practical)|'
+        r'Soy (generalmente |usualmente |naturalmente )?(paciente|amable|'
+        r'honesto|honesta|leal|determinado|determinada|curioso|curiosa|'
+        r'creativo|creativa|compasivo|compasiva|resiliente|optimista|práctico|práctica))\b',
         re.IGNORECASE
     ),
 
     # Lessons learned (timeless)
     "lesson": re.compile(
         r'\b(I\'ve learned that|Life has taught me|'
-        r'Experience shows|The lesson is|I\'ve come to understand)\b',
+        r'Experience shows|The lesson is|I\'ve come to understand|'
+        r'He aprendido que|La vida me ha enseñado|'
+        r'La experiencia muestra|La lección es|He llegado a entender|'
+        r'Aprendí que|Con el tiempo aprendí)\b',
         re.IGNORECASE
     ),
 }
@@ -178,96 +217,213 @@ SEMANTIC_PATTERNS = {
 # Theme keywords
 THEME_KEYWORDS: Dict[str, List[str]] = {
     "family": [
+        # English
         "family", "families", "children", "child", "son", "daughter",
         "grandchildren", "grandchild", "grandson", "granddaughter",
         "spouse", "wife", "husband", "parent", "parents", "mother",
         "father", "mom", "dad", "sibling", "brother", "sister",
-        "aunt", "uncle", "cousin", "relative", "ancestor"
+        "aunt", "uncle", "cousin", "relative", "ancestor",
+        # Spanish
+        "familia", "familias", "hijos", "hijo", "hija", "niños", "niño", "niña",
+        "esposo", "esposa", "pareja", "madre", "padre", "mamá", "papá",
+        "hermano", "hermana", "abuelo", "abuela", "nieto", "nieta",
+        "tío", "tía", "primo", "prima", "pariente", "ancestro",
     ],
     "legacy": [
+        # English
         "legacy", "remember", "remembered", "future", "generations",
         "pass on", "leave behind", "heritage", "tradition", "traditions",
-        "inherit", "inheritance", "lasting", "enduring", "continue"
+        "inherit", "inheritance", "lasting", "enduring", "continue",
+        # Spanish
+        "legado", "recuerdo", "recordar", "futuro", "generaciones",
+        "pasar", "dejar", "herencia", "tradición", "tradiciones",
+        "heredar", "duradero", "duradera", "continuar",
     ],
     "authenticity": [
+        # English
         "authentic", "genuine", "true self", "honest", "honesty",
         "real", "sincere", "integrity", "transparent", "vulnerable",
-        "truth", "truthful", "pretend", "mask", "facade"
+        "truth", "truthful", "pretend", "mask", "facade",
+        # Spanish
+        "auténtico", "auténtica", "genuino", "genuina", "verdadero", "verdadera",
+        "honesto", "honesta", "honestidad", "real", "sincero", "sincera",
+        "integridad", "transparente", "vulnerable", "verdad", "máscara",
     ],
     "values": [
+        # English
         "value", "values", "believe", "belief", "beliefs", "principle",
         "principles", "ethics", "ethical", "moral", "morals",
-        "right", "wrong", "virtue", "virtues", "character"
+        "right", "wrong", "virtue", "virtues", "character",
+        # Spanish
+        "valor", "valores", "creer", "creencia", "creencias", "principio",
+        "principios", "ética", "ético", "ética", "moral", "morales",
+        "correcto", "incorrecto", "virtud", "virtudes", "carácter",
     ],
     "love": [
+        # English
         "love", "loved", "loving", "care", "caring", "affection",
         "cherish", "cherished", "adore", "devoted", "devotion",
-        "heart", "heartfelt", "tender", "warmth", "embrace"
+        "heart", "heartfelt", "tender", "warmth", "embrace",
+        # Spanish
+        "amor", "amado", "amada", "amar", "amando", "cariño", "cariñoso",
+        "cariñosa", "afecto", "adorar", "devoto", "devota", "devoción",
+        "corazón", "ternura", "calidez", "abrazo",
     ],
     "philosophy": [
+        # English
         "meaning", "purpose", "identity", "consciousness", "existence",
         "life", "death", "wisdom", "understanding", "truth",
-        "reality", "spiritual", "soul", "essence", "nature"
+        "reality", "spiritual", "soul", "essence", "nature",
+        # Spanish
+        "significado", "propósito", "identidad", "conciencia", "existencia",
+        "vida", "muerte", "sabiduría", "comprensión", "verdad",
+        "realidad", "espiritual", "alma", "esencia", "naturaleza",
     ],
     "health": [
+        # English
         "health", "healthy", "illness", "sick", "disease", "cancer",
         "diagnosis", "treatment", "doctor", "hospital", "medical",
-        "wellness", "healing", "recovery", "pain", "suffering"
+        "wellness", "healing", "recovery", "pain", "suffering",
+        # Spanish
+        "salud", "saludable", "enfermedad", "enfermo", "enferma", "cáncer",
+        "diagnóstico", "tratamiento", "médico", "médica", "hospital",
+        "bienestar", "curación", "recuperación", "dolor", "sufrimiento",
     ],
     "career": [
+        # English
         "career", "work", "job", "profession", "business", "company",
         "office", "colleague", "boss", "employee", "retire",
-        "retirement", "success", "achievement", "accomplishment"
+        "retirement", "success", "achievement", "accomplishment",
+        # Spanish
+        "carrera", "trabajo", "empleo", "profesión", "negocio", "empresa",
+        "oficina", "colega", "jefe", "jefa", "empleado", "empleada",
+        "jubilación", "jubilarse", "éxito", "logro", "meta",
     ],
     "growth": [
+        # English
         "growth", "grow", "growing", "learn", "learning", "change",
         "changing", "evolve", "evolving", "develop", "development",
-        "improve", "improvement", "progress", "journey", "path"
+        "improve", "improvement", "progress", "journey", "path",
+        # Spanish
+        "crecimiento", "crecer", "creciendo", "aprender", "aprendizaje",
+        "cambio", "cambiar", "evolucionar", "evolucionando", "desarrollar",
+        "desarrollo", "mejorar", "mejora", "progreso", "camino", "trayectoria",
     ],
     "spirituality": [
+        # English
         "god", "faith", "prayer", "church", "spiritual", "spirit",
         "soul", "blessing", "blessed", "divine", "sacred", "holy",
-        "worship", "religion", "religious", "believe"
+        "worship", "religion", "religious", "believe",
+        # Spanish
+        "dios", "fe", "oración", "iglesia", "espiritual", "espíritu",
+        "alma", "bendición", "bendito", "bendita", "divino", "divina",
+        "sagrado", "sagrada", "adoración", "religión", "religioso", "religiosa",
+    ],
+    "therapy": [
+        # English
+        "therapy", "session", "therapist", "counseling", "anxiety",
+        "depression", "trauma", "healing", "mental health",
+        # Spanish
+        "terapia", "sesión", "terapeuta", "consejería", "ansiedad",
+        "depresión", "trauma", "sanación", "salud mental",
+    ],
+    "relationships": [
+        # English
+        "relationship", "relationships", "friend", "friends", "partner",
+        "connection", "trust", "bond", "communication",
+        # Spanish
+        "relación", "relaciones", "amigo", "amiga", "amigos", "amigas",
+        "pareja", "conexión", "confianza", "vínculo", "comunicación",
     ],
 }
 
 # Participant keywords
 PARTICIPANT_KEYWORDS: Dict[str, List[str]] = {
-    "spouse": ["spouse", "wife", "husband", "partner"],
-    "children": ["children", "child", "son", "daughter", "kids", "kid"],
+    "spouse": [
+        "spouse", "wife", "husband", "partner",
+        "esposo", "esposa", "pareja", "cónyuge",
+    ],
+    "children": [
+        "children", "child", "son", "daughter", "kids", "kid",
+        "hijos", "hijo", "hija", "niños", "niño", "niña", "chicos",
+    ],
     "grandchildren": [
         "grandchildren", "grandchild", "grandson", "granddaughter",
-        "grandkids", "grandkid"
+        "grandkids", "grandkid",
+        "nietos", "nieto", "nieta",
     ],
-    "parents": ["mother", "father", "mom", "dad", "parent", "parents"],
-    "siblings": ["brother", "sister", "sibling", "siblings"],
-    "therapist": ["therapist", "counselor", "psychologist", "psychiatrist"],
-    "doctor": ["doctor", "physician", "nurse", "oncologist", "specialist"],
-    "friends": ["friend", "friends", "buddy", "pal"],
-    "family": ["family", "relative", "relatives", "aunt", "uncle", "cousin"],
+    "parents": [
+        "mother", "father", "mom", "dad", "parent", "parents",
+        "madre", "padre", "mamá", "papá", "padres",
+    ],
+    "siblings": [
+        "brother", "sister", "sibling", "siblings",
+        "hermano", "hermana", "hermanos",
+    ],
+    "therapist": [
+        "therapist", "counselor", "psychologist", "psychiatrist",
+        "terapeuta", "consejero", "consejera", "psicólogo", "psicóloga", "psiquiatra",
+    ],
+    "doctor": [
+        "doctor", "physician", "nurse", "oncologist", "specialist",
+        "médico", "médica", "enfermero", "enfermera", "oncólogo", "especialista",
+    ],
+    "friends": [
+        "friend", "friends", "buddy", "pal",
+        "amigo", "amiga", "amigos", "amigas",
+    ],
+    "family": [
+        "family", "relative", "relatives", "aunt", "uncle", "cousin",
+        "familia", "familiar", "familiares", "tío", "tía", "primo", "prima",
+    ],
 }
 
 # Emotional valence keywords
 EMOTION_KEYWORDS: Dict[str, List[str]] = {
     "positive": [
+        # English
         "happy", "happiness", "joy", "joyful", "love", "loving",
         "grateful", "gratitude", "thankful", "excited", "excitement",
         "proud", "pride", "blessed", "wonderful", "amazing", "beautiful",
         "hopeful", "hope", "peaceful", "peace", "content", "satisfied",
-        "delighted", "thrilled", "elated", "cheerful", "optimistic"
+        "delighted", "thrilled", "elated", "cheerful", "optimistic",
+        # Spanish
+        "feliz", "felicidad", "alegría", "alegre", "amor", "amando",
+        "agradecido", "agradecida", "gratitud", "gracias", "emocionado",
+        "emocionada", "emoción", "orgulloso", "orgullosa", "orgullo",
+        "bendecido", "bendecida", "maravilloso", "maravillosa", "asombroso",
+        "hermoso", "hermosa", "esperanzador", "esperanzadora", "esperanza",
+        "tranquilo", "tranquila", "paz", "contento", "contenta",
+        "satisfecho", "satisfecha", "encantado", "encantada", "optimista",
     ],
     "negative": [
+        # English
         "sad", "sadness", "angry", "anger", "frustrated", "frustration",
         "worried", "worry", "anxious", "anxiety", "disappointed",
         "disappointment", "hurt", "pain", "painful", "grief", "grieving",
         "scared", "fear", "fearful", "depressed", "depression", "lonely",
-        "loneliness", "regret", "guilty", "shame", "ashamed"
+        "loneliness", "regret", "guilty", "shame", "ashamed",
+        # Spanish
+        "triste", "tristeza", "enojado", "enojada", "enojo", "rabia",
+        "frustrado", "frustrada", "frustración", "preocupado", "preocupada",
+        "preocupación", "ansioso", "ansiosa", "ansiedad", "decepcionado",
+        "decepcionada", "decepción", "herido", "herida", "dolor", "doloroso",
+        "duelo", "llorando", "asustado", "asustada", "miedo", "temeroso",
+        "temerosa", "deprimido", "deprimida", "depresión", "solo", "sola",
+        "soledad", "arrepentimiento", "culpa", "vergüenza", "avergonzado",
+        "avergonzada", "angustiado", "angustiada",
     ],
     "reflective": [
+        # English
         "think", "thinking", "thought", "wonder", "wondering",
         "consider", "considering", "realize", "realized", "understand",
         "understanding", "ponder", "reflect", "reflecting", "contemplate",
-        "muse", "question", "questioning"
+        "muse", "question", "questioning",
+        # Spanish
+        "pensar", "pensando", "pensamiento", "preguntarme", "preguntarse",
+        "considerar", "considerando", "darme cuenta", "comprender",
+        "comprensión", "reflexionar", "reflexionando", "contemplar",
+        "meditar", "cuestionar", "cuestionando", "analizar",
     ],
 }
 
@@ -275,31 +431,45 @@ EMOTION_KEYWORDS: Dict[str, List[str]] = {
 EVENT_TYPES: Dict[str, List[str]] = {
     "milestone": [
         "wedding", "birth", "graduation", "retirement", "anniversary",
-        "birthday", "promotion", "achievement"
+        "birthday", "promotion", "achievement",
+        "boda", "nacimiento", "graduación", "jubilación", "aniversario",
+        "cumpleaños", "ascenso", "logro", "meta alcanzada",
     ],
     "loss": [
         "death", "funeral", "dying", "passed away", "lost", "goodbye",
-        "mourning", "grief"
+        "mourning", "grief",
+        "muerte", "funeral", "muriendo", "falleció", "perdido", "adiós",
+        "duelo", "luto",
     ],
     "medical": [
         "diagnosis", "surgery", "hospital", "treatment", "cancer",
-        "illness", "recovery", "therapy"
+        "illness", "recovery", "therapy",
+        "diagnóstico", "cirugía", "hospital", "tratamiento", "cáncer",
+        "enfermedad", "recuperación", "terapia",
     ],
     "travel": [
         "trip", "vacation", "travel", "journey", "visit", "visited",
-        "flew", "drove", "destination"
+        "flew", "drove", "destination",
+        "viaje", "vacaciones", "viajar", "visita", "visitar",
+        "voló", "manejó", "destino",
     ],
     "conversation": [
         "talked", "discussed", "conversation", "said", "told",
-        "asked", "replied", "shared"
+        "asked", "replied", "shared",
+        "hablamos", "discutimos", "conversación", "dijo", "dije",
+        "contó", "preguntó", "respondió", "compartió",
     ],
     "activity": [
         "played", "cooked", "built", "made", "created", "worked",
-        "helped", "taught", "learned"
+        "helped", "taught", "learned",
+        "jugó", "cocinó", "construyó", "hizo", "creó", "trabajó",
+        "ayudó", "enseñó", "aprendió",
     ],
     "gathering": [
         "party", "reunion", "celebration", "ceremony", "meeting",
-        "dinner", "gathering", "get-together"
+        "dinner", "gathering", "get-together",
+        "fiesta", "reunión", "celebración", "ceremonia", "cita",
+        "cena", "evento", "encuentro",
     ],
 }
 
@@ -307,27 +477,38 @@ EVENT_TYPES: Dict[str, List[str]] = {
 KNOWLEDGE_TYPES: Dict[str, List[str]] = {
     "belief": [
         "believe", "belief", "faith", "conviction", "trust",
-        "confident", "certain"
+        "confident", "certain",
+        "creer", "creencia", "fe", "convicción", "confiar", "seguro", "cierto",
     ],
     "value": [
         "value", "values", "important", "matters", "priority",
-        "principle", "cherish"
+        "principle", "cherish",
+        "valor", "valores", "importante", "importa", "prioridad",
+        "principio", "apreciar",
     ],
     "insight": [
         "realize", "understand", "learn", "discover", "recognize",
-        "see", "know"
+        "see", "know",
+        "darme cuenta", "comprender", "aprender", "descubrir",
+        "reconocer", "ver", "saber",
     ],
     "preference": [
         "prefer", "like", "enjoy", "love", "favor", "choose",
-        "tendency"
+        "tendency",
+        "preferir", "gustar", "disfrutar", "amar", "favorecer",
+        "elegir", "tendencia",
     ],
     "identity": [
         "am", "identity", "self", "person", "character", "nature",
-        "essence"
+        "essence",
+        "soy", "identidad", "yo mismo", "yo misma", "persona",
+        "carácter", "naturaleza", "esencia",
     ],
     "wisdom": [
         "wisdom", "lesson", "truth", "meaning", "purpose",
-        "philosophy", "principle"
+        "philosophy", "principle",
+        "sabiduría", "lección", "verdad", "significado", "propósito",
+        "filosofía", "principio",
     ],
 }
 

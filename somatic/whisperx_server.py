@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/home/gasu/ubik/venv/bin/python
 """
 WhisperX Transcription Service — UBIK Somatic Node
 
@@ -14,13 +14,14 @@ Usage:
     WHISPERX_PORT=9200 python whisperx_server.py
 
 Author: UBIK Project
-Version: 0.1.0
+Version: 0.1.1
 """
 
 import asyncio
 import logging
 import os
 import tempfile
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
@@ -31,7 +32,15 @@ from fastapi.responses import JSONResponse
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ubik.whisperx")
 
-app = FastAPI(title="WhisperX Transcription Service", version="0.1.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Eagerly load model at startup in a background task."""
+    asyncio.create_task(_eager_load_model())
+    yield
+
+
+app = FastAPI(title="WhisperX Transcription Service", version="0.1.1", lifespan=lifespan)
 
 # ---------------------------------------------------------------------------
 # Model state (lazy-loaded on first request)
@@ -108,13 +117,22 @@ async def transcribe(
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+async def _eager_load_model():
+    """Load model at server startup so /health reports model_loaded=True promptly."""
+    logger.info("Pre-loading transcription model at startup ...")
+    try:
+        await _get_model()
+    except Exception as exc:
+        logger.error("Startup model load failed: %s", exc)
+
+
 async def _get_model():
-    """Lazy-load model on first request; thread-safe via asyncio lock."""
+    """Load model on demand; thread-safe via asyncio lock."""
     global _model
     if _model is None:
         async with _model_lock:
             if _model is None:
-                logger.info("Loading transcription model (first request) ...")
+                logger.info("Loading transcription model ...")
                 loop = asyncio.get_event_loop()
                 _model = await loop.run_in_executor(None, _load_model)
                 logger.info("Model loaded: %s", _model[0])

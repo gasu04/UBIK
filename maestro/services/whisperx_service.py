@@ -189,6 +189,22 @@ class WhisperXService(UbikService):
             logger.error("whisperx: server script not found at %s", server_script)
             return False
 
+        # If a server process is already listening on the port (e.g. started by
+        # systemd before maestro ran), skip launching a duplicate and just wait
+        # for the model to finish loading.
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as _pre:
+                r = await _pre.get(f"http://localhost:{self._port}/health")
+                if r.status_code == 200:
+                    logger.info(
+                        "whisperx: server already listening on port %d — "
+                        "waiting for model to load without re-launching",
+                        self._port,
+                    )
+                    return await self._wait_for_healthy("localhost")
+        except Exception:
+            pass  # nothing on port yet, proceed with launch
+
         log_path = Path("/tmp/whisperx_startup.log")
         try:
             log_fh = open(log_path, "a")  # noqa: WPS515
@@ -200,6 +216,14 @@ class WhisperXService(UbikService):
         try:
             venv_path = self._venv_path
             conda = _find_conda()
+
+            # Fallback: the ubik project venv always ships whisperx on Somatic.
+            # Used when no explicit venv_path was passed and conda is not installed.
+            if not venv_path and not conda:
+                candidate = ubik_root / "venv"
+                if (candidate / "bin" / "python").exists():
+                    venv_path = candidate
+                    logger.info("whisperx: using ubik venv at %s", venv_path)
 
             if venv_path and (venv_path / "bin" / "python").exists():
                 python = str(venv_path / "bin" / "python")
