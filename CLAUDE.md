@@ -40,12 +40,15 @@ This project follows the global coding standards defined in
 
 ## Session Journaling (MANDATORY)
 
+**SESSIONS.md lives in the UBIK project:** `/Volumes/990PRO 4T/UBIK/SESSIONS.md`
+It syncs automatically to Google Drive (GdriveMirror/Ubik) via the UBIK post-commit hook.
+
 At the START of every session:
-- Read the last 20 lines of SESSIONS.md to understand what was last done
+- Read the last 20 lines of `/Volumes/990PRO 4T/UBIK/SESSIONS.md`
 - State what you found before proceeding
 
 At the END of every session (or when asked to wrap up):
-- Append a structured entry to SESSIONS.md with this exact format:
+- Append a structured entry to `/Volumes/990PRO 4T/UBIK/SESSIONS.md` with this exact format:
 
 ## Session: [YYYY-MM-DD HH:MM] — [Node: Hippocampal|Somatic]
 **Goal:** [what was attempted]
