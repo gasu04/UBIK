@@ -49,3 +49,24 @@
 **Next session should:**
 - Review and commit unstaged changes in UBIK ingestion/ and maestro/ (or confirm they are intentional WIP)
 ---
+
+## Session: 2026-06-06 21:05 — [Node: Hippocampal]
+**Goal:** Verify and fix SESSIONS.md GDrive sync; commit UBIK Neo4j schema work; launch Docker
+**Completed:**
+- Discovered GdriveMirror is a stale local HFS+ volume — does NOT auto-sync to Google Drive
+- Identified correct live GDrive mount: ~/Library/CloudStorage/GoogleDrive-gsanchezurrutia@gmail.com/My Drive/Ubik/
+- Fixed scripts/sync_sessions.sh to copy to the live GDrive mount
+- Verified SESSIONS.md landed in gsanchezurrutia@gmail.com Drive (My Drive/Ubik/)
+- Committed and pushed sync script fix to UBIK
+- Reviewed and committed the previously unstaged Neo4j schema upgrade (9 files, 545 insertions)
+- Launched Docker Desktop (confirmed running, v28.3.3)
+**State left in:**
+- Both repos clean and pushed
+- SESSIONS.md syncing correctly to gsanchezurrutia@gmail.com GDrive on every UBIK commit
+- Docker Desktop running
+- UBIK untracked: Ingested_data/, MAESTRO-0.12.0.md, UBIKParallax-source-v5/, UBIKParallax-source-v6/, UBIK_Claude_Prompts/ — not reviewed this session
+**Files changed:**
+- `UBIK/scripts/sync_sessions.sh`: corrected GDrive target from GdriveMirror to live CloudStorage mount
+**Next session should:**
+- Decide what to do with UBIK untracked dirs (Ingested_data/, UBIKParallax-source-v5/v6/, UBIK_Claude_Prompts/) — gitignore or commit
+---
