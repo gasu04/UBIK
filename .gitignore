@@ -40,3 +40,9 @@ benchmark_results_*.txt
 # Environment variables
 .env
 .env.local
+
+# Config env overrides
+config/.env
+
+# Large model weights
+*.gguf

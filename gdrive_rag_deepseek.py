@@ -23,9 +23,16 @@ Requirements:
 
 import os
 import io
+import sys
 import requests
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Dict, Any
+
+# Allow running from project root or from within the package
+sys.path.insert(0, str(Path(__file__).parent))
+
+from config.settings import settings
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -78,24 +85,49 @@ class JinaEmbeddings(Embeddings):
         return self.embed_documents([text])[0]
 
 class GoogleDriveRAG:
-    def __init__(self, credentials_path="credentials.json"):
+    def __init__(self, credentials_path: str = "credentials.json") -> None:
         self.credentials_path = credentials_path
         self.token_path = "token.json"
-        self.download_dir = Path("./gdrive_downloads")
+        self.download_dir = Path(__file__).parent / "gdrive_downloads"
         self.download_dir.mkdir(exist_ok=True)
-        # Base directory for all embeddings on 990PRO 4T SSD
-        self.embeddings_base_dir = Path("/Volumes/990PRO 4T/DeepSeek/chroma_embeddings")
-        self.embeddings_base_dir.mkdir(exist_ok=True)
-        self.vector_db_path = None  # Will be set when selecting/creating embedding
-        self.current_folder_name = None  # Track which folder we're working with
+        # Base directory for all ChromaDB collections — configurable via EMBEDDINGS_BASE_DIR
+        self.embeddings_base_dir = settings.embeddings_base_dir
+        self.embeddings_base_dir.mkdir(parents=True, exist_ok=True)
+        self.vector_db_path: Optional[str] = None  # Set when selecting/creating embedding
+        self.current_folder_name: Optional[str] = None  # Track which folder we're using
 
         print("🚀 Initializing Google Drive RAG System...\n")
+
+        # Setup Jina API key first (required for embeddings)
+        self.jina_api_key = self._setup_jina_api_key()
 
         # Initialize components
         self.drive_service = self._authenticate_gdrive()
         self.embeddings = self._init_embeddings()
         self.llm = self._init_llm()
         self.vectorstore = None
+
+    def _setup_jina_api_key(self):
+        """Setup Jina API key at startup"""
+        print("🔑 Setting up Jina AI API key...")
+
+        # Check environment variable first
+        api_key = os.getenv('JINA_API_KEY')
+
+        if api_key:
+            print("   ✓ Found JINA_API_KEY in environment\n")
+            return api_key
+
+        # If not in environment, prompt user
+        print("   ⚠️  JINA_API_KEY not found in environment")
+        print("   You can set it permanently with: export JINA_API_KEY='your-key-here'")
+        api_key = input("   Enter your Jina API key: ").strip()
+
+        if not api_key:
+            raise ValueError("Jina API key is required! Get one at: https://jina.ai")
+
+        print("   ✓ API key configured\n")
+        return api_key
 
     def _authenticate_gdrive(self):
         """Authenticate with Google Drive"""
@@ -120,21 +152,14 @@ class GoogleDriveRAG:
         print("✓ Google Drive authenticated\n")
         return service
 
-    def _init_embeddings(self):
+    def _init_embeddings(self) -> "JinaEmbeddings":
         """Initialize Jina AI embeddings"""
-        print("📊 Loading Jina AI Embeddings (jina-embeddings-v2-base-en)...")
+        print(f"📊 Loading Jina AI Embeddings ({settings.jina_model})...")
 
-        # Get API key from environment or prompt user
-        api_key = os.getenv('JINA_API_KEY')
-        if not api_key:
-            print("   ⚠️  JINA_API_KEY not found in environment")
-            api_key = input("   Enter your Jina API key: ").strip()
-            if not api_key:
-                raise ValueError("Jina API key is required!")
-
+        # Use the API key that was set up during initialization
         embeddings = JinaEmbeddings(
-            api_key=api_key,
-            model="jina-embeddings-v2-base-en"
+            api_key=self.jina_api_key,
+            model=settings.jina_model
         )
 
         # Test the connection works
@@ -149,13 +174,13 @@ class GoogleDriveRAG:
 
         return embeddings
 
-    def _init_llm(self):
+    def _init_llm(self) -> OllamaLLM:
         """Initialize DeepSeek model"""
-        print("🤖 Loading DeepSeek R1 14B...")
+        print(f"🤖 Loading {settings.deepseek_model} via Ollama ({settings.ollama_base_url})...")
         llm = OllamaLLM(
-            model="deepseek-r1:14b",
-            base_url="http://localhost:11434",
-            temperature=0.7
+            model=settings.deepseek_model,
+            base_url=settings.ollama_base_url,
+            temperature=settings.llm_temperature
         )
         print("✓ DeepSeek loaded\n")
         return llm
@@ -575,25 +600,36 @@ class GoogleDriveRAG:
 
         print(f"✓ Total documents loaded: {len(all_documents)}\n")
 
+        # Debug: Check document content
+        total_chars = sum(len(doc.page_content) for doc in all_documents)
+        print(f"📊 Total characters in documents: {total_chars:,}")
+        if total_chars == 0:
+            print("❌ Warning: Documents have no text content!")
+            print("   These PDFs might be scanned images without OCR.")
+            print("   Cannot create embeddings from empty documents.\n")
+            return 0
+
         # Split documents
         print("✂️  Splitting documents into chunks...")
-        # Optimized for M4 Pro with DeepSeek's 131k context window
-        # 3000 chars ≈ 750 tokens per chunk
-        # With k=5: 3,750 tokens total context (~3% of 131k capacity)
+        # chunk_size/overlap are tunable via CHUNK_SIZE / CHUNK_OVERLAP env vars
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=3000,      # 3x larger for better context
-            chunk_overlap=500     # More overlap for continuity
+            chunk_size=settings.chunk_size,
+            chunk_overlap=settings.chunk_overlap
         )
         splits = text_splitter.split_documents(all_documents)
         print(f"✓ Created {len(splits)} chunks\n")
+
+        if len(splits) == 0:
+            print("❌ Error: Text splitter created 0 chunks!")
+            print("   Documents might be too short or have formatting issues.\n")
+            return 0
 
         # Create vector store with batching for large document sets
         print("💾 Creating ChromaDB vector store...")
         print(f"   Processing {len(splits)} chunks in batches...")
 
         # Process in batches to avoid overwhelming Ollama
-        # Using small batches to prevent crashes
-        batch_size = 10
+        batch_size = settings.embedding_batch_size
 
         try:
             if len(splits) > batch_size:
@@ -629,7 +665,7 @@ class GoogleDriveRAG:
 
                     # Delay to let Ollama breathe
                     import time
-                    time.sleep(1)
+                    time.sleep(settings.embedding_batch_delay)
             else:
                 # Small dataset, process all at once
                 self.vectorstore = Chroma.from_documents(
@@ -670,7 +706,7 @@ class GoogleDriveRAG:
             return True
         return False
 
-    def query(self, question, k=5):
+    def query(self, question: str, k: int = 5) -> Optional[Dict[str, Any]]:
         """Query the RAG system - optimized for M4 Pro hardware"""
         if not self.vectorstore:
             print("❌ No vector store available. Process documents first!")
@@ -819,7 +855,7 @@ def main():
 
             print()
             print("🔍 Searching documents...")
-            result = rag.query(question, k=5)  # Retrieve 5 chunks for better context
+            result = rag.query(question, k=2)  # Retrieve 2 chunks (reduced for 7B model memory limits)
 
             if result:
                 print(f"\n🤖 DeepSeek Answer:\n{result['result']}\n")
