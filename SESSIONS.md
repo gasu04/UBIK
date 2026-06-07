@@ -70,3 +70,27 @@
 **Next session should:**
 - Decide what to do with UBIK untracked dirs (Ingested_data/, UBIKParallax-source-v5/v6/, UBIK_Claude_Prompts/) — gitignore or commit
 ---
+
+## Session: 2026-06-07 03:25 — [Node: Hippocampal]
+**Goal:** Get maestro start working; set up daily Seagate2T backup for UBIK
+**Completed:**
+- Diagnosed Docker not starting: daemon socket was stale, Docker Desktop blocked on macOS admin dialog
+- Resolved by user running sudo launchctl kickstart -k system/com.docker.vmnetd, then killing stale backend and restarting com.docker.backend directly — Docker daemon came up v29.4.0
+- Diagnosed Neo4j container stuck in restart loop for 2 months ("Neo4j is already running (pid:7)") — stale container writable layer, not a PID file in the volume
+- Fixed by force-removing ubik-neo4j and recreating via docker compose up -d neo4j — Neo4j came up clean, all data intact
+- Created scripts/sync_to_seagate.sh: daily rsync of UBIK project + Docker data to /Volumes/Seagate2T/UBIK/ using --checksum, skips if drive not mounted
+- Registered com.ubik.sync-to-seagate.plist as launchd agent (daily at 03:00)
+- Ran initial sync: 546MB project + 531MB data transferred successfully
+- Committed and pushed sync script to UBIK
+**State left in:**
+- Docker running (v29.4.0), Neo4j healthy, ChromaDB running
+- maestro start should now work (docker + neo4j + chromadb up)
+- Daily Seagate2T sync active via launchd
+- UBIK untracked dirs still unresolved: Ingested_data/, MAESTRO-0.12.0.md, UBIKParallax-source-v5/v6/, UBIK_Claude_Prompts/
+**Files changed:**
+- `UBIK/scripts/sync_to_seagate.sh`: created rsync backup script
+- `~/Library/LaunchAgents/com.ubik.sync-to-seagate.plist`: created launchd daily job (not in git — user-level agent)
+**Next session should:**
+- Run maestro start and confirm all services healthy
+- Decide on untracked dirs in UBIK (gitignore large ones, commit docs)
+---
