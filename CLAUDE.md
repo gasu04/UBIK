@@ -457,3 +457,30 @@ Run `/compact` every 20–30 turns to keep context lean.
 ---
 
 *"The best code is no code at all. The second best is code so clear it documents itself."*
+
+---
+
+## Session Journaling (MANDATORY)
+
+**SESSIONS.md** is the canonical session log for all UBIK and DeepSeek work.
+It syncs to Google Drive automatically via `scripts/sync_sessions.sh` on every commit that touches it.
+GdriveMirror path: `/Volumes/GdriveMirror/Ubik/SESSIONS.md`
+
+At the START of every session:
+- Read the last 20 lines of `SESSIONS.md` (at the UBIK project root)
+- State what you found before proceeding
+
+At the END of every session (or when asked to wrap up):
+- Append a structured entry to `SESSIONS.md` with this exact format:
+
+## Session: [YYYY-MM-DD HH:MM] — [Node: Hippocampal|Somatic]
+**Goal:** [what was attempted]
+**Completed:**
+- [bullet per thing actually done]
+**State left in:**
+- [what is running, what is broken, what is half-done]
+**Files changed:**
+- [path]: [one-line description of change]
+**Next session should:**
+- [the most important thing to do next]
+---
