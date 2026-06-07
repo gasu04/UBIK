@@ -562,7 +562,7 @@ class TestModels:
         """Test IngestItem creation from path."""
         item = IngestItem.from_path(text_file)
 
-        assert item.source_path == str(text_file)
+        assert Path(item.source_path).resolve() == Path(text_file).resolve()
         assert item.source_type == "local"
         assert item.content_type == ContentType.TEXT
         assert item.file_extension == ".txt"

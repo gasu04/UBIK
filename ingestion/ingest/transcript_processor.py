@@ -36,6 +36,18 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+# ---------------------------------------------------------------------------
+# Person alias table — maps informal names to canonical full names.
+# Applied during to_neo4j_operations() so Neo4j always stores one node per
+# person regardless of how they appear in the YAML front matter.
+# ---------------------------------------------------------------------------
+PERSON_ALIASES: Dict[str, str] = {
+    "Leti": "Leticia Zuno",
+    "Leticia": "Leticia Zuno",
+    "leti": "Leticia Zuno",
+    "leticia": "Leticia Zuno",
+}
+
 import yaml
 
 from .chunkers import Chunk
@@ -127,11 +139,15 @@ class MeetingMetadata:
     participants: List[str] = field(default_factory=list)
     speakers: Dict[str, str] = field(default_factory=dict)
     location: Optional[str] = None
+    location_type: str = "unknown"
     duration_minutes: Optional[int] = None
     recorder: str = "unknown"
     meeting_title: Optional[str] = None
     agenda_topics: List[str] = field(default_factory=list)
     actual_topics: List[str] = field(default_factory=list)
+    key_themes: List[str] = field(default_factory=list)
+    people_mentioned: List[str] = field(default_factory=list)
+    session_date_iso: Optional[str] = None
     decisions_made: List[str] = field(default_factory=list)
     action_items: List[ActionItem] = field(default_factory=list)
     emotional_tone: str = "neutral"
@@ -139,6 +155,15 @@ class MeetingMetadata:
     transcript_quality: str = "good"
     contains_sensitive: bool = False
     language: str = "en"
+
+    @property
+    def meeting_id(self) -> str:
+        """Stable, deterministic Neo4j ID for this meeting node."""
+        date_str = self.session_date_iso or (
+            self.meeting_date.date().isoformat() if self.meeting_date else "unknown"
+        )
+        type_slug = self.meeting_type.replace("_", "-")
+        return f"meeting_{date_str}_{type_slug}"
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MeetingMetadata":
@@ -172,17 +197,30 @@ class MeetingMetadata:
             elif isinstance(item, str):
                 action_items.append(ActionItem(who="", what=item))
 
+        # Parse session_date_iso — keep as plain string (no datetime conversion)
+        session_date_iso = data.get("session_date_iso")
+        if session_date_iso is not None:
+            # Normalise date objects YAML may have already parsed
+            if isinstance(session_date_iso, (date, datetime)):
+                session_date_iso = session_date_iso.isoformat()[:10]
+            else:
+                session_date_iso = str(session_date_iso)
+
         return cls(
             meeting_date=meeting_date,
             meeting_type=data.get("meeting_type", "conversation"),
             participants=data.get("participants", []),
             speakers=data.get("speakers", data.get("speaker_mapping", {})),
             location=data.get("location"),
+            location_type=data.get("location_type", "unknown"),
             duration_minutes=data.get("duration_minutes", data.get("duration")),
             recorder=data.get("recorder", data.get("transcribed_by", "unknown")),
             meeting_title=data.get("meeting_title", data.get("title")),
             agenda_topics=data.get("agenda_topics", data.get("agenda", [])),
             actual_topics=data.get("actual_topics", data.get("topics", [])),
+            key_themes=data.get("key_themes", data.get("themes", [])),
+            people_mentioned=data.get("people_mentioned", []),
+            session_date_iso=session_date_iso,
             decisions_made=data.get("decisions_made", data.get("decisions", [])),
             action_items=action_items,
             emotional_tone=data.get("emotional_tone", "neutral"),
@@ -235,33 +273,40 @@ class MeetingMetadata:
 
         return meta
 
-    def to_neo4j_operations(self) -> List[Dict[str, Any]]:
+    def to_neo4j_operations(
+        self,
+        person_aliases: Optional[Dict[str, str]] = None,
+    ) -> List[Dict[str, Any]]:
         """
         Generate Neo4j graph operations for this meeting.
 
         Creates nodes for:
         - Meeting event
-        - Participants (Person nodes)
-        - Topics discussed
-        - Decisions made
+        - TimeSlice (from session_date_iso)
+        - Location (from location + location_type)
+        - Participants (Person nodes, role="speaker")
+        - People mentioned (Person nodes, role="mentioned")
+        - Topics (from key_themes, fallback to actual_topics)
+        - Decisions and ActionItems
 
-        Creates relationships:
-        - PARTICIPATED_IN
-        - DISCUSSED
-        - DECIDED
-        - ASSIGNED_TO (for action items)
+        Person names are normalised through PERSON_ALIASES (module-level)
+        merged with any caller-supplied *person_aliases* dict.
+        Topic nodes use ``merge_topic`` op so session_count is incremented.
         """
-        operations = []
-        meeting_id = f"meeting_{self.meeting_date.isoformat() if self.meeting_date else 'unknown'}_{hash(self.meeting_title or '')}"
+        aliases = {**PERSON_ALIASES, **(person_aliases or {})}
+        operations: List[Dict[str, Any]] = []
+        mid = self.meeting_id
+        date_iso = self.meeting_date.isoformat() if self.meeting_date else None
 
-        # Create Meeting node
+        # ── Meeting node ───────────────────────────────────────────────────
         operations.append({
             "operation": "merge_node",
             "label": "Meeting",
             "properties": {
-                "id": meeting_id,
+                "id": mid,
                 "type": self.meeting_type,
-                "date": self.meeting_date.isoformat() if self.meeting_date else None,
+                "date": date_iso,
+                "session_date_iso": self.session_date_iso,
                 "title": self.meeting_title,
                 "location": self.location,
                 "duration_minutes": self.duration_minutes,
@@ -269,82 +314,149 @@ class MeetingMetadata:
             },
         })
 
-        # Create Person nodes and PARTICIPATED_IN relationships
-        for participant in self.participants:
-            person_id = f"person_{participant.lower().replace(' ', '_')}"
+        # ── TimeSlice node (fix 4) ─────────────────────────────────────────
+        if self.session_date_iso:
+            ts_id = f"timeslice_{self.session_date_iso}"
+            try:
+                y, m, d = (int(p) for p in self.session_date_iso.split("-")[:3])
+            except (ValueError, TypeError):
+                y = m = d = None
+            operations.append({
+                "operation": "merge_node",
+                "label": "TimeSlice",
+                "properties": {
+                    "id": ts_id,
+                    "date": self.session_date_iso,
+                    "year": y,
+                    "month": m,
+                    "day": d,
+                },
+            })
+            operations.append({
+                "operation": "merge_relationship",
+                "from_label": "Meeting",
+                "from_id": mid,
+                "to_label": "TimeSlice",
+                "to_id": ts_id,
+                "rel_type": "AT_TIME",
+                "properties": {},
+            })
 
+        # ── Location node (fix 5) ──────────────────────────────────────────
+        if self.location:
+            loc_id = f"location_{self.location.lower().replace(' ', '_')[:50]}"
+            operations.append({
+                "operation": "merge_node",
+                "label": "Location",
+                "properties": {
+                    "id": loc_id,
+                    "name": self.location,
+                    "location_type": self.location_type,
+                },
+            })
+            operations.append({
+                "operation": "merge_relationship",
+                "from_label": "Meeting",
+                "from_id": mid,
+                "to_label": "Location",
+                "to_id": loc_id,
+                "rel_type": "OCCURRED_AT",
+                "properties": {},
+            })
+
+        # ── Person nodes — speakers (fix 2) ───────────────────────────────
+        for participant in self.participants:
+            canonical = aliases.get(participant, participant)
+            person_id = f"person_{canonical.lower().replace(' ', '_')}"
             operations.append({
                 "operation": "merge_node",
                 "label": "Person",
                 "properties": {
                     "id": person_id,
-                    "name": participant,
+                    "name": canonical,
+                    "role": "speaker",
                 },
             })
-
             operations.append({
                 "operation": "merge_relationship",
                 "from_label": "Person",
                 "from_id": person_id,
                 "to_label": "Meeting",
-                "to_id": meeting_id,
+                "to_id": mid,
                 "rel_type": "PARTICIPATED_IN",
-                "properties": {
-                    "date": self.meeting_date.isoformat() if self.meeting_date else None,
-                },
+                "properties": {"date": date_iso},
             })
 
-        # Create Topic nodes and DISCUSSED relationships
-        for topic in self.actual_topics:
-            topic_id = f"topic_{topic.lower().replace(' ', '_')[:50]}"
-
+        # ── Person nodes — mentioned people (fix 2) ───────────────────────
+        for person in self.people_mentioned:
+            canonical = aliases.get(person, person)
+            person_id = f"person_{canonical.lower().replace(' ', '_')}"
             operations.append({
                 "operation": "merge_node",
+                "label": "Person",
+                "properties": {
+                    "id": person_id,
+                    "name": canonical,
+                    "role": "mentioned",
+                },
+            })
+            operations.append({
+                "operation": "merge_relationship",
+                "from_label": "Meeting",
+                "from_id": mid,
+                "to_label": "Person",
+                "to_id": person_id,
+                "rel_type": "MENTIONS",
+                "properties": {},
+            })
+
+        # ── Topic nodes — key_themes primary, actual_topics fallback (fix 3)
+        topics = self.key_themes or self.actual_topics
+        for topic in topics:
+            topic_id = f"topic_{topic.lower().replace(' ', '_')[:50]}"
+            operations.append({
+                "operation": "merge_topic",
                 "label": "Topic",
                 "properties": {
                     "id": topic_id,
                     "name": topic,
                 },
             })
-
             operations.append({
                 "operation": "merge_relationship",
                 "from_label": "Meeting",
-                "from_id": meeting_id,
+                "from_id": mid,
                 "to_label": "Topic",
                 "to_id": topic_id,
                 "rel_type": "DISCUSSED",
                 "properties": {},
             })
 
-        # Create Decision nodes
+        # ── Decision nodes ─────────────────────────────────────────────────
         for i, decision in enumerate(self.decisions_made):
-            decision_id = f"decision_{meeting_id}_{i}"
-
+            decision_id = f"decision_{mid}_{i}"
             operations.append({
                 "operation": "merge_node",
                 "label": "Decision",
                 "properties": {
                     "id": decision_id,
                     "content": decision,
-                    "date": self.meeting_date.isoformat() if self.meeting_date else None,
+                    "date": date_iso,
                 },
             })
-
             operations.append({
                 "operation": "merge_relationship",
                 "from_label": "Meeting",
-                "from_id": meeting_id,
+                "from_id": mid,
                 "to_label": "Decision",
                 "to_id": decision_id,
                 "rel_type": "DECIDED",
                 "properties": {},
             })
 
-        # Create ActionItem nodes and relationships
+        # ── ActionItem nodes ───────────────────────────────────────────────
         for i, action in enumerate(self.action_items):
-            action_id = f"action_{meeting_id}_{i}"
-
+            action_id = f"action_{mid}_{i}"
             operations.append({
                 "operation": "merge_node",
                 "label": "ActionItem",
@@ -355,20 +467,18 @@ class MeetingMetadata:
                     "status": action.status,
                 },
             })
-
             operations.append({
                 "operation": "merge_relationship",
                 "from_label": "Meeting",
-                "from_id": meeting_id,
+                "from_id": mid,
                 "to_label": "ActionItem",
                 "to_id": action_id,
                 "rel_type": "CREATED_ACTION",
                 "properties": {},
             })
-
-            # Link to assignee if specified
             if action.who:
-                person_id = f"person_{action.who.lower().replace(' ', '_')}"
+                canonical = aliases.get(action.who, action.who)
+                person_id = f"person_{canonical.lower().replace(' ', '_')}"
                 operations.append({
                     "operation": "merge_relationship",
                     "from_label": "ActionItem",
@@ -380,6 +490,20 @@ class MeetingMetadata:
                 })
 
         return operations
+
+    def to_cleanup_operations(self) -> List[Dict[str, Any]]:
+        """
+        Return Neo4j operations to remove old slugified Concept nodes.
+
+        The legacy update_identity_graph() method created Concept nodes with
+        names like 'person_gines' and 'topic_anxiety_and_stress'.  These are
+        superseded by proper Person and Topic nodes and should be deleted.
+
+        Call this once after migrating to the new schema, not on every ingest.
+        """
+        return [{
+            "operation": "cleanup_old_concept_slugs",
+        }]
 
 
 @dataclass

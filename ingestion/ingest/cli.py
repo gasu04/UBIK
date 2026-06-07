@@ -514,6 +514,7 @@ async def create_mcp_client(args: argparse.Namespace):
         try:
             from .mcp_writer import LocalMemoryWriter
 
+            _load_maestro_env()  # ensure NEO4J_PASSWORD and friends are in env
             writer = LocalMemoryWriter()
             logger.info("Using LocalMemoryWriter (direct ChromaDB + Neo4j)")
             return writer
@@ -567,15 +568,29 @@ async def cleanup_mcp_client(client) -> None:
 
 
 def _load_maestro_env() -> None:
-    """Load maestro .env into os.environ (values already set are not overwritten)."""
-    env_path = Path.home() / "ubik" / "maestro" / ".env"
-    if not env_path.exists():
-        return
-    for line in env_path.read_text().splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, val = line.partition("=")
-            os.environ.setdefault(key.strip(), val.strip())
+    """Load env files into os.environ (values already set are not overwritten).
+
+    Search order:
+      1. The ingestion package's own .env (next to this file)
+      2. ~/ubik/maestro/.env  (legacy path)
+      3. UBIK_ROOT/maestro/.env  (volume path)
+    """
+    candidates = [
+        Path(__file__).parent.parent / ".env",          # ingestion/.env
+        Path.home() / "ubik" / "maestro" / ".env",      # legacy ~/ubik
+    ]
+    ubik_root = os.environ.get("UBIK_ROOT")
+    if ubik_root:
+        candidates.append(Path(ubik_root) / "maestro" / ".env")
+
+    for env_path in candidates:
+        if not env_path.exists():
+            continue
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, val = line.partition("=")
+                os.environ.setdefault(key.strip(), val.strip())
 
 
 def _purge_source_files(filenames: List[str]) -> Dict[str, int]:
@@ -776,18 +791,36 @@ async def run_local(args: argparse.Namespace) -> int:
     # Purge existing records if --overwrite
     if getattr(args, 'overwrite', False) and not args.dry_run:
         glob = "**/*" if args.recursive else "*"
-        candidates = [
-            f.name for f in path.glob(glob)
+        candidate_files = [
+            f for f in path.glob(glob)
             if f.is_file() and (
                 extensions is None or f.suffix.lower() in extensions
             )
         ]
+        candidates = [f.name for f in candidate_files]
         if candidates:
             print(f"Overwrite: purging existing records for {len(candidates)} file(s)...")
             deleted = _purge_source_files(candidates)
             for coll, n in deleted.items():
                 if n:
                     print(f"  Deleted {n} records from {coll}")
+
+            # Also tombstone manifest entries so tracker doesn't skip them
+            log_dir = Path(args.log_dir).expanduser().resolve()
+            manifest_path = log_dir / IngestionManifest.MANIFEST_FILE
+            if manifest_path.exists():
+                manifest = IngestionManifest(log_dir=log_dir)
+                tombstoned = 0
+                for f in candidate_files:
+                    try:
+                        file_hash, already_ingested = manifest.check_file(f)
+                        if already_ingested:
+                            manifest.tombstone(file_hash, f.name)
+                            tombstoned += 1
+                    except Exception:
+                        pass
+                if tombstoned:
+                    print(f"  Reset {tombstoned} manifest entries for re-ingestion")
             print()
 
     # Create MCP client for storage

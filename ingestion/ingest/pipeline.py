@@ -121,6 +121,8 @@ class PipelineConfig:
     parallel_files: int = 4
     continue_on_storage_error: bool = True
     execute_neo4j_ops: bool = True
+    # Extra name → canonical-name mappings merged with PERSON_ALIASES at op time
+    person_aliases: Dict[str, str] = field(default_factory=dict)
 
 
 class IngestPipeline:
@@ -722,7 +724,22 @@ class IngestPipeline:
 
         # Execute Neo4j operations if present
         if self.config.execute_neo4j_ops:
-            neo4j_ops = processed.extracted_metadata.get("neo4j_operations", [])
+            neo4j_ops = list(processed.extracted_metadata.get("neo4j_operations", []))
+
+            # Inject (Meeting)-[:HAS_CHUNK]->(Memory) for every stored memory
+            meeting_meta = processed.extracted_metadata.get("meeting_metadata")
+            if meeting_meta and stats.memory_ids:
+                for mid in stats.memory_ids:
+                    neo4j_ops.append({
+                        "operation": "merge_relationship",
+                        "from_label": "Meeting",
+                        "from_id": meeting_meta.meeting_id,
+                        "to_label": "Memory",
+                        "to_id": mid,
+                        "rel_type": "HAS_CHUNK",
+                        "properties": {},
+                    })
+
             if neo4j_ops:
                 neo4j_stats = await self._execute_neo4j_operations(neo4j_ops)
                 stats.neo4j_ops_executed = neo4j_stats[0]
@@ -880,8 +897,14 @@ class IngestPipeline:
         if not self.mcp_client:
             return (0, 0)
 
-        if not hasattr(self.mcp_client, 'update_identity_graph'):
-            logger.debug("MCP client doesn't support update_identity_graph")
+        has_merge_node = hasattr(self.mcp_client, 'merge_node')
+        has_merge_rel = hasattr(self.mcp_client, 'merge_relationship_by_id')
+        has_merge_topic = hasattr(self.mcp_client, 'merge_topic_node')
+        has_raw_cypher = hasattr(self.mcp_client, 'execute_raw_cypher')
+        has_identity_graph = hasattr(self.mcp_client, 'update_identity_graph')
+
+        if not has_merge_node and not has_identity_graph:
+            logger.debug("MCP client doesn't support any Neo4j operations")
             return (0, 0)
 
         successful = 0
@@ -891,25 +914,88 @@ class IngestPipeline:
             try:
                 op_type = op.get("operation")
 
-                if op_type == "merge_relationship":
-                    # Convert to update_identity_graph call
-                    result = await self.mcp_client.update_identity_graph(
-                        from_concept=op.get("from_id", ""),
-                        relation_type=op.get("rel_type", "RELATES_TO"),
-                        to_concept=op.get("to_id", ""),
-                        weight=1.0,
-                        context=str(op.get("properties", {})),
-                    )
-
-                    if result.get("status") != "error":
-                        successful += 1
+                if op_type == "merge_node":
+                    if has_merge_node:
+                        result = await self.mcp_client.merge_node(
+                            label=op.get("label", "Node"),
+                            properties=op.get("properties", {}),
+                        )
+                        if result.get("status") == "error":
+                            failed += 1
+                        else:
+                            successful += 1
                     else:
-                        failed += 1
+                        successful += 1  # remote MCP — nodes created implicitly
 
-                elif op_type == "merge_node":
-                    # Node creation could be done via relationship to Self
-                    # For now, just count as successful (nodes are created implicitly)
-                    successful += 1
+                elif op_type == "merge_relationship":
+                    from_label = op.get("from_label")
+                    from_id = op.get("from_id", "")
+                    to_label = op.get("to_label")
+                    to_id = op.get("to_id", "")
+                    rel_type = op.get("rel_type", "RELATES_TO")
+                    props = op.get("properties", {})
+
+                    if has_merge_rel and from_label and to_label:
+                        result = await self.mcp_client.merge_relationship_by_id(
+                            from_label=from_label,
+                            from_id=from_id,
+                            to_label=to_label,
+                            to_id=to_id,
+                            rel_type=rel_type,
+                            properties=props,
+                        )
+                    elif has_identity_graph:
+                        result = await self.mcp_client.update_identity_graph(
+                            from_concept=from_id,
+                            relation_type=rel_type,
+                            to_concept=to_id,
+                            weight=1.0,
+                            context=str(props),
+                        )
+                    else:
+                        result = {"status": "skipped"}
+
+                    if result.get("status") == "error":
+                        failed += 1
+                    else:
+                        successful += 1
+
+                elif op_type == "merge_topic":
+                    # Topic node with session_count increment (fix 3)
+                    if has_merge_topic:
+                        result = await self.mcp_client.merge_topic_node(
+                            label=op.get("label", "Topic"),
+                            properties=op.get("properties", {}),
+                        )
+                    elif has_merge_node:
+                        result = await self.mcp_client.merge_node(
+                            label=op.get("label", "Topic"),
+                            properties=op.get("properties", {}),
+                        )
+                    else:
+                        result = {"status": "skipped"}
+                    if result.get("status") == "error":
+                        failed += 1
+                    else:
+                        successful += 1
+
+                elif op_type == "cleanup_old_concept_slugs":
+                    # Delete legacy Concept nodes created by update_identity_graph
+                    if has_raw_cypher:
+                        result = await self.mcp_client.execute_raw_cypher(
+                            """
+                            MATCH (c:Concept)
+                            WHERE c.name STARTS WITH 'person_'
+                               OR c.name STARTS WITH 'topic_'
+                            DETACH DELETE c
+                            """
+                        )
+                        if result.get("status") == "error":
+                            failed += 1
+                        else:
+                            successful += 1
+                    else:
+                        successful += 1  # skip silently on remote clients
 
                 else:
                     logger.debug(f"Unknown Neo4j operation type: {op_type}")

@@ -5,7 +5,7 @@ Maestro — Virtual Environment Manager
 Detects, validates, and activates the correct Python environment on each
 UBIK node, and provides a uniform interface for running commands inside it.
 
-    Hippocampal: standard venv at ``{ubik_root}/hippocampal/venv/``
+    Hippocampal: standard venv at ``/Volumes/990PRO 4T/DeepSeek/venv/``
     Somatic:     conda environment named ``pytorch_env``
 
 Public API:
@@ -96,8 +96,8 @@ def _find_conda() -> str:
 
 
 def _hippocampal_venv_path(node: NodeIdentity) -> Path:
-    """Resolve the Hippocampal venv path from NodeIdentity or ubik_root."""
-    return node.python_venv_path or (node.ubik_root / "hippocampal" / "venv")
+    """Resolve the Hippocampal venv path from NodeIdentity or the known default."""
+    return node.python_venv_path or Path("/Volumes/990PRO 4T/DeepSeek/venv")
 
 
 # ---------------------------------------------------------------------------

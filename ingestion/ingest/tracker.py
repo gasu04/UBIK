@@ -29,6 +29,7 @@ Version: 1.0.0
 
 import csv
 import fcntl
+import os
 import hashlib
 import json
 import shutil
@@ -242,7 +243,12 @@ class IngestionManifest:
         """
         file_hash = compute_file_hash(path)
         records = self._hash_index.get(file_hash, [])
-        already = any(r.storage_status != "reprocessing" for r in records)
+        if not records:
+            return file_hash, False
+        # Only the most recent record determines status — a tombstone
+        # (storage_status="reprocessing") resets the file for re-ingestion.
+        latest = max(records, key=lambda r: r.ingested_at)
+        already = latest.storage_status != "reprocessing"
         return file_hash, already
 
     def is_already_ingested(self, file_path: str) -> bool:
@@ -492,10 +498,12 @@ class FileMover:
     """
 
     DEFAULT_BASE_DIR = Path("~/ubik/Ingested_data")
+    DEFAULT_ARCHIVE_SUBDIR = "ingested"
 
     def __init__(
         self,
         base_ingested_dir: Optional[Path] = None,
+        archive_dir: Optional[Path] = None,
         dry_run: bool = False,
     ) -> None:
         """
@@ -504,6 +512,12 @@ class FileMover:
         Args:
             base_ingested_dir: Root archive directory.
                                Defaults to ~/ubik/Ingested_data.
+            archive_dir: Fixed directory where ALL ingested files land,
+                         regardless of their source folder name.
+                         If set, overrides the {source_directory}_ingested
+                         subdirectory logic entirely.
+                         Falls back to UBIK_ARCHIVE_DIR env var, then
+                         {base_ingested_dir}/ingested/.
             dry_run: If True, compute destination paths but do not move files.
         """
         if base_ingested_dir is None:
@@ -511,28 +525,33 @@ class FileMover:
         self.base_ingested_dir = Path(base_ingested_dir).expanduser().resolve()
         self.dry_run = dry_run
 
+        # Resolve fixed archive dir: explicit arg > env var > default subdir
+        if archive_dir is not None:
+            self.archive_dir: Optional[Path] = Path(archive_dir).expanduser().resolve()
+        elif os.environ.get("UBIK_ARCHIVE_DIR"):
+            self.archive_dir = Path(os.environ["UBIK_ARCHIVE_DIR"]).expanduser().resolve()
+        else:
+            self.archive_dir = self.base_ingested_dir / self.DEFAULT_ARCHIVE_SUBDIR
+
         if not dry_run:
+            self.archive_dir.mkdir(parents=True, exist_ok=True)
             (self.base_ingested_dir / "ingestion_log").mkdir(parents=True, exist_ok=True)
 
     def compute_destination(self, source_path: Path, source_directory: str) -> Path:
         """
         Compute the destination path for a file without moving it.
 
-        Appends _2, _3, … before the extension if the destination already
-        exists. This method is idempotent: repeated calls with the same
-        arguments return the same path (assuming no file is created between
-        calls).
+        All files land in self.archive_dir (a single fixed directory).
+        Appends _2, _3, … before the extension on name collisions.
 
         Args:
             source_path: Original file path.
-            source_directory: Parent folder name used to construct the
-                              destination subdirectory (e.g. "therapy"
-                              -> "therapy_ingested").
+            source_directory: Ignored — kept for API compatibility.
 
         Returns:
             Intended destination Path (may not yet exist).
         """
-        dest_dir = self.base_ingested_dir / f"{source_directory}_ingested"
+        dest_dir = self.archive_dir
         dest_path = dest_dir / source_path.name
         if dest_path.exists():
             stem = source_path.stem

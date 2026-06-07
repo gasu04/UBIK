@@ -48,16 +48,19 @@ for arg in "$@"; do
     esac
 done
 
+# All UBIK Hippocampal modules use the shared DeepSeek venv
+PYTHON="/Volumes/990PRO 4T/DeepSeek/venv/bin/python"
+
 # -----------------------------------------------------------------------------
 # Step 1: Check Python
 # -----------------------------------------------------------------------------
 echo -e "\n${YELLOW}[1/6] Checking Python...${NC}"
 
-if command -v python3 &> /dev/null; then
-    PYTHON_VERSION=$(python3 --version 2>&1)
-    echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION"
+if [ -x "$PYTHON" ]; then
+    PYTHON_VERSION=$("$PYTHON" --version 2>&1)
+    echo -e "  ${GREEN}✓${NC} $PYTHON_VERSION (${PYTHON})"
 else
-    echo -e "  ${RED}✗${NC} Python 3 not found"
+    echo -e "  ${RED}✗${NC} DeepSeek venv not found at ${PYTHON}"
     exit 1
 fi
 
@@ -71,7 +74,7 @@ if [ -f "requirements.txt" ]; then
     # Check if key packages are installed
     MISSING=false
     for pkg in pdfplumber pyyaml httpx; do
-        if ! python3 -c "import $pkg" 2>/dev/null; then
+        if ! "$PYTHON" -c "import $pkg" 2>/dev/null; then
             echo -e "  ${YELLOW}!${NC} Missing: $pkg"
             MISSING=true
         fi
@@ -79,7 +82,7 @@ if [ -f "requirements.txt" ]; then
 
     if [ "$MISSING" = true ]; then
         echo -e "  Installing dependencies..."
-        pip install -q -r requirements.txt
+        "$PYTHON" -m pip install -q -r requirements.txt
         echo -e "  ${GREEN}✓${NC} Dependencies installed"
     else
         echo -e "  ${GREEN}✓${NC} All dependencies present"
@@ -93,7 +96,7 @@ fi
 # -----------------------------------------------------------------------------
 echo -e "\n${YELLOW}[3/6] Verifying package...${NC}"
 
-if python3 -c "from ingest import IngestPipeline, PipelineConfig; print('  \033[0;32m✓\033[0m Package imports successful')"; then
+if "$PYTHON" -c "from ingest import IngestPipeline, PipelineConfig; print('  \033[0;32m✓\033[0m Package imports successful')"; then
     :
 else
     echo -e "  ${RED}✗${NC} Package import failed"
@@ -101,7 +104,7 @@ else
 fi
 
 # Check submodules
-python3 -c "
+"$PYTHON" -c "
 from ingest.models import MemoryCandidate, MemoryType
 from ingest.processors import ProcessorRegistry
 from ingest.chunkers import SmartChunker
@@ -131,7 +134,7 @@ fi
 echo -e "\n${YELLOW}[5/6] Testing with templates...${NC}"
 
 if [ -d "templates" ]; then
-    python3 -m ingest.cli local templates/ --dry-run 2>&1 | grep -E "(Files:|Memories:|Episodic:|Semantic:)" | while read line; do
+    "$PYTHON" -m ingest.cli local templates/ --dry-run 2>&1 | grep -E "(Files:|Memories:|Episodic:|Semantic:)" | while read line; do
         echo "  $line"
     done
     echo -e "  ${GREEN}✓${NC} Template processing successful"
@@ -145,7 +148,7 @@ fi
 if [ "$WITH_MCP" = true ]; then
     echo -e "\n${YELLOW}[6/6] Checking MCP connection...${NC}"
 
-    python3 -c "
+    "$PYTHON" -c "
 import asyncio
 import sys
 sys.path.insert(0, '/Volumes/990PRO 4T/UBIK/somatic/mcp_client')

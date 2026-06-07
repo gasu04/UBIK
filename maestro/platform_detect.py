@@ -9,7 +9,7 @@ UBIK_ROOT, find the Python venv, reach the remote node via Tailscale).
 Nodes:
     HIPPOCAMPAL — Mac Mini M4 Pro (macOS, arm64)
                   UBIK root:  /Volumes/990PRO 4T/UBIK/
-                  Python env: {ubik_root}/hippocampal/venv/
+                  Python env: /Volumes/990PRO 4T/DeepSeek/venv/
     SOMATIC     — PowerSpec RTX 5090 (WSL2 Linux)
                   UBIK root:  /home/gasu/ubik/
                   Python env: conda, pytorch_env
@@ -59,8 +59,9 @@ logger = logging.getLogger(__name__)
 _MACOS_UBIK_ROOT = Path("/Volumes/990PRO 4T/UBIK")
 _LINUX_UBIK_ROOT = Path("/home/gasu/ubik")
 
-# Relative sub-path of the Python venv inside the Hippocampal UBIK root.
-_HIPPOCAMPAL_VENV_SUBPATH = Path("hippocampal/venv")
+# Absolute path to the shared Python venv on the Hippocampal node.
+# All UBIK Hippocampal modules must use this venv.
+_HIPPOCAMPAL_VENV_PATH = Path("/Volumes/990PRO 4T/DeepSeek/venv")
 
 # Hostname substrings that reliably identify each node (case-insensitive).
 _HIPPOCAMPAL_HOSTNAME_MARKERS: frozenset[str] = frozenset({"minim4", "mac.lan"})
@@ -260,7 +261,7 @@ def _build_identity(
         )
 
     if node_type == NodeType.HIPPOCAMPAL:
-        venv_path: Optional[Path] = ubik_root / _HIPPOCAMPAL_VENV_SUBPATH
+        venv_path: Optional[Path] = _HIPPOCAMPAL_VENV_PATH
         activate_cmd: Optional[str] = f"source {venv_path}/bin/activate"
     elif node_type == NodeType.SOMATIC:
         venv_path = None

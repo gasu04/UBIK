@@ -294,7 +294,7 @@ class LocalMemoryWriter:
                 metadatas=[metadata],
             ),
         )
-        await self._create_memory_node(memory_id, memory_type, metadata)
+        await self._create_memory_node(memory_id, memory_type, metadata, content=content)
         logger.debug("Stored episodic %s (source=%s)", memory_id, source_file)
         return {"status": "success", "memory_id": memory_id}
 
@@ -405,6 +405,102 @@ class LocalMemoryWriter:
         logger.debug("Stored intellectual %s (author=%s)", memory_id, external_author)
         return {"status": "success", "memory_id": memory_id}
 
+    async def merge_node(
+        self,
+        label: str,
+        properties: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """MERGE a node with the given label and properties into Neo4j.
+
+        Uses the ``id`` field in properties as the MERGE key. If no ``id``
+        is present, falls back to ``name``.
+
+        Args:
+            label: Neo4j node label (e.g. ``"Meeting"``, ``"Person"``).
+            properties: Property dict; must contain ``id`` or ``name``.
+
+        Returns:
+            ``{"status": "success"}`` or ``{"status": "skipped/error", …}``
+        """
+        driver = self._neo4j()
+        if driver is None:
+            return {"status": "skipped", "reason": "Neo4j unavailable"}
+
+        merge_key = properties.get("id") or properties.get("name")
+        if not merge_key:
+            return {"status": "skipped", "reason": "No id or name in properties"}
+
+        # Build a safe property dict — strip None values
+        props = {k: v for k, v in properties.items() if v is not None}
+
+        try:
+            async with driver.session() as session:
+                await session.run(
+                    f"""
+                    MERGE (n:{label} {{id: $merge_key}})
+                    ON CREATE SET n += $props, n.created_at = datetime()
+                    ON MATCH  SET n += $props, n.updated_at = datetime()
+                    """,
+                    merge_key=str(merge_key),
+                    props=props,
+                )
+            return {"status": "success"}
+        except Exception as exc:
+            logger.warning("Neo4j merge_node failed (%s): %s", label, exc)
+            return {"status": "error", "message": str(exc)}
+
+    async def merge_relationship_by_id(
+        self,
+        from_label: str,
+        from_id: str,
+        to_label: str,
+        to_id: str,
+        rel_type: str,
+        properties: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """MERGE a typed relationship between two nodes looked up by id.
+
+        Both nodes must already exist (use :meth:`merge_node` first).
+
+        Args:
+            from_label: Label of the source node.
+            from_id: ``id`` property of the source node.
+            to_label: Label of the target node.
+            to_id: ``id`` property of the target node.
+            rel_type: Relationship type (e.g. ``"PARTICIPATED_IN"``).
+            properties: Optional properties to set on the relationship.
+
+        Returns:
+            ``{"status": "success"}`` or ``{"status": "skipped/error", …}``
+        """
+        driver = self._neo4j()
+        if driver is None:
+            return {"status": "skipped", "reason": "Neo4j unavailable"}
+
+        props = {k: v for k, v in (properties or {}).items() if v is not None}
+
+        try:
+            async with driver.session() as session:
+                await session.run(
+                    f"""
+                    MATCH (a:{from_label} {{id: $from_id}})
+                    MATCH (b:{to_label} {{id: $to_id}})
+                    MERGE (a)-[r:{rel_type}]->(b)
+                    ON CREATE SET r += $props, r.created_at = datetime()
+                    ON MATCH  SET r += $props, r.updated_at = datetime()
+                    """,
+                    from_id=str(from_id),
+                    to_id=str(to_id),
+                    props=props,
+                )
+            return {"status": "success"}
+        except Exception as exc:
+            logger.warning(
+                "Neo4j merge_relationship_by_id failed (%s)-[%s]->(%s): %s",
+                from_label, rel_type, to_label, exc,
+            )
+            return {"status": "error", "message": str(exc)}
+
     async def update_identity_graph(
         self,
         from_concept: str,
@@ -493,28 +589,111 @@ class LocalMemoryWriter:
         except Exception:
             return False
 
+    async def merge_topic_node(
+        self,
+        label: str,
+        properties: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """MERGE a Topic node and increment its session_count on each match.
+
+        Unlike :meth:`merge_node`, which overwrites all properties, this method
+        uses ``ON MATCH SET t.session_count = coalesce(t.session_count, 0) + 1``
+        so the counter accumulates across ingestion runs.
+
+        Args:
+            label: Node label (typically ``"Topic"``).
+            properties: Must contain ``id`` or ``name``.
+
+        Returns:
+            ``{"status": "success"}`` or ``{"status": "skipped/error", …}``
+        """
+        driver = self._neo4j()
+        if driver is None:
+            return {"status": "skipped", "reason": "Neo4j unavailable"}
+
+        topic_id = properties.get("id") or properties.get("name")
+        if not topic_id:
+            return {"status": "skipped", "reason": "No id or name in properties"}
+
+        props = {k: v for k, v in properties.items() if v is not None}
+
+        try:
+            async with driver.session() as session:
+                await session.run(
+                    f"""
+                    MERGE (t:{label} {{id: $topic_id}})
+                    ON CREATE SET t += $props,
+                                  t.session_count = 1,
+                                  t.created_at = datetime()
+                    ON MATCH  SET t += $props,
+                                  t.session_count = coalesce(t.session_count, 0) + 1,
+                                  t.updated_at = datetime()
+                    """,
+                    topic_id=str(topic_id),
+                    props=props,
+                )
+            return {"status": "success"}
+        except Exception as exc:
+            logger.warning("Neo4j merge_topic_node failed (%s): %s", label, exc)
+            return {"status": "error", "message": str(exc)}
+
+    async def execute_raw_cypher(
+        self,
+        cypher: str,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Execute arbitrary Cypher — used for schema cleanup operations.
+
+        Args:
+            cypher: Cypher query string.
+            params: Optional parameter dict.
+
+        Returns:
+            ``{"status": "success"}`` or ``{"status": "skipped/error", …}``
+        """
+        driver = self._neo4j()
+        if driver is None:
+            return {"status": "skipped", "reason": "Neo4j unavailable"}
+        try:
+            async with driver.session() as session:
+                await session.run(cypher, **(params or {}))
+            return {"status": "success"}
+        except Exception as exc:
+            logger.warning("Neo4j execute_raw_cypher failed: %s", exc)
+            return {"status": "error", "message": str(exc)}
+
     async def _create_memory_node(
         self,
         memory_id: str,
         memory_type: str,
         metadata: Dict[str, Any],
+        content: str = "",
     ) -> None:
-        """Create a Memory node anchored to the Self CoreIdentity node (best-effort)."""
+        """Create a Memory node anchored to the Self CoreIdentity node (best-effort).
+
+        Populates chromadb_id (= memory_id), memory_type, and a 200-char summary
+        so the graph node is meaningful on its own. (fix 1)
+        """
         driver = self._neo4j()
         if driver is None:
             return
+        summary = (content[:200] + "…") if len(content) > 200 else content
         try:
             async with driver.session() as session:
                 await session.run(
                     """
                     MATCH (s:CoreIdentity {name: 'Self'})
                     MERGE (m:Memory {id: $memory_id})
-                    SET m.type      = $memory_type,
+                    SET m.type        = $memory_type,
+                        m.memory_type = $memory_type,
+                        m.chromadb_id = $memory_id,
+                        m.summary     = $summary,
                         m.ingested_at = $ingested_at
                     MERGE (s)-[:HAS_MEMORY]->(m)
                     """,
                     memory_id=memory_id,
                     memory_type=memory_type,
+                    summary=summary,
                     ingested_at=metadata.get("ingested_at", ""),
                 )
         except Exception as exc:
