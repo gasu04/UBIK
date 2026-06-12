@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Google Drive credentials (IMPORTANT: Never commit these!)
+credentials.json
+token.json
+
+# ChromaDB embeddings (too large for git)
+chroma_embeddings/
+chroma_gdrive_db/
+
+# Downloaded files
+gdrive_downloads/
+
+# Benchmark results
+benchmark_results_*.txt
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Config env overrides
+config/.env
+
+# Large model weights
+*.gguf

@@ -1,0 +1,30 @@
+# Core LangChain packages
+langchain>=1.1.0
+langchain-community>=0.4.0
+langchain-core>=1.1.0
+langchain-text-splitters>=1.0.0
+langchain-huggingface>=1.1.0
+langchain-ollama>=1.0.0
+
+# Vector Store
+chromadb
+
+# Embeddings
+sentence-transformers
+
+# Google Drive API
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+google-api-python-client>=2.0.0
+
+# Document Loaders - Core
+pypdf  # For PDF files
+python-docx  # For Word documents
+unstructured  # For various document types
+openpyxl  # For Excel files
+
+# Optional but recommended
+beautifulsoup4  # For HTML parsing
+lxml  # For XML/HTML processing
+pandas  # For CSV/Excel handling
