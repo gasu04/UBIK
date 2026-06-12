@@ -94,3 +94,23 @@
 - Run maestro start and confirm all services healthy
 - Decide on untracked dirs in UBIK (gitignore large ones, commit docs)
 ---
+
+## Session: 2026-06-12 17:20 — Node: Hippocampal
+**Goal:** Consolidate the DeepSeek repo into the UBIK repo, preserving full history
+**Completed:**
+- Merged /Volumes/990PRO 4T/DeepSeek (github.com/gasu04/DeepSeek14B, branch main @ b82966e) into UBIK as deepseek/ via git subtree add — all 8 DeepSeek commits preserved and reachable
+- Moved untracked runtime assets into UBIK/deepseek/: 8.9GB GGUF model, chroma_embeddings/, gdrive_downloads/, credentials.json, token.json, benchmark results, .cache (all covered by deepseek/.gitignore)
+- Updated deepseek/config/.env.example embeddings example path to the new location
+- Symlinked deepseek/venv -> /Volumes/990PRO 4T/DeepSeek/venv (venv is shared with other projects per deepseek/CLAUDE.md — must NOT be moved or deleted); changed .gitignore venv/ -> venv so the symlink is ignored
+**State left in:**
+- UBIK master is 3 commits ahead of origin (subtree merge + path fixes + this entry) — not pushed
+- Old /Volumes/990PRO 4T/DeepSeek dir still holds: .git + tracked code (now duplicated in UBIK/deepseek/), and the SHARED venv which must stay; the rest of the dir can be archived/deleted after verification
+- GitHub repo gasu04/DeepSeek14B is now superseded — consider archiving it
+- UBIK untracked dirs still unresolved: Ingested_data/, MAESTRO-0.12.0.md, UBIKParallax-source-v5/v6/, UBIK_Claude_Prompts/
+**Files changed:**
+- deepseek/ (new): entire DeepSeek14B repo merged under this prefix with full history
+- deepseek/config/.env.example: embeddings example path updated to UBIK/deepseek/
+- deepseek/.gitignore: venv pattern now also matches the venv symlink
+**Next session should:**
+- Push UBIK to origin; verify DeepSeek RAG runs from UBIK/deepseek/ (launcher.py / start_ollama.py), then archive the old DeepSeek dir (keep its venv!)
+---
