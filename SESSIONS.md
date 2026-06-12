@@ -114,3 +114,19 @@
 **Next session should:**
 - Push UBIK to origin; verify DeepSeek RAG runs from UBIK/deepseek/ (launcher.py / start_ollama.py), then archive the old DeepSeek dir (keep its venv!)
 ---
+
+## Session: 2026-06-12 18:34 — Node: Hippocampal
+**Goal:** Push the DeepSeek consolidation to origin and archive the superseded GitHub repo
+**Completed:**
+- Pushed UBIK master to origin (1a4df75..ff08e77): subtree merge of DeepSeek14B, path fixes, and session entry now on GitHub
+- Archived github.com/gasu04/DeepSeek14B via gh repo archive — verified read-only (isArchived=true); can be unarchived from repo settings if needed
+**State left in:**
+- UBIK master in sync with origin
+- DeepSeek consolidation complete: code + history under UBIK/deepseek/, runtime assets moved, GitHub repo archived
+- Old /Volumes/990PRO 4T/DeepSeek dir still on disk — safe to archive/delete EXCEPT venv/ (shared with other projects, reached via UBIK/deepseek/venv symlink)
+- UBIK untracked dirs still unresolved: Ingested_data/, MAESTRO-0.12.0.md, UBIKParallax-source-v5/v6/, UBIK_Claude_Prompts/
+**Files changed:**
+- SESSIONS.md: this entry (no other file changes this session)
+**Next session should:**
+- Verify DeepSeek RAG runs from UBIK/deepseek/ (launcher.py / start_ollama.py), then clean up the old DeepSeek dir (keep its venv!); decide on UBIK untracked dirs
+---
