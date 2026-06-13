@@ -1,0 +1,74 @@
+# =============================================================================
+# UBIK Content Type Registry
+# =============================================================================
+# One entry per content type the ingestion system accepts. Loaded and
+# validated by ingest/registry.py (fail-loud on any malformed entry).
+# Routes each source file to a parser, an enrichment level, and target
+# ChromaDB collections.
+#
+# Schema (required for every entry):
+#   parser:             str  — transcript | letter | note | constitution | qa_pair
+#   enrichment:         str  — required | light | none
+#   target_collections: list — ChromaDB collections ([] = not general ingestion)
+#
+# Optional fields:
+#   diarization_trust:   none | partial | full
+#                        Confidence in the source's speaker attribution.
+#                        "none" = mono-diarized or unattributed; any source
+#                        below "full" is BLOCKED for the voice corpus.
+#   default_sensitive:   review | true | false — Gate 1 default for
+#                        contains_sensitive when enrichment can't decide
+#   voice_corpus_eligible: bool — text may feed voice/DPO training
+#   metadata_overrides:  map  — forced metadata values at storage time
+#   route_to:            str  — alternate destination (bypasses IngestPipeline)
+# =============================================================================
+
+content_types:
+  transcript_tactiq:
+    parser: transcript          # routes to existing transcript_processor
+    enrichment: required
+    diarization_trust: none     # mono-diarized — voice corpus BLOCKED
+    default_sensitive: review
+    voice_corpus_eligible: false
+    target_collections: [ubik_episodic]
+
+  transcript_gemini:
+    parser: transcript
+    enrichment: required
+    diarization_trust: partial  # Gemini labels speakers, but attribution unverified
+    default_sensitive: review
+    voice_corpus_eligible: false  # blocked until diarization_trust is "full"
+    target_collections: [ubik_episodic]
+
+  transcript_fireflies:
+    parser: transcript
+    enrichment: required
+    diarization_trust: partial  # Fireflies diarizes per speaker; verify against known voices
+    default_sensitive: review
+    voice_corpus_eligible: false  # blocked until diarization_trust is "full"
+    target_collections: [ubik_episodic]
+
+  letter_maestro:
+    parser: letter              # new parser, Phase 5
+    enrichment: light           # metadata only; text is already pure Gines
+    voice_corpus_eligible: true
+    target_collections: [ubik_episodic, ubik_semantic]
+
+  memory_note:
+    parser: note
+    enrichment: required
+    target_collections: [ubik_episodic]
+
+  ethical_constitution:
+    parser: constitution
+    enrichment: none            # hand-curated; ingest verbatim
+    target_collections: [ubik_semantic]
+    metadata_overrides:
+      stability: core
+      importance: 1.0
+
+  qa_calibration:
+    parser: qa_pair
+    enrichment: none
+    target_collections: []      # NOT general ingestion — routes to golden
+    route_to: voice_vault/golden_set/   # set / DPO staging instead
