@@ -130,3 +130,20 @@
 **Next session should:**
 - Verify DeepSeek RAG runs from UBIK/deepseek/ (launcher.py / start_ollama.py), then clean up the old DeepSeek dir (keep its venv!); decide on UBIK untracked dirs
 ---
+
+## Session: 2026-06-12 20:05 — Node: Hippocampal
+**Goal:** Verify the DeepSeek RAG pipeline runs from its new home at UBIK/deepseek/
+**Completed:**
+- Confirmed all code paths are Path(__file__)-relative: settings.py resolves embeddings_base_dir to <project_root>/chroma_embeddings, so the moved ChromaDB data is picked up automatically at the new location — no code changes needed
+- Verified the venv symlink (deepseek/venv -> old DeepSeek/venv) works: Python 3.13.7 runs, key deps (requests, chromadb, dotenv) import cleanly
+- Live Ollama check (api/tags) was not run — session ended before service-level verification
+**State left in:**
+- Static verification passed; runtime verification incomplete: Ollama service check, model availability (deepseek-r1:14b), unit tests, and an end-to-end RAG query still pending
+- UBIK master in sync with origin (before this entry)
+- Old /Volumes/990PRO 4T/DeepSeek dir untouched — keep venv/, rest deletable after full verification
+- UBIK untracked dirs still unresolved: Ingested_data/, MAESTRO-0.12.0.md, UBIKParallax-source-v5/v6/, UBIK_Claude_Prompts/
+**Files changed:**
+- SESSIONS.md: this entry (no code changes this session)
+**Next session should:**
+- Finish runtime verification from UBIK/deepseek/: pytest tests/unit, Ollama up + model present, one end-to-end RAG query; then clean up old DeepSeek dir (keep its venv!)
+---
