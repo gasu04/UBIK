@@ -147,3 +147,31 @@
 **Next session should:**
 - Finish runtime verification from UBIK/deepseek/: pytest tests/unit, Ollama up + model present, one end-to-end RAG query; then clean up old DeepSeek dir (keep its venv!)
 ---
+
+## Session: 2026-06-12 20:10 — Node: Hippocampal
+**Goal:** Port the ingestion program into UBIK — Phase 0 (recon), Phase 1 (scaffolding/config/registries), Phase 2 (source acquisition)
+**Completed:**
+- Phase 0 recon: mapped ingestion/ pipeline (models, transcript_processor, cli discovery); found ChromaDB/Neo4j/MCP all DOWN (containers exited Jun 7); located raw Tactiq zips (~1,261 files, Seagate2T), 27 .transcript outputs, manifest (330 records, last ingest 2026-03-19); no _protagonist_only.txt or Known_Persons export existed locally
+- CRITICAL recon finding: ChromaDB bind mount (UBIK/data/chromadb) is stale/empty (Jan 17) — real collections live in the container's writable layer (image persists to /data, compose maps /chroma/chroma). docker rm ubik-chromadb would DESTROY the 192 stored memories
+- Somatic vLLM confirmed at 100.92.95.39:8002 (adrian-1, DeepSeek-R1-Distill-Qwen-14B-AWQ); 100.79.166.114:8002 is an unrelated nginx site
+- Phase 1: created sources/{tactiq,gemini,fireflies,letters,memory_notes,constitution}, enriched/, pending_review/, approved/, quarantine/{source,enrichment}, registry/, qa/, config/, logs/
+- registry/known_persons.yaml: converted from "Digital Twin Taxonomy and Registry Setup" CSV export, then corrected per Gines — 12 persons (Maggie wife; sons Adrian/Gines Alberto/Jaime; nueras Carissa/Delia/Sofia; nietas Elena/Mathilde; Leticia Zuno is THERAPIST not partner); schema: privacy_tier private/therapy/family/business + ubik_access_level
+- registry/content_types.yaml: 7 types; voice-corpus invariant enforced by loader (diarization_trust below "full" can never be voice_corpus_eligible)
+- ingest/registry.py: fail-loud loaders + CSV converter (validates before replacing)
+- config/ingestion_config.py: env-driven dataclasses; per-privacy-tier endpoint routing, fail-safe (all tiers → sensitive/Somatic endpoint unless UBIK_STANDARD_PRIVACY_TIERS relaxes)
+- Spanish-first directive recorded (qa/learned_rules.md + Claude memory): parsing/names/prompts Spanish primero; bare Gines/GASU = father, son = "Gines Alberto"/"Gines Hijo"
+- Phase 2: fetch_sources.py — --local mode demoed (3 real Tactiq .docx, byte-identical, SHA-256 dedup, sources/MANIFEST.jsonl); --gdrive OAuth desktop flow written, awaiting credentials
+- .gitignore: credentials/tokens + all raw content dirs ignored (verified); 58/58 tests pass
+**State left in:**
+- ChromaDB/Neo4j/MCP containers still DOWN (untouched — start them next session; fix bind-mount mismatch BEFORE any docker rm)
+- 3 demo files in sources/tactiq/ + manifest; /tmp/tactiq_demo can be deleted
+- qa/ docs are placeholders pending Claude.ai session docs; Google Sheet now BEHIND known_persons.yaml (update Sheet: Elena=nieta, add Maggie/Jaime/Gines Alberto/nueras)
+- Known issue logged: SpeakerTurnParser regexes break on accented names ([A-Za-z]); Tactiq raw files are .docx but transcript parser expects .transcript — pre-parse step needed in Phase 3
+**Files changed:**
+- ingestion/{fetch_sources.py,ingest/registry.py,config/*,registry/*,qa/*,tests/test_{registry,ingestion_config,fetch_sources}.py}: new (Phases 1-2)
+- ingestion/.env.example: +13 enrichment/gate/Drive vars
+- .gitignore: credentials + raw-content ignore rules
+- SESSIONS.md: this entry
+**Next session should:**
+- Phase 3 (enrichment) per Gines's spec; before that: start ubik-chromadb/ubik-neo4j containers and migrate ChromaDB data out of the container writable layer onto the bind mount (data-loss risk), and get collection counts (deferred Checkpoint 0 item)
+---
