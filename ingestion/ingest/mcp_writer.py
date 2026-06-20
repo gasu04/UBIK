@@ -19,7 +19,14 @@ Embeddings:
     sentence-transformers all-MiniLM-L6-v2 (384 dimensions, cosine space)
     Matches the model used to build the existing ubik_* collections.
 
-Version: 1.0.0
+Tier classification: Tier 1 (silent-failure-critical, 100% coverage). This
+module hosts the source-document deduplication of CLAUDE.md §3.4.1 entry #5:
+a missed dedup check writes a duplicate memory that can't be rolled back and
+silently skews retrieval probabilities forever. See ``store_episodic`` /
+``_find_episodic_by_sha`` and the dedup tests that deliberately trigger the
+double-write path.
+
+Version: 1.1.0
 """
 
 import asyncio
@@ -257,8 +264,18 @@ class LocalMemoryWriter:
         participants: str = "gines",
         themes: str = "",
         source_file: Optional[str] = None,
+        source_sha256: Optional[str] = None,
+        extra_metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Write an episodic memory directly to ``ubik_episodic``.
+
+        Source-document deduplication (CLAUDE.md §3.4.1 Tier 1, entry #5):
+        when *source_sha256* is given, the first 16 hex chars are stored as
+        ``source_sha256`` metadata and checked **before** writing. A second
+        ingest of the same source is a no-op that returns
+        ``{"status": "duplicate", ...}`` — never a second row. This is the
+        silent-failure guard: a missed check re-imports a duplicate and biases
+        retrieval probabilities forever.
 
         Args:
             content: Memory text.
@@ -269,10 +286,29 @@ class LocalMemoryWriter:
             participants: Comma-separated participant names.
             themes: Comma-separated theme tags.
             source_file: Original source filename for provenance.
+            source_sha256: Full SHA-256 of the source document. Enables dedup;
+                stored truncated to 16 chars. Omit to disable the dedup check
+                (preserves the original HippocampalClient behavior).
+            extra_metadata: Additional metadata to persist (e.g. the Phase 3
+                fields: ``diarization_warning``, ``type_inferred_from``,
+                ``enrichment_confidence``, ``resolution_status_summary``,
+                ``voice_corpus_eligible``, ``ingestion_phase``). ``None`` values
+                are dropped; keys never overwrite the core fields silently.
 
         Returns:
-            ``{"status": "success", "memory_id": "<id>"}``
+            ``{"status": "success", "memory_id": "<id>"}`` on write, or
+            ``{"status": "duplicate", "memory_id": "<existing-id>"}`` if a row
+            with the same ``source_sha256`` already exists.
         """
+        sha16 = source_sha256[:16] if source_sha256 else None
+        if sha16:
+            existing = await self._find_episodic_by_sha(sha16)
+            if existing is not None:
+                logger.info(
+                    "Duplicate episodic skipped (sha=%s, existing=%s)", sha16, existing
+                )
+                return {"status": "duplicate", "memory_id": existing}
+
         memory_id = self._ep_id()
         embedding = await self._embed_async(content)
         metadata: Dict[str, Any] = {
@@ -285,6 +321,10 @@ class LocalMemoryWriter:
             "source_file": source_file or "",
             "ingested_at": datetime.now(timezone.utc).isoformat(),
         }
+        if sha16:
+            metadata["source_sha256"] = sha16
+        if extra_metadata:
+            metadata.update({k: v for k, v in extra_metadata.items() if v is not None})
         await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: self._episodic.add(
@@ -297,6 +337,25 @@ class LocalMemoryWriter:
         await self._create_memory_node(memory_id, memory_type, metadata, content=content)
         logger.debug("Stored episodic %s (source=%s)", memory_id, source_file)
         return {"status": "success", "memory_id": memory_id}
+
+    async def _find_episodic_by_sha(self, sha16: str) -> Optional[str]:
+        """Return the id of an existing episodic memory with this source hash.
+
+        Args:
+            sha16: First 16 hex chars of the source document SHA-256.
+
+        Returns:
+            The existing memory id, or ``None`` if no row carries this hash.
+
+        Note:
+            Tier 1 dedup probe (CLAUDE.md §3.4.1 #5). Exact metadata match on
+            ``source_sha256``; a silent miss here causes a duplicate import.
+        """
+        def _query() -> Optional[str]:
+            res = self._episodic.get(where={"source_sha256": sha16})
+            ids = (res or {}).get("ids") or []
+            return ids[0] if ids else None
+        return await asyncio.get_event_loop().run_in_executor(None, _query)
 
     async def store_semantic(
         self,

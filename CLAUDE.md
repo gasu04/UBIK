@@ -334,7 +334,7 @@ These modules share one property: **failure is silent, and damage compounds befo
 | 2 | Reasoning-chain stripping (`strip_reasoning`) | `~/ubik/somatic/prompts/parser.py` | A silent leak contaminates voice output without anyone noticing until a family member reads it |
 | 3 | Voice Freeze state machine (`freeze_semantic`, `unfreeze_semantic`) | `~/ubik/hippocampal/mcp_server.py` | A silent unfreeze during post-training writes poisons the trained voice and is invisible in logs |
 | 4 | Privacy redaction (`SafeJSONFormatter`) | `~/ubik/somatic/logging_config.py` | Silent failure = memory content lands in persisted logs; discovered only by manual audit |
-| 5 | Ingestion deduplication (source-document-ID) | *(planned — tag location once built on Hippocampal Node)* | Silent duplicates skew retrieval probabilities; bias discovered years later, if at all |
+| 5 | Ingestion deduplication (source-document-ID) | `ingestion/ingest/mcp_writer.py` (`store_episodic` / `_find_episodic_by_sha`) | Silent duplicates skew retrieval probabilities; bias discovered years later, if at all |
 | 6 | Circuit Breaker Probe Latch (`allow_request`) | `~/ubik/somatic/mcp_client/circuit_breaker.py` | Silent loss of the one-probe invariant = thundering herd when the Hippocampal Node recovers |
 
 **Adding a new Tier 1 entry:** the proposing module's header docstring must declare the tier (§2.5), state the silent-failure reason in one sentence, and there must be at least one test that deliberately triggers the silent failure mode (not just the loud one). Changes to this registry require updating CLAUDE.md itself — it is load-bearing.
