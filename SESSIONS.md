@@ -308,3 +308,18 @@
 - Power on + reach the Somatic vLLM endpoint and set `UBIK_ENRICHMENT_MODEL` (+ `SOMATIC_TAILSCALE_IP`/`VLLM_PORT`) in `ingestion/.env`, then run **CP2** (`run_phase3.py --stage 2 --dry-run --limit 8`, hand-score per `qa/rubric.md`; gate = conf ≥0.7 on ≥6/8). Only then CP3 live, CP4 (human Gate 1 via `interactive_ingest.py`), CP5 (write to ChromaDB).
 - Decide the commit (branch off `master`? honest message reflecting gaps-filled + 4 pre-existing tracker fails). Optionally fix the pre-existing `FileMover` `<source>_ingested/` bug separately.
 ---
+
+## Session: 2026-06-29 — Node: Hippocampal
+**Goal:** Fold two carried-over pending items into the canonical log so they are not lost, and reaffirm the repo (not Drive) as the source of truth for SESSIONS.md.
+**Completed:**
+- Verified the Drive copy (`My Drive/Ubik/SESSIONS.md`) is byte-identical to the repo copy — no divergence to reconcile. The repo remains canonical; Drive is the downstream mirror written by `scripts/sync_sessions.sh` on post-commit.
+- Recorded two pending items surfaced in a prior Drive-based (Claude.ai) working session so they survive into the canonical log (see "Next session should").
+**State left in:**
+- No code changes this session — only this log entry added.
+- Workflow note reaffirmed: decisions mirror to the repo via `sync_sessions.sh` on the next commit; Drive is a convenience mirror, the repo file is canonical. Entries drafted from Drive should be folded back into the repo file when next in Claude Code.
+**Files changed:**
+- SESSIONS.md: this entry
+**Next session should:**
+- Retire the installed `ubik-memory-sweep` skill so it does not compete with the current memory/journaling system.
+- Update the ingestion loader for the new fields and the `EPISODIC` token.
+---
