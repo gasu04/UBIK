@@ -26,3 +26,22 @@ data/
 
 # Model weights
 models/
+
+# Google OAuth credentials & tokens — never commit (Phase 2 fetch_sources)
+config/gdrive_credentials.json
+config/gdrive_token.json
+*credentials*.json
+*token*.json
+
+# Raw personal content & fetch state — never commit
+ingestion/sources/*/*
+ingestion/sources/MANIFEST.jsonl
+ingestion/enriched/*
+ingestion/pending_review/*
+ingestion/approved/*
+ingestion/quarantine/*/*
+!ingestion/sources/*/.gitkeep
+!ingestion/enriched/.gitkeep
+!ingestion/pending_review/.gitkeep
+!ingestion/approved/.gitkeep
+!ingestion/quarantine/*/.gitkeep

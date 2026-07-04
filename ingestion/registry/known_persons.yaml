@@ -1,0 +1,94 @@
+# UBIK Known Persons Registry
+# Originally generated from "Digital Twin Taxonomy and Registry Setup - Known_persons.csv";
+# manually corrected 2026-06-12 per Gines (family structure update).
+# NOTE: the Google Sheet is now BEHIND this file — update the Sheet to match,
+# or the next CSV conversion will clobber these corrections.
+#
+# Family graph (not expressible in this schema; for the Neo4j identity graph):
+#   Maggie ⚭ Ginés Sanchez Urrutia
+#   Sons: Adrian (⚭ Carissa), Gines Alberto (⚭ Delia), Jaime (partner Sofia)
+#   Elena = daughter of Jaime & Sofia (granddaughter)
+#   Mathilde = daughter of Gines Alberto & Delia (granddaughter)
+persons:
+- canonical_name: Ginés Sanchez Urrutia
+  aliases:
+  - Ginés
+  - Gines
+  - GASU
+  relationship: self
+  role: protagonist
+  privacy_tier: private
+  ubik_access_level: admin
+- canonical_name: Leticia Zuno
+  aliases:
+  - Leti
+  - Leticia
+  relationship: therapist
+  role: professional
+  privacy_tier: therapy
+  ubik_access_level: restricted
+- canonical_name: Maggie
+  aliases: []
+  relationship: wife
+  role: core_family
+  privacy_tier: family
+  ubik_access_level: full
+- canonical_name: Adrian
+  aliases:
+  - Adrián
+  relationship: son
+  role: core_family
+  privacy_tier: family
+  ubik_access_level: full
+- canonical_name: Gines Alberto
+  aliases:
+  - Ginés Alberto
+  - Gines Hijo
+  - Ginés Hijo
+  relationship: son
+  role: core_family
+  privacy_tier: family
+  ubik_access_level: full
+- canonical_name: Jaime
+  aliases: []
+  relationship: son
+  role: core_family
+  privacy_tier: family
+  ubik_access_level: full
+- canonical_name: Carissa
+  aliases: []
+  relationship: daughter_in_law   # wife of Adrian
+  role: extended_family
+  privacy_tier: family
+  ubik_access_level: restricted   # UNCONFIRMED — set explicitly if in-laws get more
+- canonical_name: Delia
+  aliases: []
+  relationship: daughter_in_law   # wife of Gines Alberto
+  role: extended_family
+  privacy_tier: family
+  ubik_access_level: restricted   # UNCONFIRMED
+- canonical_name: Sofia
+  aliases: []
+  relationship: daughter_in_law   # partner of Jaime
+  role: extended_family
+  privacy_tier: family
+  ubik_access_level: restricted   # UNCONFIRMED
+- canonical_name: Elena
+  aliases: []
+  relationship: granddaughter     # daughter of Jaime & Sofia
+  role: next_gen
+  privacy_tier: family
+  ubik_access_level: self_and_descendants
+- canonical_name: Mathilde
+  aliases:
+  - Mathi
+  relationship: granddaughter     # daughter of Gines Alberto & Delia
+  role: next_gen
+  privacy_tier: family
+  ubik_access_level: self_and_descendants
+- canonical_name: Carlos Romero
+  aliases: []
+  relationship: colleague
+  role: business
+  privacy_tier: business
+  ubik_access_level: restricted
