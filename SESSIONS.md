@@ -323,3 +323,18 @@
 - Retire the installed `ubik-memory-sweep` skill so it does not compete with the current memory/journaling system.
 - Update the ingestion loader for the new fields and the `EPISODIC` token.
 ---
+
+## Session: 2026-07-04 — Node: Hippocampal
+**Goal:** Session wrap-up. Commit and publish the SESSIONS.md pending-items entry to the UBIK repo. (Only UBIK-project work is logged here; other unrelated tooling done this session — worldmonitor, workspace-agent, gcloud, CrewAI, notebooklm-py — is intentionally omitted.)
+**Completed:**
+- Committed the 2026-06-29 pending-items entry as `46b5095` on branch `phase3-enrichment-pipeline` (1 file, 15 insertions). The `post-commit` hook ran `scripts/sync_sessions.sh` → mirrored SESSIONS.md to `gsanchezurrutia@gmail.com/Ubik`; verified repo and Drive byte-identical (repo canonical, Drive downstream mirror).
+- Pushed `phase3-enrichment-pipeline` to origin — this was the branch's **first push**, so it also published the Phase 3 enrichment pipeline commit `c33e2e4` (gaps-filled build from the 2026-06-20 session) that had been local-only until now. GitHub offered a PR link; branch NOT merged to `master`.
+**State left in:**
+- `phase3-enrichment-pipeline` now on origin (`46b5095` confirmed on `origin/phase3-enrichment-pipeline`), not merged to `master`. Branch carries both the Phase 3 enrichment work and the SESSIONS.md pending-items entry.
+- Two carried-over pending items still open (see 2026-06-29 entry): retire the `ubik-memory-sweep` skill; update the ingestion loader for the new fields + `EPISODIC` token.
+**Files changed:**
+- SESSIONS.md: this entry.
+**Next session should:**
+- Decide whether to open/merge the `phase3-enrichment-pipeline` PR into `master`.
+- Address the two pending items: retire `ubik-memory-sweep`; update the ingestion loader (new fields + `EPISODIC` token).
+---
