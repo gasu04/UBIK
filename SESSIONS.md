@@ -384,3 +384,26 @@
 - Optional follow-ups still open from 2026-07-04(b): per-service `maestro shutdown --service NAME`; WhisperX health tests; persist the systemd user units as installed `.service` files.
 - Still pending from earlier: retire `ubik-memory-sweep`; update the ingestion loader (new fields + `EPISODIC` token).
 ---
+
+## Session: 2026-07-05 (b) — Node: Hippocampal
+**Goal:** Web control panel for UBIK (all Maestro commands in the browser + Neo4j link, styled after the PKD Ubik book); make it persistent with launchd.
+**Completed (maestro v0.14.0; PR #4 merged → `20875a9`):**
+- New `maestro/web/` package: FastAPI backend `server.py` reusing the Maestro Python API (Orchestrator, ShutdownController, registry, metrics, health). Endpoints `/api/{config,status,health,metrics,logs,start,shutdown}`; destructive ops require `confirm=true`.
+- Static SPA (`index.html`/`style.css`/`app.js`/`ubik-logo.svg`): live auto-refreshing cross-node service grid; Start (all / per-service / local-only); Shutdown (dry-run / local-only / emergency, confirm modal); Health/Metrics/Logs to a console; links to Neo4j browser (`:7474`) + ChromaDB/MCP/vLLM/API-docs.
+- Logo is **original** (aerosol can + wordmark — not the copyrighted cover; swap `static/ubik-logo.svg`). Retro-commercial theme with rotating in-book Ubik ad epigraphs ("Safe when used as directed").
+- New CLI `maestro web [--host --port]` (default `0.0.0.0:8090`); requirements += fastapi, uvicorn.
+- Verified via screenshot + curl (all endpoints, static assets, live `/api/status`).
+- **launchd persistence** `com.ubik.maestro-web` (mirrors `com.ubik.chromadb`; all artifacts local-disk, not in repo): plist (RunAtLoad+KeepAlive, logs → `~/Library/Logs/com.ubik.maestro-web.*`), wrapper `~/ubik-bin/start_maestro_web.sh` (volume-wait guard, sets PYTHONPATH + MAESTRO_LOG_DIR), FDA interpreter copy `~/ubik-bin/ubik-maestro-python`. Read+write of the external volume under launchd both work. KeepAlive auto-restart verified (killed pid → respawned → HTTP 200).
+- **Bug fixed**: local `maestro/.env` had `MAESTRO_LOG_DIR=<spaces># comment` → pydantic-settings took the comment as the value (crashed under launchd cwd=/, silently made a garbage dir on manual runs). Cleaned the `.env` line, deleted the garbage dir, pinned `MAESTRO_LOG_DIR` in the wrapper. `.env.example` was already correct.
+**State left in:**
+- `master` = `20875a9` (local + origin, in sync); `maestro-web` branch deleted (local + remote).
+- Web panel **live** at `http://100.103.242.91:8090` via launchd (persists across reboots / login).
+**Files changed:**
+- NEW: `maestro/web/{__init__,server}.py`, `maestro/web/static/{index.html,style.css,app.js,ubik-logo.svg}`
+- `maestro/cli.py` (`web` command), `maestro/requirements.txt` (fastapi/uvicorn), `maestro/__init__.py` (v0.14.0)
+- Local-disk only (not repo): `~/ubik-bin/{start_maestro_web.sh,ubik-maestro-python}`, `~/Library/LaunchAgents/com.ubik.maestro-web.plist`, `maestro/.env` (gitignored) log-dir fix
+- SESSIONS.md: this entry
+**Next session should:**
+- Optional: swap in a licensed Ubik cover image at `static/ubik-logo.svg`; add background-job progress for long start/shutdown ops; auth in front of the panel if exposed beyond the tailnet.
+- Carried over: per-service `maestro shutdown --service NAME`; WhisperX health tests; persist vLLM/WhisperX systemd user units as `.service` files; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
+---
