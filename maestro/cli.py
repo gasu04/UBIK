@@ -413,21 +413,27 @@ def status_cmd(
     metavar="SECS",
     help="Per-probe timeout when checking current service health.",
 )
-def start_cmd(service_name: Optional[str], timeout: float) -> None:
-    """Start local UBIK services in dependency order.
+@click.option(
+    "--local-only",
+    is_flag=True,
+    default=False,
+    help="Only start services hosted on this node (skip the remote node).",
+)
+def start_cmd(service_name: Optional[str], timeout: float, local_only: bool) -> None:
+    """Start UBIK services across the cluster in dependency order.
 
-    Without --service, equivalent to running the full startup sequence:
-    probes each local service and starts any that are unhealthy, respecting
-    dependency order (Docker before Neo4j, etc.).
+    Without --service, probes every service and starts any that are unhealthy,
+    respecting dependency order (Docker before Neo4j, etc.).  Services on the
+    remote (Somatic) node are started over SSH.  Use --local-only to restrict
+    startup to services hosted on this node.
 
-    With --service NAME, starts exactly one service (the named service must
-    run on the local node).
+    With --service NAME, starts exactly one service — local or remote.
 
     \b
     Examples:
         maestro start
-        maestro start --service neo4j
-        maestro start --service chromadb
+        maestro start --service vllm      # remote (Somatic) — over SSH
+        maestro start --local-only
     """
     from maestro.orchestrator import Orchestrator
     from maestro.platform_detect import detect_node
@@ -452,13 +458,11 @@ def start_cmd(service_name: Optional[str], timeout: float) -> None:
             console.print(f"[bold red]Unknown service:[/bold red] {service_name}")
             sys.exit(2)
 
-        if svc.node != identity.node_type:
+        if svc.node != identity.node_type and identity.node_type.value != "unknown":
             console.print(
-                f"[yellow]Service [bold]{service_name}[/bold] runs on the "
-                f"[bold]{svc.node.value}[/bold] node, not "
-                f"[bold]{identity.node_type.value}[/bold] — cannot start locally.[/yellow]"
+                f"  [dim]{service_name} runs on the {svc.node.value} node — "
+                f"starting over SSH from {identity.node_type.value}.[/dim]"
             )
-            sys.exit(1)
 
         console.print(f"  Starting [bold]{service_name}[/bold]...")
         try:
@@ -474,11 +478,12 @@ def start_cmd(service_name: Optional[str], timeout: float) -> None:
             sys.exit(1)
 
     else:
-        # ── All local services ────────────────────────────────────────────
+        # ── All services (cluster-wide unless --local-only) ────────────────
         orch = Orchestrator(registry, identity)
-        console.print("  Starting all unhealthy local services...")
+        scope = "local" if local_only else "cluster"
+        console.print(f"  Starting all unhealthy services ({scope})...")
         try:
-            failed = asyncio.run(orch.ensure_all_running())
+            failed = asyncio.run(orch.ensure_all_running(local_only=local_only))
         except Exception as exc:
             console.print(f"[bold red]Start error:[/bold red] {exc}")
             sys.exit(2)
@@ -490,7 +495,7 @@ def start_cmd(service_name: Optional[str], timeout: float) -> None:
             )
             sys.exit(1)
         else:
-            console.print("  [bold green]All local services are running.[/bold green]")
+            console.print(f"  [bold green]All {scope} services are running.[/bold green]")
 
 
 # ---------------------------------------------------------------------------
@@ -683,17 +688,26 @@ def watch_cmd(
         "Last resort — prefer the default orderly shutdown."
     ),
 )
-def shutdown_cmd(dry_run: bool, emergency: bool) -> None:
-    """Stop all local UBIK services in reverse dependency order.
+@click.option(
+    "--local-only",
+    is_flag=True,
+    default=False,
+    help="Only stop services hosted on this node (skip the remote node).",
+)
+def shutdown_cmd(dry_run: bool, emergency: bool, local_only: bool) -> None:
+    """Stop UBIK services across the cluster in reverse dependency order.
 
     Default: graceful ordered stop (MCP → ChromaDB → Neo4j → Docker on
-    Hippocampal; vLLM on Somatic), escalating to SIGKILL per service if
-    the graceful stop does not complete within 30 seconds.
+    Hippocampal; vLLM/WhisperX on Somatic, stopped over SSH), escalating to
+    SIGKILL per service if the graceful stop does not complete within 30
+    seconds.  Somatic vLLM is stopped via its graceful wrapper so GPU VRAM is
+    released.  Use --local-only to stop only this node's services.
 
     \b
     Examples:
         maestro shutdown
         maestro shutdown --dry-run
+        maestro shutdown --local-only
         maestro shutdown --emergency
     """
     from maestro.platform_detect import detect_node
@@ -718,7 +732,9 @@ def shutdown_cmd(dry_run: bool, emergency: bool) -> None:
             asyncio.run(ctrl.emergency_shutdown())
             console.print("[bold red]Emergency shutdown complete.[/bold red]")
         else:
-            stopped = asyncio.run(ctrl.orderly_shutdown(dry_run=dry_run))
+            stopped = asyncio.run(
+                ctrl.orderly_shutdown(dry_run=dry_run, local_only=local_only)
+            )
             if dry_run:
                 console.print(
                     f"[bold yellow]DRY RUN[/bold yellow] — would stop "

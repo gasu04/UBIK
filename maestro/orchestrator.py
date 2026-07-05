@@ -116,35 +116,44 @@ class Orchestrator:
 
         return result
 
-    async def ensure_all_running(self) -> list[str]:
-        """Bring all LOCAL services to a healthy state in dependency order.
+    async def ensure_all_running(self, *, local_only: bool = False) -> list[str]:
+        """Bring services to a healthy state in dependency order.
 
-        For each local service (in the topological startup order from
+        By default this manages the *entire cluster* — services on the local
+        node are started with local subprocess control, and services on the
+        remote node are started over SSH (the service objects handle the
+        local-vs-remote decision internally).  Pass ``local_only=True`` to
+        restrict startup to services hosted on this node.
+
+        For each service (in the topological startup order from
         :meth:`~ServiceRegistry.get_startup_order`):
 
         1. If a dependency previously failed to start, skip this service
            and add it to the failed list.
         2. If the service is already healthy, skip it.
-        3. Verify all local dependencies are healthy.  If any are not,
-           skip this service.
+        3. Verify all dependencies are healthy.  If any are not, skip this
+           service.
         4. Attempt :meth:`~UbikService.start` (which includes the health-wait
            loop).  If it returns ``False``, record the failure.
 
+        Services are probed at the correct host (``localhost`` for local,
+        Tailscale IP for remote) via :meth:`_probe_host_for`.
+
         Args:
-            (none)
+            local_only: When ``True``, skip services not hosted on this node.
 
         Returns:
             List of service names that could not be started.  An empty list
-            means all local services are healthy.
+            means every in-scope service is healthy.
         """
         local_node = self._identity.node_type
         ubik_root = self._registry.cfg.ubik_root
         failed: list[str] = []
 
         for svc in self._registry.get_startup_order():
-            if svc.node != local_node:
+            if local_only and svc.node != local_node:
                 logger.debug(
-                    "%s is on %s node — skipping (not local)",
+                    "%s is on %s node — skipping (local_only)",
                     svc.name, svc.node.value,
                 )
                 continue
@@ -160,23 +169,26 @@ class Orchestrator:
                 continue
 
             # Already healthy? Nothing to do.
-            current = await svc.probe_with_timeout("localhost")
+            probe_host = self._probe_host_for(svc)
+            current = await svc.probe_with_timeout(probe_host)
             if current.healthy:
                 logger.info(
                     "%s: already healthy (%.0fms)", svc.name, current.latency_ms
                 )
                 continue
 
-            # Verify all local dependencies are healthy before starting
+            # Verify all dependencies are healthy before starting
             dep_ok = True
             for dep_name in svc.depends_on:
                 dep_svc = next(
                     (s for s in self._registry.get_all() if s.name == dep_name),
                     None,
                 )
-                if dep_svc is None or dep_svc.node != local_node:
+                if dep_svc is None:
                     continue
-                dep_result = await dep_svc.probe_with_timeout("localhost")
+                dep_result = await dep_svc.probe_with_timeout(
+                    self._probe_host_for(dep_svc)
+                )
                 if not dep_result.healthy:
                     logger.error(
                         "%s: dependency '%s' is not healthy — cannot start",
@@ -189,8 +201,11 @@ class Orchestrator:
                 failed.append(svc.name)
                 continue
 
-            # Attempt to start (start() blocks until healthy or timeout)
-            logger.info("%s: unhealthy — attempting start", svc.name)
+            # Attempt to start (start() blocks until healthy or timeout).
+            # Remote services execute over SSH inside start(); the ubik_root
+            # passed here is only used by local services.
+            where = "remote" if svc.node != local_node else "local"
+            logger.info("%s: unhealthy — attempting start (%s)", svc.name, where)
             success = await svc.start(ubik_root)
             if success:
                 logger.info("%s: started successfully", svc.name)

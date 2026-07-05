@@ -338,3 +338,32 @@
 - Decide whether to open/merge the `phase3-enrichment-pipeline` PR into `master`.
 - Address the two pending items: retire `ubik-memory-sweep`; update the ingestion loader (new fields + `EPISODIC` token).
 ---
+
+## Session: 2026-07-04 (b) — Node: Hippocampal
+**Goal:** Make one Maestro instance (Hippocampal) start/shutdown/manage BOTH nodes; delete Maestro from the Somatic node after testing.
+**Completed (branch `maestro-remote-control`, commit `cb1f1ab`, maestro v0.13.0):**
+- Recon: status was already cross-node (Tailscale probes) but `ensure_all_running` skipped remote and shutdown was local-only; Somatic vLLM stop used abrupt SIGKILL → **VRAM leak** (the imperative Gines flagged).
+- Read the canonical Somatic graceful lifecycle `somatic/inference/vllm_server.py`: on SIGTERM it runs vLLM CUDA cleanup (`destroy_model_parallel`/`empty_cache`) and waits up to 60s before force-kill — that window is what frees VRAM.
+- **SSH transport** — the `windows-server` ssh config forces `RequestTTY yes`+`RemoteCommand wsl ~`; overrode with `BatchMode/RequestTTY=no/RemoteCommand=none` and deliver the bash script over **stdin** to `wsl bash -s` (sidesteps cmd.exe→WSL quoting). Somatic reachable non-interactively (key-based).
+- **Persistence discovery**: a plain `nohup … &` over `wsl bash -s` is torn down when `wsl.exe` exits. WSL has systemd (PID 1) and **user lingering is enabled for gasu** → launch services as transient **systemd user units** via `systemd-run --user` (bus at `/run/user/1000`); they survive the SSH session. No sudo (none available; passwordless sudo = NO).
+- New `maestro/remote.py` (`RemoteExecutor.from_config`, `run`, `check`). `config.py`: SomaticConfig `ssh_host=windows-server`, `use_wsl`, `ssh_connect_timeout`, `remote_ubik_root=/home/gasu/ubik`.
+- `vllm_service`/`whisperx_service`: node-aware `start`/`stop`. Remote start = `systemd-run --user --unit=ubik-{vllm,whisperx}` (vLLM via `vllm_server.py --rtx5080 --skip-checks --config … --model … --port …`, `KillSignal=SIGTERM`, `KillMode=mixed`, `TimeoutStopSec=90`). Remote stop = `systemctl --user stop` (graceful → VRAM release), pkill fallback for unmanaged procs, reports `nvidia-smi`. vLLM `max_wait_s` 120→300.
+- `orchestrator.ensure_all_running` + `shutdown.orderly_shutdown`: default cluster-wide, probe each service at its real host, remote services skip local SIGKILL; `--local-only` flag added to `maestro start`/`shutdown`.
+- **Live test PASSED (real hardware)**: remote start → vLLM healthy (HTTP 200), VRAM 32077 MiB used; graceful stop → **VRAM 746 MiB (fully released)**. Imperative satisfied.
+- Fixed a **pre-existing** vLLM config bug (blocked startup, unrelated to Maestro): only WSLg `/Xwayland` (746 MiB) uses the GPU; `gpu_memory_utilization: 0.90` left KV cache short for 98K ctx and `0.95` exceeded free VRAM → set **0.93** on Somatic (`config/models/vllm_config.yaml`; gitignored on Hippocampal). vLLM now uses ~full 32 GB.
+- Deleted `~/ubik/maestro` on the Somatic node (git-tracked & clean → recoverable via `git checkout`); remote control depends only on `somatic/inference/vllm_server.py`, `somatic/whisperx_server.py`, `config/`, venvs, systemd — none in `maestro/`.
+- Tests: new `test_remote.py`; updated orchestrator/shutdown tests for cluster-wide semantics. Affected suites green (159 passed). Remaining failures are all **pre-existing** and env-specific (no conda on the Mac; venv-path detection; `whisperx` registry-count debt) — verified identical on stashed original code; plus a pre-existing `test_logger` stderr-teardown crash and `test_health_runner` network-timeout tests.
+**State left in:**
+- `maestro-remote-control` committed locally (`cb1f1ab`), **not pushed / not merged**.
+- Somatic: `maestro/` removed (working tree shows it deleted); vLLM config at 0.93; vLLM currently **stopped** (test left it down, VRAM released); WhisperX server process was running on CPU.
+- Native ChromaDB/MCP/Neo4j on Hippocampal untouched (live test used a scoped script, never `maestro shutdown`).
+**Files changed:**
+- NEW: `maestro/remote.py`, `maestro/tests/test_remote.py`
+- `maestro/{config,cli,orchestrator,shutdown,__init__}.py`, `maestro/services/{__init__,vllm_service,whisperx_service}.py`, `maestro/tests/{test_orchestrator,test_shutdown}.py`
+- Somatic-only (gitignored here): `config/models/vllm_config.yaml` 0.90→0.93
+- SESSIONS.md: this entry
+**Next session should:**
+- Push `maestro-remote-control` and open a PR into `master` if approved.
+- Optional: add per-service `maestro shutdown --service NAME` for scoped remote stops; wire WhisperX health tests (deferred by Gines).
+- Consider persisting the vLLM/WhisperX systemd user units as installed `.service` files (currently transient via `systemd-run`).
+---
