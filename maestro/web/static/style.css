@@ -1,0 +1,135 @@
+/* UBIK Maestro — retro-commercial theme, after the in-chapter Ubik ads. */
+
+:root {
+  --bg:        #0e1020;
+  --bg2:       #14162a;
+  --panel:     #f4ecd8;   /* warm "newsprint" */
+  --panel-ink: #14162a;
+  --yellow:    #ffd23f;   /* Ubik yellow */
+  --red:       #e63946;
+  --teal:      #2a9d8f;   /* healthy */
+  --amber:     #e9a23b;   /* degraded */
+  --grey:      #6b7080;
+  --ink:       #e9e6df;
+  --mono: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: Helvetica, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 500px at 80% -10%, #1c1f3a 0%, transparent 60%),
+    var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 64px; }
+
+/* ── Header ─────────────────────────────────────────────── */
+header.masthead {
+  display: flex; align-items: center; gap: 18px;
+  border-bottom: 4px solid var(--yellow);
+  padding-bottom: 16px;
+}
+header.masthead img { width: 92px; height: 92px; }
+.title h1 {
+  margin: 0; font-size: 44px; font-weight: 900; letter-spacing: 1px;
+  color: var(--yellow); text-transform: uppercase;
+}
+.title .sub { margin: 2px 0 0; color: var(--grey); font-weight: 700;
+  text-transform: uppercase; letter-spacing: 3px; font-size: 12px; }
+.node-badge {
+  margin-left: auto; text-align: right; font-size: 12px; color: var(--grey);
+}
+.node-badge b { color: var(--ink); font-size: 15px; }
+
+/* ── Ad banner (rotating epigraph) ──────────────────────── */
+.ad {
+  margin: 20px 0; background: var(--yellow); color: var(--panel-ink);
+  border-radius: 6px; padding: 16px 20px; position: relative;
+  box-shadow: 0 6px 0 rgba(0,0,0,0.35);
+}
+.ad .kicker { font-weight: 900; text-transform: uppercase; letter-spacing: 2px;
+  font-size: 11px; color: var(--red); }
+.ad .copy { font-size: 19px; font-weight: 700; line-height: 1.35; margin: 4px 0 6px; font-style: italic; }
+.ad .disclaimer { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: 0.7; }
+
+/* ── Section titles ─────────────────────────────────────── */
+h2.sec { text-transform: uppercase; letter-spacing: 2px; font-size: 14px;
+  color: var(--yellow); border-left: 5px solid var(--red); padding-left: 10px;
+  margin: 30px 0 14px; }
+
+/* ── Controls ───────────────────────────────────────────── */
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+button, select {
+  font-family: var(--sans); font-weight: 800; text-transform: uppercase;
+  letter-spacing: 1px; font-size: 13px; cursor: pointer;
+  border: 2px solid var(--panel-ink); border-radius: 6px; padding: 10px 16px;
+  background: var(--panel); color: var(--panel-ink);
+  box-shadow: 0 4px 0 rgba(0,0,0,0.4); transition: transform .05s, box-shadow .05s;
+}
+button:hover { transform: translateY(-1px); box-shadow: 0 5px 0 rgba(0,0,0,0.4); }
+button:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0,0,0,0.4); }
+button:disabled { opacity: 0.5; cursor: wait; box-shadow: none; transform: none; }
+button.primary { background: var(--yellow); }
+button.danger  { background: var(--red); color: #fff; border-color: #7a1620; }
+button.ghost   { background: transparent; color: var(--ink); border-color: var(--grey); box-shadow: none; }
+select { background: #fff; }
+.spacer { flex: 1; }
+
+/* ── Status grid ────────────────────────────────────────── */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.card {
+  background: var(--bg2); border: 1px solid #262a44; border-radius: 8px;
+  padding: 14px 16px; position: relative; overflow: hidden;
+}
+.card .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+.dot.healthy { background: var(--teal); box-shadow: 0 0 10px var(--teal); }
+.dot.down    { background: var(--red);  box-shadow: 0 0 10px var(--red); }
+.dot.degraded{ background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+.card .name { font-weight: 900; text-transform: uppercase; letter-spacing: 1px; font-size: 16px; }
+.card .meta { color: var(--grey); font-size: 12px; margin-top: 6px; }
+.card .node { position: absolute; top: 12px; right: 12px; font-size: 10px;
+  text-transform: uppercase; letter-spacing: 1px; color: var(--grey);
+  border: 1px solid #2c3050; border-radius: 4px; padding: 2px 6px; }
+.card .err { color: var(--red); font-size: 11px; margin-top: 6px; word-break: break-word; }
+
+/* ── Links ──────────────────────────────────────────────── */
+.links { display: flex; flex-wrap: wrap; gap: 10px; }
+.links a {
+  text-decoration: none; color: var(--panel-ink); background: var(--panel);
+  font-weight: 800; text-transform: uppercase; letter-spacing: 1px; font-size: 13px;
+  border-radius: 6px; padding: 10px 16px; box-shadow: 0 4px 0 rgba(0,0,0,0.4);
+}
+.links a.neo4j { background: var(--yellow); }
+.links a:hover { transform: translateY(-1px); }
+
+/* ── Console ────────────────────────────────────────────── */
+.console {
+  background: #0a0c18; border: 1px solid #262a44; border-radius: 8px;
+  font-family: var(--mono); font-size: 12.5px; color: #cfe3d8;
+  padding: 14px; min-height: 120px; max-height: 340px; overflow: auto;
+  white-space: pre-wrap; line-height: 1.5;
+}
+.console .t { color: var(--grey); }
+.console .ok { color: var(--teal); }
+.console .bad { color: var(--red); }
+.console .warn { color: var(--amber); }
+
+/* ── Footer ─────────────────────────────────────────────── */
+footer { margin-top: 40px; text-align: center; color: var(--grey);
+  font-size: 11px; text-transform: uppercase; letter-spacing: 2px; }
+
+/* ── Modal ──────────────────────────────────────────────── */
+.modal-back { position: fixed; inset: 0; background: rgba(4,6,16,0.8);
+  display: none; align-items: center; justify-content: center; z-index: 50; }
+.modal-back.show { display: flex; }
+.modal { background: var(--panel); color: var(--panel-ink); border-radius: 8px;
+  padding: 24px; max-width: 440px; width: 90%; box-shadow: 0 12px 0 rgba(0,0,0,0.5); }
+.modal h3 { margin: 0 0 8px; text-transform: uppercase; color: var(--red); }
+.modal .opts { margin: 14px 0; display: grid; gap: 8px; font-weight: 700; }
+.modal .row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }

@@ -1046,3 +1046,62 @@ def check_cmd(
         print_check_results(cluster, cfg, console)
 
     sys.exit(_cluster_exit_code(cluster))
+
+
+# ---------------------------------------------------------------------------
+# web command
+# ---------------------------------------------------------------------------
+
+@cli.command("web")
+@click.option(
+    "--host",
+    default="0.0.0.0",
+    show_default=True,
+    metavar="ADDR",
+    help="Bind address (0.0.0.0 makes it reachable over Tailscale).",
+)
+@click.option(
+    "--port",
+    default=8090,
+    show_default=True,
+    type=int,
+    metavar="PORT",
+    help="TCP port for the control panel.",
+)
+def web_cmd(host: str, port: int) -> None:
+    """Serve the UBIK web control panel (all Maestro commands in the browser).
+
+    Every operation is available from the page — status, start (all / per
+    service / local-only), shutdown (dry-run / local-only / emergency), health,
+    metrics, logs — plus links to the Neo4j browser and other consoles.
+
+    \b
+    Examples:
+        maestro web
+        maestro web --port 8090
+    """
+    console = Console(highlight=False)
+    try:
+        cfg = get_config()
+    except Exception as exc:
+        console.print(f"[bold red]Config error:[/bold red] {exc}")
+        sys.exit(2)
+
+    configure_logging(cfg)
+    try:
+        from maestro.web import run_web
+    except Exception as exc:
+        console.print(
+            f"[bold red]Web dependencies missing:[/bold red] {exc}\n"
+            "Install with: pip install fastapi uvicorn"
+        )
+        sys.exit(2)
+
+    console.print(
+        f"  [bold]UBIK Maestro[/bold] control panel → "
+        f"[bold yellow]http://{host}:{port}[/bold yellow]  (Ctrl+C to stop)"
+    )
+    try:
+        run_web(host=host, port=port)
+    except KeyboardInterrupt:
+        console.print("\n[dim]Web server stopped.[/dim]")
