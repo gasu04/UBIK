@@ -429,3 +429,22 @@
 - Run `pip-audit` against the active DeepSeek venv to surface any CVE-flagged packages.
 - Carried over: per-service `maestro shutdown --service NAME`; WhisperX health tests; persist vLLM/WhisperX systemd user units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
 ---
+
+## Session: 2026-07-05 (d) — Node: Hippocampal
+**Goal:** Security audit and CVE remediation across all UBIK Python environments (Hippocampal DeepSeek venv + Somatic pytorch_env / ubik/venv).
+**Completed:**
+- **Hippocampal DeepSeek venv** (`/Volumes/990PRO 4T/DeepSeek/venv/`, Python 3.13.7): installed pip-audit; found 167 vulnerabilities across 40 packages. Upgraded all fixable packages in two passes (35-package main pass + torch/transformers separately). Resolved post-upgrade conflicts: fastapi 0.128→0.139 (starlette 1.x compatibility — critical for maestro web panel), protobuf pinned back to 6.33.6 (avoid breaking Google API packages), marshmallow/sentence-transformers/langchain-huggingface upgraded. Restarted `com.ubik.maestro-web` launchd agent to pick up new starlette/fastapi; confirmed HTTP 200. Final state: **4 CVEs remaining** (chromadb, diskcache, lupa, nltk — all have no upstream fix yet).
+- **Somatic discovery**: SSH'd via `ssh -o BatchMode… windows-server "wsl bash -s"`. Found two envs: `~/pytorch_env` (primary, has vLLM/torch/ray) and `~/ubik/venv` (built with `include-system-site-packages=true` on top of pytorch_env — effectively the same package set). No conda. Both Python 3.12.3.
+- **Somatic audit**: both envs identical — ~110+ CVEs. Key findings: vLLM 0.13.0 (15 CVEs, needs 0.22.1), torch 2.9.0 (4 CVEs), ray 2.54.0 (1 CVE), plus the same aiohttp/starlette/cryptography/jupyter stack issues as Hippocampal.
+- **Somatic step 1 upgrades** (all packages except vLLM/torch/ray): upgraded both envs in parallel. Fixed post-upgrade conflicts: fastapi upgraded for starlette 1.x; protobuf pinned to 6.33.6; datasets/prometheus-fastapi-instrumentator upgraded. Final state: **27 CVEs remaining** — all confined to vllm 0.13.0 (15), torch 2.9.0 (4), ray 2.54.0 (1), chromadb/diskcache/nltk (3 no-fix). Step 2 (vLLM+torch+ray coordinated upgrade) deferred pending compatibility research.
+**State left in:**
+- Hippocampal venv: 4 CVEs (no fix available), all services healthy, web panel on new fastapi/starlette.
+- Somatic both envs: 27 CVEs, all in vLLM/torch/ray — deferred to Step 2.
+- `master` = `35f0990` unchanged (no code changes this session).
+**Files changed:**
+- SESSIONS.md: this entry (no repo code changes — venv upgrades are outside git)
+**Next session should:**
+- **Step 2 — vLLM upgrade** (Somatic): research vLLM 0.13.0→0.22.1 breaking changes for RTX 5090 + AWQ model; then upgrade `vllm + torch + ray` together and re-validate `vllm_server.py` startup with the current `vllm_config.yaml`. This will clear the remaining 16 fixable Somatic CVEs.
+- Upgrade `ray 2.54.0` → 2.55.0 (can be done independently of vLLM if needed).
+- Carried over: TradingAgents Python 3.10→3.12 before EOL; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader.
+---
