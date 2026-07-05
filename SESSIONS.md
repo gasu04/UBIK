@@ -367,3 +367,20 @@
 - Optional: add per-service `maestro shutdown --service NAME` for scoped remote stops; wire WhisperX health tests (deferred by Gines).
 - Consider persisting the vLLM/WhisperX systemd user units as installed `.service` files (currently transient via `systemd-run`).
 ---
+
+## Session: 2026-07-05 — Node: Hippocampal
+**Goal:** Ship the maestro cross-node work: push, PR, merge, sync local, clean up.
+**Completed:**
+- Pushed `maestro-remote-control` to origin; opened **PR #3** (base `master`, +1116/−139), mergeable/CLEAN.
+- Merged PR #3 via merge commit **`e4f11c3`** (mergedAt 2026-07-05 02:47 UTC) — maestro v0.13.0 cross-node control + the 2026-07-04(b) SESSIONS entry now on `master`.
+- Fast-forwarded local `master` `724c8d8 → e4f11c3` (in sync with origin).
+- Deleted branch `maestro-remote-control` (local `git branch -d`, merge-verified, was `4535134`; and `origin`). No such branches remain.
+**State left in:**
+- `master` = `e4f11c3` on both local and origin; working tree clean; on `master`.
+- Somatic still has `maestro/` removed and vLLM config at 0.93 (vLLM stopped, VRAM released).
+**Files changed:**
+- SESSIONS.md: this entry (no code changes this session — release/merge only).
+**Next session should:**
+- Optional follow-ups still open from 2026-07-04(b): per-service `maestro shutdown --service NAME`; WhisperX health tests; persist the systemd user units as installed `.service` files.
+- Still pending from earlier: retire `ubik-memory-sweep`; update the ingestion loader (new fields + `EPISODIC` token).
+---
