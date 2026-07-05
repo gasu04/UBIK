@@ -448,3 +448,30 @@
 - Upgrade `ray 2.54.0` → 2.55.0 (can be done independently of vLLM if needed).
 - Carried over: TradingAgents Python 3.10→3.12 before EOL; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader.
 ---
+
+## Session: 2026-07-05 (e) — Node: Hippocampal
+**Goal:** Upgrade ray on Somatic; plan the vLLM upgrade.
+**Completed:**
+- **Ray upgraded** on Somatic `pytorch_env`: 2.54.0 → **2.56.0** (pip picked the latest stable; ubik/venv inherits via include-system-site-packages). Clears CVE-2026-41486. Ray CVE is now resolved.
+- **vLLM upgrade plan produced** (deferred to next dedicated session). Key findings from reading the actual `vllm_server.py` and `vllm_config.yaml`:
+  - torch is **2.9.0+cu128** (CUDA 12.8) — already very new; the plan does NOT downgrade torch.
+  - `vllm_config.yaml` requires **no changes** — all flags compatible with 0.22.x.
+  - **Critical risk**: `vllm_server.py` lines 79–84 import `destroy_model_parallel` / `cleanup_dist_env_and_memory` from `vllm.distributed.parallel_state` — this is what frees VRAM on shutdown. The import path likely moved between 0.13 and 0.22. Silent `ImportError` fallback means VRAM leaks if not fixed. Must verify and patch before go-live.
+  - **FA3 risk**: line 45 forces `VLLM_FLASH_ATTN_VERSION=2` (Blackwell workaround from 0.13 era). 0.22.x supports FA3 on Blackwell natively; workaround may now be a performance penalty — test both ways.
+  - **CUDA wheel risk**: vLLM PyPI wheels are built for CUDA 12.4/12.6; torch is cu128. Should work at runtime but monitor for CUDA errors on first startup.
+  - Rollback: `pip install vllm==0.13.0 xgrammar==0.1.27` (xgrammar must be re-pinned to 0.1.27 for 0.13.0).
+**State left in:**
+- Somatic `pytorch_env`: ray=2.56.0, vLLM still at 0.13.0 (upgrade deferred). Remaining CVEs: vLLM 0.13.0 (15 CVEs), torch 2.9.0 (4 CVEs, tied to vLLM upgrade), chromadb/diskcache/nltk (3 no-fix).
+- `master` = `e690715` unchanged; no code changes this session.
+**Files changed:**
+- SESSIONS.md: this entry
+**Next session should (vLLM upgrade — plan ready):**
+  1. SSH to Somatic; freeze current state: `~/pytorch_env/bin/pip freeze > ~/pytorch_env_vllm_0.13_freeze.txt`
+  2. `pip install vllm==0.22.0` (add `--extra-index-url https://download.pytorch.org/whl/cu124` if wheel mismatch)
+  3. Verify cleanup API: `python3 -c "from vllm.distributed.parallel_state import destroy_model_parallel, cleanup_dist_env_and_memory; print('OK')"` — if it fails, find new path and patch `vllm_server.py` lines 79–84
+  4. Test FA3: comment out `VLLM_FLASH_ATTN_VERSION=2` (line 45) and test; restore if Blackwell kernel fails
+  5. Start server with `--skip-checks`, confirm it listens on :8002 and AWQ Marlin kernel loads
+  6. Send SIGTERM; confirm VRAM drops to ~0.7 GB (WSLg only) — if not, cleanup API path is wrong
+  7. Rollback if needed: `pip install vllm==0.13.0 xgrammar==0.1.27`
+- Also carried over: TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader.
+---
