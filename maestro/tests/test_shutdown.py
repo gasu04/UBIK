@@ -148,28 +148,52 @@ class TestShutdownControllerInit:
 # ---------------------------------------------------------------------------
 
 class TestLocalServicesInShutdownOrder:
-    """Startup order from get_startup_order(): [docker, vllm, neo4j, chromadb, mcp].
-    Hippocampal local: [docker, neo4j, chromadb, mcp] → reversed: [mcp, chromadb, neo4j, docker].
-    Somatic local: [vllm] → reversed: [vllm].
+    """Startup order from get_startup_order():
+    [docker, neo4j, chromadb, mcp, vllm, whisperx].
+
+    Cluster reversed: [whisperx, vllm, mcp, chromadb, neo4j, docker].
+    Hippocampal local (local_only): [mcp, chromadb, neo4j, docker].
+    Somatic local (local_only): [whisperx, vllm].
     """
 
     def test_hippocampal_reversed_order(self, app_config):
         ctrl = _make_ctrl(app_config, NodeType.HIPPOCAMPAL)
-        names = [s.name for s in ctrl._local_services_in_shutdown_order()]
+        names = [
+            s.name
+            for s in ctrl._services_in_shutdown_order(local_only=True)
+        ]
         assert names == ["mcp", "chromadb", "neo4j", "docker"]
 
     def test_somatic_reversed_order(self, app_config):
         ctrl = _make_ctrl(app_config, NodeType.SOMATIC)
-        names = [s.name for s in ctrl._local_services_in_shutdown_order()]
-        assert names == ["vllm"]
+        names = [
+            s.name
+            for s in ctrl._services_in_shutdown_order(local_only=True)
+        ]
+        assert names == ["whisperx", "vllm"]
+
+    def test_cluster_reversed_order_includes_both_nodes(self, app_config):
+        ctrl = _make_ctrl(app_config, NodeType.HIPPOCAMPAL)
+        names = [s.name for s in ctrl._services_in_shutdown_order()]
+        # Default (cluster-wide) covers remote services too.
+        assert set(names) == {
+            "docker", "neo4j", "chromadb", "mcp", "vllm", "whisperx",
+        }
+        # Dependents stop before their dependencies; docker (foundation) last.
+        assert names.index("mcp") < names.index("neo4j")
+        assert names.index("mcp") < names.index("chromadb")
+        assert names[-1] == "docker"
 
     def test_unknown_node_returns_empty(self, app_config):
         ctrl = _make_ctrl(app_config, NodeType.UNKNOWN)
-        assert ctrl._local_services_in_shutdown_order() == []
+        assert ctrl._services_in_shutdown_order(local_only=True) == []
 
     def test_dependents_before_dependencies(self, app_config):
         ctrl = _make_ctrl(app_config, NodeType.HIPPOCAMPAL)
-        names = [s.name for s in ctrl._local_services_in_shutdown_order()]
+        names = [
+            s.name
+            for s in ctrl._services_in_shutdown_order(local_only=True)
+        ]
         # mcp depends on neo4j and chromadb — must stop before them
         assert names.index("mcp") < names.index("neo4j")
         assert names.index("mcp") < names.index("chromadb")
@@ -402,17 +426,30 @@ class TestVerifyAllDown:
         assert result == {}
 
     @pytest.mark.asyncio
-    async def test_only_checks_local_services(self, app_config):
+    async def test_local_only_checks_local_services(self, app_config):
         local_svc = _mock_svc("mcp", NodeType.HIPPOCAMPAL, healthy=False)
         remote_svc = _mock_svc("vllm", NodeType.SOMATIC, healthy=True)
         ctrl = _make_ctrl_with_services(
             [local_svc, remote_svc], app_config, NodeType.HIPPOCAMPAL
         )
 
-        result = await ctrl._verify_all_down()
+        result = await ctrl._verify_all_down(local_only=True)
 
         assert "mcp" in result
-        assert "vllm" not in result   # remote — never probed
+        assert "vllm" not in result   # remote — skipped under local_only
+
+    @pytest.mark.asyncio
+    async def test_cluster_checks_remote_services(self, app_config):
+        local_svc = _mock_svc("mcp", NodeType.HIPPOCAMPAL, healthy=False)
+        remote_svc = _mock_svc("vllm", NodeType.SOMATIC, healthy=True)
+        ctrl = _make_ctrl_with_services(
+            [local_svc, remote_svc], app_config, NodeType.HIPPOCAMPAL
+        )
+
+        result = await ctrl._verify_all_down()   # default: cluster-wide
+
+        assert result["mcp"] is True
+        assert result["vllm"] is False   # remote still up — probed over Tailscale
 
 
 # ---------------------------------------------------------------------------
@@ -553,7 +590,7 @@ class TestOrderlyShutdown:
         ctrl = _make_ctrl(app_config, NodeType.UNKNOWN)
 
         with patch.object(ctrl, "_stop_daemon"):
-            stopped = await ctrl.orderly_shutdown()
+            stopped = await ctrl.orderly_shutdown(local_only=True)
 
         assert stopped == []
         ctrl._mlog.log_shutdown.assert_called_once_with([])

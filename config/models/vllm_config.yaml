@@ -5,7 +5,7 @@ model:
   dtype: float16                    # AWQ requires float16, not auto/bfloat16
   quantization: awq_marlin          # Faster than awq
   tensor_parallel_size: 1
-  gpu_memory_utilization: 0.90
+  gpu_memory_utilization: 0.93  # Uses ~full 32GB RTX 5090 (0.90 left KV cache short for 98K ctx; 0.95 exceeds free VRAM behind WSLg Xwayland)
   max_model_len: 98304  # Extended context (98K tokens)
   trust_remote_code: true
 

@@ -143,20 +143,59 @@ class ShutdownController:
             log_dir=registry.cfg.log_dir
         )
 
-    # ── Service ordering ─────────────────────────────────────────────────
+    # ── Host resolution ──────────────────────────────────────────────────
 
-    def _local_services_in_shutdown_order(self) -> list[UbikService]:
-        """Return local services in reverse startup (safe shutdown) order.
+    def _probe_host_for(self, svc: UbikService) -> str:
+        """Return the probe host for a service (localhost or Tailscale IP).
 
-        Dependents (e.g. MCP) are stopped before their dependencies (Docker).
+        Mirrors :meth:`maestro.orchestrator.Orchestrator._probe_host_for` so
+        remote services are verified at their real address, not ``localhost``.
+
+        Args:
+            svc: Service instance to resolve a host for.
 
         Returns:
-            Local services to stop, with dependents first and foundations last.
+            Hostname or IP string to pass to ``probe``.
+        """
+        local_node = self._identity.node_type
+        if svc.node == local_node or local_node == NodeType.UNKNOWN:
+            return "localhost"
+        cfg = self._registry.cfg
+        if svc.node == NodeType.HIPPOCAMPAL:
+            return cfg.hippocampal.tailscale_ip
+        if svc.node == NodeType.SOMATIC:
+            return cfg.somatic.tailscale_ip
+        return "localhost"
+
+    def _is_remote(self, svc: UbikService) -> bool:
+        """Whether *svc* runs on a node other than the one we're running on."""
+        local_node = self._identity.node_type
+        return local_node != NodeType.UNKNOWN and svc.node != local_node
+
+    # ── Service ordering ─────────────────────────────────────────────────
+
+    def _services_in_shutdown_order(
+        self, *, local_only: bool = False
+    ) -> list[UbikService]:
+        """Return services in reverse startup (safe shutdown) order.
+
+        By default returns the whole cluster; remote services are stopped over
+        SSH by their own ``stop()``.  Dependents (e.g. MCP) are stopped before
+        their dependencies (Docker).
+
+        Args:
+            local_only: When ``True``, restrict to services on this node.
+
+        Returns:
+            Services to stop, with dependents first and foundations last.
         """
         local_node = self._identity.node_type
         startup_order = self._registry.get_startup_order()
-        local = [s for s in startup_order if s.node == local_node]
-        return list(reversed(local))
+        if local_only:
+            selected = [s for s in startup_order if s.node == local_node]
+        else:
+            selected = list(startup_order)
+        return list(reversed(selected))
 
     # ── Wait for service to go DOWN ──────────────────────────────────────
 
@@ -180,8 +219,9 @@ class ShutdownController:
             ``False`` on timeout.
         """
         start_ts = time.perf_counter()
+        probe_host = self._probe_host_for(svc)
         while True:
-            result = await svc.probe_with_timeout("localhost", timeout=5.0)
+            result = await svc.probe_with_timeout(probe_host, timeout=5.0)
             if not result.healthy:
                 return True
             elapsed = time.perf_counter() - start_ts
@@ -199,9 +239,20 @@ class ShutdownController:
     async def _sigkill_service(self, svc: UbikService) -> None:
         """Send SIGKILL to all processes listening on the service's ports.
 
+        Only applies to *local* services — a remote service's ports are on
+        another machine, so local ``lsof``/``fuser`` cannot reach them.  Remote
+        services perform their own SIGKILL escalation inside ``stop()`` (over
+        SSH), so this is a no-op for them.
+
         Args:
             svc: Service whose port(s) should be killed.
         """
+        if self._is_remote(svc):
+            log.debug(
+                "shutdown: %s is remote — local SIGKILL not applicable "
+                "(escalation handled by its remote stop())", svc.name,
+            )
+            return
         if not svc.ports:
             log.debug("shutdown: %s has no ports — skipping SIGKILL", svc.name)
             return
@@ -234,25 +285,34 @@ class ShutdownController:
 
     # ── Post-shutdown verification ───────────────────────────────────────
 
-    async def _verify_all_down(self) -> dict[str, bool]:
-        """Probe all local services and return a name→stopped map.
+    async def _verify_all_down(
+        self, *, local_only: bool = False
+    ) -> dict[str, bool]:
+        """Probe in-scope services and return a name→stopped map.
+
+        Args:
+            local_only: When ``True``, verify only services on this node.
 
         Returns:
             Dict mapping service name to ``True`` when confirmed DOWN
             (probe unhealthy or raised), ``False`` when still responding.
         """
         local_node = self._identity.node_type
-        local_svcs = [
-            s for s in self._registry.get_all() if s.node == local_node
+        svcs = [
+            s for s in self._registry.get_all()
+            if not local_only or s.node == local_node
         ]
-        if not local_svcs:
+        if not svcs:
             return {}
         raw = await asyncio.gather(
-            *[svc.probe_with_timeout("localhost", timeout=5.0) for svc in local_svcs],
+            *[
+                svc.probe_with_timeout(self._probe_host_for(svc), timeout=5.0)
+                for svc in svcs
+            ],
             return_exceptions=True,
         )
         result: dict[str, bool] = {}
-        for svc, outcome in zip(local_svcs, raw):
+        for svc, outcome in zip(svcs, raw):
             if isinstance(outcome, Exception):
                 result[svc.name] = True   # can't connect → confirmed DOWN
             else:
@@ -266,6 +326,7 @@ class ShutdownController:
         *,
         timeout_per_service: float = _STOP_TIMEOUT_S,
         dry_run: bool = False,
+        local_only: bool = False,
     ) -> list[str]:
         """Stop all local services in reverse dependency order.
 
@@ -299,10 +360,10 @@ class ShutdownController:
         if not dry_run:
             self._stop_daemon()
 
-        services = self._local_services_in_shutdown_order()
+        services = self._services_in_shutdown_order(local_only=local_only)
         if not services:
             log.info(
-                "shutdown: no local services on %s node",
+                "shutdown: no services in scope on %s node",
                 self._identity.node_type.value,
             )
             self._mlog.log_shutdown([])
@@ -359,7 +420,9 @@ class ShutdownController:
                 )
                 await self._sigkill_service(svc)
                 await asyncio.sleep(_KILL_SETTLE_S)
-                verify = await svc.probe_with_timeout("localhost", timeout=5.0)
+                verify = await svc.probe_with_timeout(
+                    self._probe_host_for(svc), timeout=5.0
+                )
                 if not verify.healthy:
                     log.info("shutdown: %s — killed", svc.name)
                     self._mlog.log_service_action(
@@ -376,7 +439,7 @@ class ShutdownController:
 
         # ── Post-shutdown verification ────────────────────────────────────
         if not dry_run:
-            verification = await self._verify_all_down()
+            verification = await self._verify_all_down(local_only=local_only)
             if verification:
                 report_parts = [
                     f"{n}={'DOWN' if v else 'STILL_UP'}"

@@ -41,13 +41,33 @@ from typing import Optional
 import httpx
 
 from maestro.platform_detect import NodeType, detect_node
+from maestro.remote import RemoteExecutor
 from maestro.services.base import ProbeResult, UbikService, _kill_port, _run_proc
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_PORT = 8002
 _DEFAULT_CONDA_ENV = "pytorch_env"
-_DEFAULT_MAX_WAIT_S = 120.0
+# Model load + torch.compile + CUDA-graph capture for the 14B AWQ model
+# routinely exceeds 2 minutes, so the health-wait after start is generous.
+_DEFAULT_MAX_WAIT_S = 300.0
+
+# Seconds to allow the graceful vLLM shutdown (the vllm_server.py SIGTERM
+# handler runs vLLM's CUDA cleanup — destroy_model_parallel / empty_cache —
+# which can take up to ~60s for a large model) before systemd SIGKILLs the
+# cgroup.  This is the window that actually releases GPU VRAM; skipping it
+# leaks the whole model.  Used as the unit's TimeoutStopSec.
+_REMOTE_STOP_GRACE_S = 90
+
+# Transient systemd *user* unit name for the remote vLLM server.
+_VLLM_UNIT = "ubik-vllm"
+
+# Bash that points systemctl/systemd-run at the lingering user manager's bus
+# when invoked from a non-login SSH shell (which lacks these by default).
+_USER_SYSTEMD_ENV = (
+    'export XDG_RUNTIME_DIR="/run/user/$(id -u)"\n'
+    'export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"'
+)
 
 
 def _find_conda() -> Optional[str]:
@@ -253,6 +273,9 @@ class VllmService(UbikService):
         conda_env: str = _DEFAULT_CONDA_ENV,
         venv_path: Optional[Path] = None,
         max_wait_s: float = _DEFAULT_MAX_WAIT_S,
+        remote: Optional[RemoteExecutor] = None,
+        remote_ubik_root: Optional[str] = None,
+        probe_ip: Optional[str] = None,
     ) -> None:
         if model_path is None:
             from maestro.config import get_config
@@ -262,6 +285,30 @@ class VllmService(UbikService):
         self._conda_env = conda_env
         self._venv_path = venv_path
         self._max_wait_s = max_wait_s
+        # Remote-control context (used when Maestro runs on a *different* node
+        # than this service — i.e. the single Hippocampal instance managing
+        # the Somatic vLLM).  ``None`` → this service is managed locally.
+        self._remote = remote
+        self._remote_ubik_root = remote_ubik_root
+        self._probe_ip = probe_ip
+
+    def _is_remote(self) -> bool:
+        """Whether this service must be controlled over SSH from another node.
+
+        Returns:
+            ``True`` when a :class:`RemoteExecutor` is configured and the local
+            node differs from this service's node (and is not UNKNOWN).
+        """
+        if self._remote is None:
+            return False
+        local = detect_node().node_type
+        return local != NodeType.UNKNOWN and local != self.node
+
+    def _lifecycle_probe_host(self) -> str:
+        """Host to poll for health after a start/stop (local vs remote)."""
+        if self._is_remote():
+            return self._probe_ip or self.node.value
+        return "localhost"
 
     @property
     def max_wait_s(self) -> float:
@@ -336,6 +383,10 @@ class VllmService(UbikService):
             ``True`` when vLLM is confirmed healthy; ``False`` on error or
             timeout.
         """
+        # Remote path: Maestro is on another node — drive vLLM over SSH.
+        if self._is_remote():
+            return await self._remote_start()
+
         # Pre-flight: node check (vLLM must run on Somatic)
         identity = detect_node()
         if identity.node_type not in (NodeType.SOMATIC, NodeType.UNKNOWN):
@@ -441,6 +492,111 @@ class VllmService(UbikService):
 
         return await self._wait_for_healthy("localhost")
 
+    async def _remote_start(self) -> bool:
+        """Start vLLM on the Somatic node over SSH as a systemd *user* unit.
+
+        A plain ``nohup … &`` launched over ``wsl bash -s`` does NOT survive:
+        Windows tears down the WSL command's process tree when ``wsl.exe``
+        exits.  Instead we register the graceful-lifecycle wrapper
+        (``somatic/inference/vllm_server.py``) as a transient systemd user unit
+        (``ubik-vllm``) via ``systemd-run --user``.  User lingering keeps the
+        systemd user manager alive independently of any SSH session, so the
+        unit persists.  ``KillSignal=SIGTERM`` + ``TimeoutStopSec`` give the
+        wrapper time to run vLLM's CUDA cleanup on stop (VRAM release);
+        ``KillMode=mixed`` SIGKILLs any EngineCore stragglers in the cgroup.
+
+        This method registers the unit, then polls ``/health`` over Tailscale
+        until the model finishes loading.
+
+        Returns:
+            ``True`` when vLLM becomes healthy within :attr:`max_wait_s`.
+        """
+        root = self._remote_ubik_root or "/home/gasu/ubik"
+        server = f"{root}/somatic/inference/vllm_server.py"
+        script = f"""
+set -u
+{_USER_SYSTEMD_ENV}
+SERVER={shlex.quote(server)}
+if [ ! -f "$SERVER" ]; then echo "MISSING_SERVER:$SERVER"; exit 3; fi
+mkdir -p {shlex.quote(root)}/logs/inference
+if systemctl --user is-active --quiet {_VLLM_UNIT}; then echo "ALREADY_ACTIVE"; exit 0; fi
+if curl -s -o /dev/null --max-time 3 http://localhost:{self._port}/health; then
+    echo "ALREADY_RUNNING_UNMANAGED"; exit 0
+fi
+systemctl --user reset-failed {_VLLM_UNIT} 2>/dev/null || true
+CONFIG={shlex.quote(root)}/config/models/vllm_config.yaml
+CONFIG_ARG=""
+[ -f "$CONFIG" ] && CONFIG_ARG="--config $CONFIG"
+systemd-run --user --unit={_VLLM_UNIT} \
+    --property=Type=simple \
+    --property=KillSignal=SIGTERM \
+    --property=KillMode=mixed \
+    --property=TimeoutStopSec={_REMOTE_STOP_GRACE_S} \
+    "$SERVER" --rtx5080 --skip-checks $CONFIG_ARG \
+    --model {shlex.quote(self._model_path)} --port {self._port} 2>&1
+echo "STARTED_UNIT={_VLLM_UNIT} rc=$?"
+"""
+        logger.info("vllm: remote start on %s as user unit %s", self._remote.ssh_host, _VLLM_UNIT)
+        res = await self._remote.run(script, timeout=30.0)
+        if not res.connected:
+            logger.error("vllm: remote start failed — cannot reach Somatic: %s", res.stderr.strip()[:200])
+            return False
+        if "MISSING_SERVER" in res.stdout:
+            logger.error("vllm: remote server script not found: %s", res.stdout.strip())
+            return False
+        logger.info("vllm: remote launch — %s", res.stdout.replace("\n", " ").strip())
+        # Poll /health over Tailscale until the model loads + compiles.
+        return await self._wait_for_healthy(self._lifecycle_probe_host())
+
+    async def _remote_stop(self) -> bool:
+        """Stop vLLM on the Somatic node over SSH — releasing GPU VRAM.
+
+        ``systemctl --user stop`` sends ``SIGTERM`` to the ``vllm_server.py``
+        wrapper (whose handler runs vLLM's CUDA cleanup) and blocks until the
+        unit is inactive or ``TimeoutStopSec`` elapses — at which point systemd
+        SIGKILLs any remaining cgroup processes (``KillMode=mixed``), so no
+        EngineCore worker is left pinning VRAM.  A ``pkill`` fallback covers a
+        vLLM started outside systemd.  Reports final VRAM for verification.
+
+        Returns:
+            ``True`` if vLLM is confirmed down (probe unhealthy over Tailscale).
+        """
+        script = f"""
+set -u
+{_USER_SYSTEMD_ENV}
+if systemctl --user is-active --quiet {_VLLM_UNIT}; then
+    echo "STOPPING_UNIT"
+    systemctl --user stop {_VLLM_UNIT} 2>&1
+    echo "STOP_RC=$?"
+else
+    # Not systemd-managed — graceful SIGTERM to the wrapper / api_server,
+    # then escalate so VRAM is not left pinned by orphaned EngineCore workers.
+    echo "NO_UNIT_FALLBACK"
+    pkill -TERM -f "vllm_server.py" 2>/dev/null || true
+    pkill -TERM -f "vllm.entrypoints.openai.api_server" 2>/dev/null || true
+    for i in $(seq 1 {_REMOTE_STOP_GRACE_S}); do
+        pgrep -f "vllm_server.py|vllm.entrypoints.openai.api_server" >/dev/null 2>&1 || break
+        sleep 1
+    done
+    pkill -9 -f "vllm_server.py" 2>/dev/null || true
+    pkill -9 -f "vllm.entrypoints.openai.api_server" 2>/dev/null || true
+    pkill -9 -f "VLLM::" 2>/dev/null || true
+fi
+systemctl --user reset-failed {_VLLM_UNIT} 2>/dev/null || true
+echo -n "VRAM_AFTER="
+nvidia-smi --query-gpu=memory.used,memory.free --format=csv,noheader 2>/dev/null | head -1 || echo "n/a"
+"""
+        logger.info("vllm: remote stop on %s (systemctl --user stop, graceful)", self._remote.ssh_host)
+        res = await self._remote.run(script, timeout=_REMOTE_STOP_GRACE_S + 30.0)
+        if not res.connected:
+            logger.error("vllm: remote stop failed — cannot reach Somatic: %s", res.stderr.strip()[:200])
+            return False
+        out = res.stdout.replace("\n", " ").strip()
+        logger.info("vllm: remote stop result — %s", out)
+        # Confirm the port is actually down from our side (over Tailscale).
+        verify = await self.probe_with_timeout(self._lifecycle_probe_host(), timeout=5.0)
+        return not verify.healthy
+
     async def stop(self) -> bool:
         """Kill all vLLM processes to prevent orphaned EngineCore workers.
 
@@ -459,6 +615,10 @@ class VllmService(UbikService):
         Returns:
             ``True`` if at least one process was signalled; ``False`` otherwise.
         """
+        # Remote path: Maestro is on another node — stop vLLM over SSH.
+        if self._is_remote():
+            return await self._remote_stop()
+
         logger.debug("vllm: stopping all vLLM processes for port %d", self._port)
 
         # Step 1: kill the APIServer process group.

@@ -105,8 +105,20 @@ class ServiceRegistry:
         self._register_all()
 
     def _register_all(self) -> None:
-        """Instantiate and register all service classes."""
+        """Instantiate and register all service classes.
+
+        Somatic services (vLLM, WhisperX) are given a :class:`RemoteExecutor`
+        and the Somatic Tailscale IP so a Maestro instance running on
+        Hippocampal can start/stop them over SSH.  The services only use the
+        remote path when the local node differs from their own — so the same
+        registry works unchanged on either node.
+        """
+        from maestro.remote import RemoteExecutor
+
         ubik_root = self._cfg.ubik_root
+        somatic = self._cfg.somatic
+        somatic_remote = RemoteExecutor.from_config(self._cfg)
+
         self.register(DockerService())
         self.register(Neo4jService(ubik_root))
         self.register(ChromaDbService(
@@ -119,11 +131,17 @@ class ServiceRegistry:
             port=self._cfg.hippocampal.mcp_port,
         ))
         self.register(VllmService(
-            port=self._cfg.somatic.vllm_port,
-            model_path=self._cfg.somatic.vllm_model_path,
+            port=somatic.vllm_port,
+            model_path=somatic.vllm_model_path,
+            remote=somatic_remote,
+            remote_ubik_root=somatic.remote_ubik_root,
+            probe_ip=somatic.tailscale_ip,
         ))
         self.register(WhisperXService(
-            port=self._cfg.somatic.whisperx_port,
+            port=somatic.whisperx_port,
+            remote=somatic_remote,
+            remote_ubik_root=somatic.remote_ubik_root,
+            probe_ip=somatic.tailscale_ip,
         ))
 
     @property

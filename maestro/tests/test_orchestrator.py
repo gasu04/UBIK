@@ -361,7 +361,8 @@ class TestMaxWaitSDefaults:
         assert McpServerService(ubik_root=_FAKE_ROOT).max_wait_s == 15.0
 
     def test_vllm_default(self):
-        assert VllmService(model_path="/m").max_wait_s == 120.0
+        # 14B AWQ load + torch.compile + CUDA-graph capture exceeds 2 min.
+        assert VllmService(model_path="/m").max_wait_s == 300.0
 
     def test_custom_max_wait_s(self):
         svc = Neo4jService(ubik_root=_FAKE_ROOT, max_wait_s=99.0)
@@ -390,7 +391,7 @@ class TestFullStatusCheck:
                 )
             statuses = await orch.full_status_check()
 
-        assert set(statuses.keys()) == {"docker", "neo4j", "chromadb", "mcp", "vllm"}
+        assert set(statuses.keys()) == {"docker", "neo4j", "chromadb", "mcp", "vllm", "whisperx"}
 
     @pytest.mark.asyncio
     async def test_local_services_probed_via_localhost(self, tmp_path):
@@ -478,8 +479,8 @@ class TestFullStatusCheck:
         await orch.full_status_check()
         # All services should have started before any finished
         # (i.e., gather ran them concurrently)
-        assert len(started) == 5
-        assert len(finished) == 5
+        assert len(started) == 6
+        assert len(finished) == 6
 
 
 # ---------------------------------------------------------------------------
@@ -487,26 +488,36 @@ class TestFullStatusCheck:
 # ---------------------------------------------------------------------------
 
 class TestEnsureAllRunning:
+    @staticmethod
+    def _mock_all(registry, *, healthy=True, start_return=True, down_names=()):
+        """Mock probe_with_timeout + start on EVERY service (both nodes).
+
+        Mocking all services keeps ensure_all_running() deterministic and
+        prevents remote services from issuing real SSH calls under test.
+        """
+        for svc in registry.get_all():
+            is_down = (not healthy) or svc.name in down_names
+            svc.probe_with_timeout = AsyncMock(
+                return_value=(
+                    _unhealthy(svc.name, svc.node) if is_down
+                    else _healthy(svc.name, svc.node)
+                )
+            )
+            svc.start = AsyncMock(return_value=start_return)
+
     @pytest.mark.asyncio
     async def test_already_healthy_services_not_restarted(self, tmp_path):
         cfg = _make_app_config(tmp_path)
         registry = ServiceRegistry(cfg=cfg)
         orch = Orchestrator(registry, _hippocampal_identity())
 
-        # All local services healthy
-        for svc in registry.get_all():
-            if svc.node == NodeType.HIPPOCAMPAL:
-                svc.probe_with_timeout = AsyncMock(
-                    return_value=_healthy(svc.name, svc.node)
-                )
-                svc.start = AsyncMock(return_value=True)
+        self._mock_all(registry, healthy=True)
 
         failed = await orch.ensure_all_running()
         assert failed == []
-        # start() should not have been called
+        # start() should not have been called on any service
         for svc in registry.get_all():
-            if svc.node == NodeType.HIPPOCAMPAL:
-                svc.start.assert_not_called()
+            svc.start.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_unhealthy_service_started(self, tmp_path):
@@ -515,26 +526,16 @@ class TestEnsureAllRunning:
         orch = Orchestrator(registry, _hippocampal_identity())
 
         # docker unhealthy → needs start; others healthy
-        for svc in registry.get_all():
-            if svc.node == NodeType.HIPPOCAMPAL:
-                is_down = svc.name == "docker"
-                svc.probe_with_timeout = AsyncMock(
-                    return_value=(
-                        _unhealthy(svc.name, svc.node) if is_down
-                        else _healthy(svc.name, svc.node)
-                    )
-                )
-                svc.start = AsyncMock(return_value=True)
+        self._mock_all(registry, healthy=True, down_names={"docker"})
 
         failed = await orch.ensure_all_running()
         assert failed == []
         # Only docker.start() should have been called
         for svc in registry.get_all():
-            if svc.node == NodeType.HIPPOCAMPAL:
-                if svc.name == "docker":
-                    svc.start.assert_called_once()
-                else:
-                    svc.start.assert_not_called()
+            if svc.name == "docker":
+                svc.start.assert_called_once()
+            else:
+                svc.start.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_failed_service_causes_dependents_to_be_skipped(self, tmp_path):
@@ -543,15 +544,9 @@ class TestEnsureAllRunning:
         orch = Orchestrator(registry, _hippocampal_identity())
 
         # docker fails to start → neo4j, chromadb, mcp should all be skipped
-        for svc in registry.get_all():
-            if svc.node == NodeType.HIPPOCAMPAL:
-                svc.probe_with_timeout = AsyncMock(
-                    return_value=_unhealthy(svc.name, svc.node)
-                )
-                if svc.name == "docker":
-                    svc.start = AsyncMock(return_value=False)
-                else:
-                    svc.start = AsyncMock(return_value=True)
+        self._mock_all(registry, healthy=False)
+        docker = next(s for s in registry.get_all() if s.name == "docker")
+        docker.start = AsyncMock(return_value=False)
 
         failed = await orch.ensure_all_running()
         assert "docker" in failed
@@ -560,26 +555,36 @@ class TestEnsureAllRunning:
         assert "mcp" in failed
 
     @pytest.mark.asyncio
-    async def test_remote_services_skipped(self, tmp_path):
-        """ensure_all_running() on Hippocampal should not touch vLLM."""
+    async def test_local_only_skips_remote_services(self, tmp_path):
+        """ensure_all_running(local_only=True) must not touch vLLM."""
         cfg = _make_app_config(tmp_path)
         registry = ServiceRegistry(cfg=cfg)
         orch = Orchestrator(registry, _hippocampal_identity())
 
+        # Local healthy, remote unhealthy — remote must still be skipped.
+        self._mock_all(registry, healthy=True)
         vllm_svc = next(s for s in registry.get_all() if s.name == "vllm")
         vllm_svc.probe_with_timeout = AsyncMock(
             return_value=_unhealthy("vllm", NodeType.SOMATIC)
         )
-        vllm_svc.start = AsyncMock(return_value=True)
 
-        for svc in registry.get_all():
-            if svc.node == NodeType.HIPPOCAMPAL:
-                svc.probe_with_timeout = AsyncMock(
-                    return_value=_healthy(svc.name, svc.node)
-                )
-
-        await orch.ensure_all_running()
+        await orch.ensure_all_running(local_only=True)
         vllm_svc.start.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cluster_start_includes_remote_services(self, tmp_path):
+        """Default ensure_all_running() starts an unhealthy remote vLLM too."""
+        cfg = _make_app_config(tmp_path)
+        registry = ServiceRegistry(cfg=cfg)
+        orch = Orchestrator(registry, _hippocampal_identity())
+
+        # Everything healthy except the remote vLLM.
+        self._mock_all(registry, healthy=True, down_names={"vllm"})
+
+        failed = await orch.ensure_all_running()
+        assert failed == []
+        vllm_svc = next(s for s in registry.get_all() if s.name == "vllm")
+        vllm_svc.start.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_returns_empty_list_when_all_healthy(self, tmp_path):
@@ -587,11 +592,7 @@ class TestEnsureAllRunning:
         registry = ServiceRegistry(cfg=cfg)
         orch = Orchestrator(registry, _hippocampal_identity())
 
-        for svc in registry.get_all():
-            if svc.node == NodeType.HIPPOCAMPAL:
-                svc.probe_with_timeout = AsyncMock(
-                    return_value=_healthy(svc.name, svc.node)
-                )
+        self._mock_all(registry, healthy=True)
 
         failed = await orch.ensure_all_running()
         assert failed == []
@@ -603,15 +604,10 @@ class TestEnsureAllRunning:
         registry = ServiceRegistry(cfg=cfg)
         orch = Orchestrator(registry, _hippocampal_identity())
 
-        for svc in registry.get_all():
-            if svc.node == NodeType.HIPPOCAMPAL:
-                svc.probe_with_timeout = AsyncMock(
-                    return_value=_unhealthy(svc.name, svc.node)
-                )
-                if svc.name in ("docker", "neo4j"):
-                    svc.start = AsyncMock(return_value=False)
-                else:
-                    svc.start = AsyncMock(return_value=True)
+        self._mock_all(registry, healthy=False)
+        for name in ("docker", "neo4j"):
+            svc = next(s for s in registry.get_all() if s.name == name)
+            svc.start = AsyncMock(return_value=False)
 
         failed = await orch.ensure_all_running()
         mcp_svc = next(s for s in registry.get_all() if s.name == "mcp")
@@ -648,7 +644,7 @@ class TestGenerateReport:
             for svc in registry.get_all()
         }
         report = await orch.generate_report(statuses)
-        assert "5/5" in report
+        assert "6/6" in report
 
     @pytest.mark.asyncio
     async def test_report_shows_partial_count(self, tmp_path):
@@ -663,7 +659,7 @@ class TestGenerateReport:
                 else _unhealthy(svc.name, svc.node)
             )
         report = await orch.generate_report(statuses)
-        assert "3/5" in report
+        assert "3/6" in report
 
     @pytest.mark.asyncio
     async def test_report_is_string(self, tmp_path):

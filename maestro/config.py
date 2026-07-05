@@ -249,6 +249,15 @@ class SomaticConfig(BaseSettings):
     tailscale_ip: str = "100.79.166.114"
     tailscale_hostname: str = "ubik-somatic"
 
+    # Remote-control (SSH) parameters — how the Hippocampal Maestro reaches
+    # this node to start/stop its services.  Somatic is a Windows host with a
+    # WSL2 Linux guest; ``ssh_host`` targets the Windows OpenSSH server and
+    # ``use_wsl`` wraps remote commands in ``wsl`` to land in the Linux guest.
+    ssh_host: str = "windows-server"          # SOMATIC_SSH_HOST
+    use_wsl: bool = True                        # SOMATIC_USE_WSL
+    ssh_connect_timeout: float = 8.0            # SOMATIC_SSH_CONNECT_TIMEOUT
+    remote_ubik_root: str = "/home/gasu/ubik"   # SOMATIC_REMOTE_UBIK_ROOT
+
     # Service ports — validation_alias bypasses the SOMATIC_ prefix
     vllm_port: int = Field(8002, validation_alias="VLLM_PORT")
     vllm_model_path: str = Field(
