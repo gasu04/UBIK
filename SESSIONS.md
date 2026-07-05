@@ -407,3 +407,25 @@
 - Optional: swap in a licensed Ubik cover image at `static/ubik-logo.svg`; add background-job progress for long start/shutdown ops; auth in front of the panel if exposed beyond the tailnet.
 - Carried over: per-service `maestro shutdown --service NAME`; WhisperX health tests; persist vLLM/WhisperX systemd user units as `.service` files; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
 ---
+
+## Session: 2026-07-05 (c) — Node: Hippocampal
+**Goal:** Dependency audit across all UBIK components; evict non-UBIK finance research projects; fix maestro requirement floors.
+**Completed:**
+- Full dependency audit across all 16 manifest files in the UBIK tree: surfaced chromadb v0→v1 floor mismatch, neo4j v5→v6 floor mismatch, Python version fragmentation (3.10/3.11/3.12/3.13 across projects), FinRobot entirely stale (langchain 0.1.20, aiohttp 3.8.5, pdfkit 1.0.0 unmaintained), pyautogen archived, Python 3.10 EOL October 2026.
+- Identified 4 directories that are external finance-research projects and do not belong in UBIK core: `FinRobot/`, `TradingAgents/`, `aihedgefund/`, `my-project/` (a TradingAgents duplicate).
+- Moved all four to `/Volumes/990PRO 4T/FinanceAI/` (26 MB + 1.5 GB + 5 MB + 684 MB). UBIK root is now clean.
+- Created `/Volumes/990PRO 4T/FinanceAI/venv/` (Python 3.12) with TradingAgents/aihedgefund deps installed (langchain-core 1.4.8, langgraph 1.2.7, chromadb 1.5.9). FinRobot kept isolated from the shared venv — its pinned versions conflict; requires a requirements refresh before it can be installed cleanly.
+- Wrote `FinanceAI/README.md` documenting the venv, per-project notes, and the FinRobot isolation warning.
+- Bumped `maestro/requirements.txt` floors: `chromadb>=0.5.0` → `>=1.4.0`; `neo4j>=5.20.0` → `>=6.1.0` (both now match installed venv versions). Committed `a3359cf` and pushed to `master`.
+**State left in:**
+- `master` = `a3359cf` on both local and origin; working tree clean.
+- FinanceAI projects at `/Volumes/990PRO 4T/FinanceAI/`; their TradingAgents embedded venv (Python 3.10) is still present inside `TradingAgents/` — usable but EOL in October 2026.
+**Files changed:**
+- `maestro/requirements.txt`: chromadb and neo4j floor bumps
+- SESSIONS.md: this entry
+**Next session should:**
+- Upgrade TradingAgents Python from 3.10 → 3.12 before October 2026 EOL (update `.python-version` and recreate the embedded venv).
+- Refresh FinRobot's requirements.txt (drop pinned stale versions; langchain 0.1.20 → 1.x, aiohttp 3.8.5 → 3.11+, drop pdfkit/pyautogen/unstructured 0.8.1).
+- Run `pip-audit` against the active DeepSeek venv to surface any CVE-flagged packages.
+- Carried over: per-service `maestro shutdown --service NAME`; WhisperX health tests; persist vLLM/WhisperX systemd user units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
+---
