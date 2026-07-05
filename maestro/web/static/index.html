@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>UBIK — Maestro Control</title>
+  <link rel="icon" href="/static/ubik-logo.svg">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+
+    <header class="masthead">
+      <img src="/static/ubik-logo.svg" alt="UBIK">
+      <div class="title">
+        <h1>UBIK</h1>
+        <p class="sub">Maestro Cluster Control</p>
+      </div>
+      <div class="node-badge">
+        this instance<br><b id="node">—</b>
+        <div id="ips" style="margin-top:4px"></div>
+      </div>
+    </header>
+
+    <!-- rotating in-book Ubik advertisement -->
+    <div class="ad">
+      <div class="kicker">A word from our sponsor</div>
+      <div class="copy" id="ad-copy">Loading…</div>
+      <div class="disclaimer" id="ad-disc">Safe when used as directed.</div>
+    </div>
+
+    <h2 class="sec">Operations</h2>
+    <div class="controls">
+      <button class="primary" onclick="refreshStatus()">↻ Status</button>
+      <button class="primary" onclick="startAll(false)">▶ Start all</button>
+      <select id="svc"></select>
+      <button onclick="startService()">▶ Start service</button>
+      <button class="ghost" onclick="startAll(true)">▶ Start local-only</button>
+      <button class="ghost" onclick="getHealth()">✚ Health</button>
+      <button class="ghost" onclick="getMetrics()">▤ Metrics</button>
+      <button class="ghost" onclick="getLogs()">▤ Logs</button>
+      <span class="spacer"></span>
+      <button class="danger" onclick="openShutdown()">⏻ Shutdown…</button>
+    </div>
+
+    <h2 class="sec">Services <span id="summary" style="color:var(--grey);font-weight:400"></span></h2>
+    <div class="grid" id="grid"></div>
+
+    <h2 class="sec">Consoles &amp; Databases</h2>
+    <div class="links" id="links"></div>
+
+    <h2 class="sec">Output</h2>
+    <div class="console" id="console"><span class="t">Ready. I am Ubik. Before the universe was, I am.</span></div>
+
+    <footer>
+      UBIK Maestro · <span id="foot-node">—</span> · Safe when used as directed
+    </footer>
+  </div>
+
+  <!-- shutdown modal -->
+  <div class="modal-back" id="modal">
+    <div class="modal">
+      <h3>Shutdown cluster</h3>
+      <p>Stops services in reverse dependency order. Somatic vLLM is stopped
+         gracefully so GPU VRAM is released.</p>
+      <div class="opts">
+        <label><input type="checkbox" id="sd-dry"> Dry run (report only, stop nothing)</label>
+        <label><input type="checkbox" id="sd-local"> Local-only (skip Somatic)</label>
+        <label><input type="checkbox" id="sd-emerg"> Emergency (SIGKILL local ports)</label>
+      </div>
+      <div class="row">
+        <button class="ghost" onclick="closeShutdown()">Cancel</button>
+        <button class="danger" onclick="doShutdown()">Confirm shutdown</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

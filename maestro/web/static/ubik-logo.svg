@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UBIK — original mark for the UBIK project (not the copyrighted book cover).
+  A retro aerosol can + wordmark, in the spirit of the fictional "Ubik" spray
+  from Philip K. Dick's novel. Swap this file for a licensed image if desired.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-label="UBIK spray can logo">
+  <defs>
+    <linearGradient id="can" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0"   stop-color="#ffd23f"/>
+      <stop offset="0.5" stop-color="#ffe08a"/>
+      <stop offset="1"   stop-color="#e6a500"/>
+    </linearGradient>
+    <linearGradient id="cap" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2f4a"/>
+      <stop offset="1" stop-color="#14162a"/>
+    </linearGradient>
+  </defs>
+
+  <!-- spray mist -->
+  <g fill="#e63946" opacity="0.9">
+    <circle cx="196" cy="40"  r="7"/>
+    <circle cx="214" cy="58"  r="5"/>
+    <circle cx="210" cy="30"  r="4"/>
+    <circle cx="224" cy="46"  r="3.2"/>
+    <circle cx="188" cy="58"  r="3.6"/>
+    <circle cx="206" cy="72"  r="3"/>
+  </g>
+
+  <!-- nozzle + cap -->
+  <rect x="150" y="44" width="20" height="14" rx="2" fill="url(#cap)"/>
+  <rect x="120" y="58" width="60" height="26" rx="4" fill="url(#cap)"/>
+
+  <!-- can body -->
+  <rect x="120" y="84" width="60" height="118" rx="10" fill="url(#can)" stroke="#14162a" stroke-width="4"/>
+  <!-- label band -->
+  <rect x="120" y="112" width="60" height="62" fill="#14162a"/>
+  <text x="150" y="152" font-family="Helvetica, Arial, sans-serif" font-size="26"
+        font-weight="900" fill="#ffd23f" text-anchor="middle"
+        transform="rotate(-90 150 143)" letter-spacing="2">UBIK</text>
+
+  <!-- wordmark -->
+  <text x="16" y="150" font-family="Helvetica, Arial, sans-serif" font-size="70"
+        font-weight="900" fill="#ffd23f" letter-spacing="-2">UB</text>
+  <text x="16" y="150" font-family="Helvetica, Arial, sans-serif" font-size="70"
+        font-weight="900" fill="none" stroke="#e63946" stroke-width="1.5"
+        letter-spacing="-2" opacity="0.6" transform="translate(2,2)">UB</text>
+</svg>
