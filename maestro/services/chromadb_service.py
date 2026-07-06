@@ -207,14 +207,12 @@ class ChromaDbService(UbikService):
             ``True`` when the bootout command completed without error.
         """
         uid = os.getuid()
-        logger.debug(
-            "chromadb: launchctl bootout gui/%d %s", uid, _LAUNCHD_LABEL
-        )
+        target = f"gui/{uid}/{_LAUNCHD_LABEL}"
+        logger.debug("chromadb: launchctl bootout %s", target)
         try:
             rc, _, stderr = await _run_proc(
                 "launchctl", "bootout",
-                f"gui/{uid}",
-                _LAUNCHD_LABEL,
+                target,
                 timeout=30.0,
             )
             if rc != 0:

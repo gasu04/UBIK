@@ -338,7 +338,8 @@ class TestChromaDbServiceLifecycle:
         assert result is True
         call_args = mock_proc.call_args[0]
         assert "bootout" in call_args
-        assert "com.ubik.chromadb" in call_args
+        # Target is passed as single arg "gui/<uid>/com.ubik.chromadb"
+        assert any("com.ubik.chromadb" in arg for arg in call_args)
 
     @pytest.mark.asyncio
     async def test_stop_exception(self):

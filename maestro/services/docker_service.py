@@ -154,10 +154,14 @@ class DockerService(UbikService):
         return await self._wait_for_healthy("localhost")
 
     async def stop(self) -> bool:
-        """Stop all running containers via ``docker stop``.
+        """Stop all containers then quit Docker Desktop (macOS) or the daemon.
+
+        Stopping containers alone leaves the daemon healthy; the probe would
+        never report DOWN.  On macOS we also quit Docker Desktop so the daemon
+        exits and the probe can confirm DOWN within the shutdown window.
 
         Returns:
-            ``True`` when the stop command completed without error.
+            ``True`` when the stop commands completed without error.
         """
         try:
             logger.debug("docker: stopping all containers")
@@ -167,7 +171,24 @@ class DockerService(UbikService):
             ]
             if container_ids:
                 await _run_proc("docker", "stop", *container_ids, timeout=30.0)
-            return True
         except Exception as exc:
-            logger.warning("docker stop failed: %s", exc)
+            logger.warning("docker: container stop failed: %s", exc)
             return False
+
+        # Quit the Docker daemon/Desktop so the probe can confirm DOWN.
+        system = platform.system()
+        try:
+            if system == "Darwin":
+                logger.info("docker: quitting Docker Desktop")
+                await _run_proc(
+                    "osascript", "-e", 'quit app "Docker"', timeout=15.0
+                )
+            else:
+                logger.info("docker: stopping daemon via systemctl")
+                await _run_proc(
+                    "sudo", "systemctl", "stop", "docker", timeout=30.0
+                )
+        except Exception as exc:
+            logger.warning("docker: daemon stop failed: %s", exc)
+            # Not fatal — containers are already stopped
+        return True
