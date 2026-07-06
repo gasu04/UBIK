@@ -267,18 +267,18 @@ class TestUbikRootAssignment:
 # ---------------------------------------------------------------------------
 
 class TestVenvPaths:
-    def test_hippocampal_venv_under_ubik_root(self):
-        fake_root = Path("/tmp/ubik")
-        with _patch_env(platform="darwin", ubik_root=fake_root):
+    def test_hippocampal_venv_is_deepseek(self):
+        # Hippocampal always uses the shared DeepSeek venv regardless of ubik_root.
+        from maestro.platform_detect import _HIPPOCAMPAL_VENV_PATH
+        with _patch_env(platform="darwin", ubik_root=Path("/tmp/ubik")):
             node = detect_node()
-        assert node.python_venv_path == fake_root / "hippocampal" / "venv"
+        assert node.python_venv_path == _HIPPOCAMPAL_VENV_PATH
 
-    def test_hippocampal_activate_cmd_references_venv(self):
-        fake_root = Path("/tmp/ubik")
-        with _patch_env(platform="darwin", ubik_root=fake_root):
+    def test_hippocampal_activate_cmd_references_deepseek_venv(self):
+        from maestro.platform_detect import _HIPPOCAMPAL_VENV_PATH
+        with _patch_env(platform="darwin", ubik_root=Path("/tmp/ubik")):
             node = detect_node()
-        expected_venv = fake_root / "hippocampal" / "venv"
-        assert node.python_activate_cmd == f"source {expected_venv}/bin/activate"
+        assert node.python_activate_cmd == f"source {_HIPPOCAMPAL_VENV_PATH}/bin/activate"
 
     def test_somatic_venv_path_is_none(self):
         with _patch_env(platform="linux", hostname="unknown-host"):

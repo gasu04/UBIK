@@ -189,14 +189,19 @@ class TestStartPathCheck:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_chromadb_fails_if_compose_missing(self, tmp_path):
-        svc = ChromaDbService(ubik_root=tmp_path, max_wait_s=0.1)
+    async def test_chromadb_fails_if_plist_missing(self, tmp_path):
+        missing_plist = tmp_path / "com.ubik.chromadb.plist"  # does not exist
+        svc = ChromaDbService(ubik_root=tmp_path, max_wait_s=0.1,
+                              plist_path=missing_plist)
         hippo_id = NodeIdentity(
             node_type=NodeType.HIPPOCAMPAL, hostname="mac.lan", platform="darwin",
             ubik_root=tmp_path, is_wsl=False, tailscale_ip=None,
             python_venv_path=None, python_activate_cmd=None,
         )
-        with patch("maestro.services.chromadb_service.detect_node", return_value=hippo_id):
+        unhealthy = ProbeResult(name="chromadb", node=NodeType.HIPPOCAMPAL,
+                                healthy=False, latency_ms=0.0)
+        with patch("maestro.services.chromadb_service.detect_node", return_value=hippo_id), \
+             patch.object(svc, "probe", return_value=unhealthy):
             result = await svc.start(tmp_path)
         assert result is False
 
@@ -334,9 +339,14 @@ class TestStartHealthWait:
             python_venv_path=None, python_activate_cmd=None,
         )
         healthy = _healthy("vllm", NodeType.SOMATIC)
+        from unittest.mock import MagicMock
         with patch("maestro.services.vllm_service.detect_node", return_value=somatic_id), \
-             patch("maestro.services.vllm_service.asyncio.create_subprocess_exec",
-                   new_callable=AsyncMock), \
+             patch("maestro.services.vllm_service._find_conda",
+                   return_value="/usr/bin/conda"), \
+             patch("maestro.services.vllm_service._detect_venv_path",
+                   return_value=None), \
+             patch("maestro.services.vllm_service.subprocess.Popen",
+                   return_value=MagicMock()), \
              patch.object(svc, "probe_with_timeout",
                           new_callable=AsyncMock, return_value=healthy):
             result = await svc.start(tmp_path)

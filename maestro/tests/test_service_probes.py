@@ -291,12 +291,18 @@ class TestChromaDbServiceProbe:
 class TestChromaDbServiceLifecycle:
     @pytest.mark.asyncio
     async def test_start_success(self, tmp_path):
-        (tmp_path / "docker-compose.yml").write_text("services: {}")
-        svc = ChromaDbService(ubik_root=tmp_path, max_wait_s=5.0)
+        plist = tmp_path / "com.ubik.chromadb.plist"
+        plist.write_text("")  # exists
+        svc = ChromaDbService(ubik_root=tmp_path, max_wait_s=5.0,
+                              plist_path=plist)
+        unhealthy = ProbeResult(name="chromadb", node=NodeType.HIPPOCAMPAL,
+                                healthy=False, latency_ms=0.0)
         healthy = ProbeResult(name="chromadb", node=NodeType.HIPPOCAMPAL,
                               healthy=True, latency_ms=5.0)
         with patch("maestro.services.chromadb_service.detect_node",
                    return_value=_hippo_identity()), \
+             patch.object(svc, "probe", new_callable=AsyncMock,
+                          return_value=unhealthy), \
              patch("maestro.services.chromadb_service._run_proc",
                    new_callable=AsyncMock, return_value=(0, "", "")) as mock_proc, \
              patch.object(svc, "probe_with_timeout",
@@ -304,15 +310,23 @@ class TestChromaDbServiceLifecycle:
             result = await svc.start(tmp_path)
         assert result is True
         call_args = mock_proc.call_args[0]
-        assert "chromadb" in call_args
+        assert "bootstrap" in call_args
 
     @pytest.mark.asyncio
-    async def test_start_failure_nonzero_rc(self):
-        svc = ChromaDbService(ubik_root=_FAKE_ROOT)
-        with patch("maestro.services.chromadb_service._run_proc",
+    async def test_start_failure_nonzero_rc(self, tmp_path):
+        plist = tmp_path / "com.ubik.chromadb.plist"
+        plist.write_text("")  # exists
+        svc = ChromaDbService(ubik_root=tmp_path, plist_path=plist)
+        unhealthy = ProbeResult(name="chromadb", node=NodeType.HIPPOCAMPAL,
+                                healthy=False, latency_ms=0.0)
+        with patch("maestro.services.chromadb_service.detect_node",
+                   return_value=_hippo_identity()), \
+             patch.object(svc, "probe", new_callable=AsyncMock,
+                          return_value=unhealthy), \
+             patch("maestro.services.chromadb_service._run_proc",
                    new_callable=AsyncMock,
                    return_value=(1, "", "some error")):
-            result = await svc.start(_FAKE_ROOT)
+            result = await svc.start(tmp_path)
         assert result is False
 
     @pytest.mark.asyncio
@@ -323,15 +337,15 @@ class TestChromaDbServiceLifecycle:
             result = await svc.stop()
         assert result is True
         call_args = mock_proc.call_args[0]
-        assert "stop" in call_args
-        assert "chromadb" in call_args
+        assert "bootout" in call_args
+        assert "com.ubik.chromadb" in call_args
 
     @pytest.mark.asyncio
     async def test_stop_exception(self):
         svc = ChromaDbService(ubik_root=_FAKE_ROOT)
         with patch("maestro.services.chromadb_service._run_proc",
                    new_callable=AsyncMock,
-                   side_effect=OSError("docker gone")):
+                   side_effect=OSError("launchctl gone")):
             result = await svc.stop()
         assert result is False
 
@@ -540,27 +554,34 @@ class TestVllmServiceLifecycle:
         svc = VllmService(model_path="/fake/model", max_wait_s=5.0)
         healthy = ProbeResult(name="vllm", node=NodeType.SOMATIC,
                               healthy=True, latency_ms=5.0)
-        mock_proc = AsyncMock()
+        mock_popen = MagicMock()
         with patch("maestro.services.vllm_service.detect_node",
                    return_value=_somatic_identity()), \
-             patch("maestro.services.vllm_service.asyncio.create_subprocess_exec",
-                   new_callable=AsyncMock, return_value=mock_proc) as mock_exec, \
+             patch("maestro.services.vllm_service._find_conda",
+                   return_value="/usr/bin/conda"), \
+             patch("maestro.services.vllm_service._detect_venv_path",
+                   return_value=None), \
+             patch("maestro.services.vllm_service.subprocess.Popen",
+                   return_value=mock_popen) as mock_popen_cls, \
              patch.object(svc, "probe_with_timeout",
                           new_callable=AsyncMock, return_value=healthy):
             result = await svc.start(_FAKE_ROOT)
         assert result is True
-        args = mock_exec.call_args[0]
-        assert "conda" in args
+        args = mock_popen_cls.call_args[0][0]
+        assert "/usr/bin/conda" in args
         assert "run" in args
         assert "vllm" in args
         assert "serve" in args
         assert "/fake/model" in args
-        assert mock_exec.call_args[1].get("start_new_session") is True
 
     @pytest.mark.asyncio
     async def test_start_exception(self):
         svc = VllmService(model_path="/fake/model")
-        with patch("maestro.services.vllm_service.asyncio.create_subprocess_exec",
+        with patch("maestro.services.vllm_service._find_conda",
+                   return_value="/usr/bin/conda"), \
+             patch("maestro.services.vllm_service._detect_venv_path",
+                   return_value=None), \
+             patch("maestro.services.vllm_service.subprocess.Popen",
                    side_effect=FileNotFoundError("conda not found")):
             result = await svc.start(_FAKE_ROOT)
         assert result is False
@@ -568,8 +589,14 @@ class TestVllmServiceLifecycle:
     @pytest.mark.asyncio
     async def test_stop_calls_kill_port(self):
         svc = VllmService(model_path="/fake/model")
-        with patch("maestro.services.vllm_service._kill_port",
-                   new_callable=AsyncMock, return_value=True) as mock_kill:
+        # fuser raises → fallback to _kill_port
+        with patch("maestro.services.vllm_service._run_proc",
+                   new_callable=AsyncMock,
+                   side_effect=OSError("fuser not available")) as _, \
+             patch("maestro.services.vllm_service._kill_port",
+                   new_callable=AsyncMock, return_value=True) as mock_kill, \
+             patch("maestro.services.vllm_service._find_vllm_pids",
+                   return_value=[]):
             result = await svc.stop()
         assert result is True
         mock_kill.assert_called_once_with(8002)
@@ -612,14 +639,14 @@ def _make_registry(tmp_path):
 
 
 class TestServiceRegistry:
-    def test_get_all_returns_five_services(self, tmp_path):
+    def test_get_all_returns_six_services(self, tmp_path):
         registry = _make_registry(tmp_path)
-        assert len(registry.get_all()) == 5
+        assert len(registry.get_all()) == 6
 
     def test_all_service_names_present(self, tmp_path):
         registry = _make_registry(tmp_path)
         names = {s.name for s in registry.get_all()}
-        assert names == {"docker", "neo4j", "chromadb", "mcp", "vllm"}
+        assert names == {"docker", "neo4j", "chromadb", "mcp", "vllm", "whisperx"}
 
     def test_get_services_for_hippocampal(self, tmp_path):
         registry = _make_registry(tmp_path)
@@ -630,17 +657,18 @@ class TestServiceRegistry:
         assert "chromadb" in names
         assert "mcp" in names
         assert "vllm" not in names
+        assert "whisperx" not in names
 
     def test_get_services_for_somatic(self, tmp_path):
         registry = _make_registry(tmp_path)
         somatic = registry.get_services_for_node(NodeType.SOMATIC)
-        assert len(somatic) == 1
-        assert somatic[0].name == "vllm"
+        names = {s.name for s in somatic}
+        assert names == {"vllm", "whisperx"}
 
     def test_get_startup_order_length(self, tmp_path):
         registry = _make_registry(tmp_path)
         order = registry.get_startup_order()
-        assert len(order) == 5
+        assert len(order) == 6
 
     def test_get_startup_order_docker_first(self, tmp_path):
         registry = _make_registry(tmp_path)
@@ -665,7 +693,7 @@ class TestServiceRegistry:
         # Should complete without raising ValueError
         registry = _make_registry(tmp_path)
         order = registry.get_startup_order()
-        assert len(order) == 5
+        assert len(order) == 6
 
     def test_register_adds_service(self, tmp_path):
         registry = _make_registry(tmp_path)

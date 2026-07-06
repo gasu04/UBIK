@@ -6,14 +6,17 @@ Probes and manages the ChromaDB vector store on the Hippocampal node.
 
 probe:  HTTP GET to ``/api/v2/heartbeat`` — 200 means the server is up.
         Falls back to ``/api/v1/heartbeat`` for older ChromaDB versions.
-start:  ``docker compose … up -d chromadb`` then waits for healthy probe.
-stop:   ``docker compose … stop chromadb``
+start:  ``launchctl bootstrap gui/<uid> ~/Library/LaunchAgents/com.ubik.chromadb.plist``
+stop:   ``launchctl bootout gui/<uid> com.ubik.chromadb``
+
+ChromaDB runs as a native launchd service (NOT Docker) on Hippocampal.
 
 Author: UBIK Project
-Version: 0.2.0
+Version: 0.3.0
 """
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Optional
@@ -27,6 +30,8 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_PORT = 8001
 _DEFAULT_MAX_WAIT_S = 30.0
+_LAUNCHD_LABEL = "com.ubik.chromadb"
+_PLIST_PATH = Path.home() / "Library" / "LaunchAgents" / f"{_LAUNCHD_LABEL}.plist"
 
 
 class ChromaDbService(UbikService):
@@ -39,6 +44,7 @@ class ChromaDbService(UbikService):
         port: int = _DEFAULT_PORT,
         token: Optional[str] = None,
         max_wait_s: float = _DEFAULT_MAX_WAIT_S,
+        plist_path: Optional[Path] = None,
     ) -> None:
         if ubik_root is None:
             from maestro.config import get_config
@@ -50,6 +56,7 @@ class ChromaDbService(UbikService):
         self._port = port
         self._token = token
         self._max_wait_s = max_wait_s
+        self._plist_path = plist_path or _PLIST_PATH
 
     @property
     def max_wait_s(self) -> float:
@@ -69,6 +76,9 @@ class ChromaDbService(UbikService):
 
     @property
     def depends_on(self) -> list[str]:
+        # Keep docker as a scheduling constraint to preserve shutdown order
+        # (chromadb stops before docker, docker stops last).
+        # Native launchd ChromaDB does not need Docker to run.
         return ["docker"]
 
     async def probe(self, host: str) -> ProbeResult:
@@ -130,23 +140,23 @@ class ChromaDbService(UbikService):
             )
 
     async def start(self, ubik_root: Path) -> bool:
-        """Start chromadb via ``docker compose up -d chromadb``.
+        """Start ChromaDB via ``launchctl bootstrap``.
 
         Pre-flight checks:
           - Verifies this is the Hippocampal node.
-          - Verifies ``docker-compose.yml`` exists at *ubik_root*.
+          - Verifies the plist exists.
+          - Returns True immediately if already healthy (idempotent).
 
-        After issuing the compose command, polls ``probe()`` every 3 seconds
+        After issuing the bootstrap command, polls ``probe()`` every 3 seconds
         until ChromaDB is healthy or ``max_wait_s`` is exceeded.
 
         Args:
-            ubik_root: UBIK project root containing ``docker-compose.yml``.
+            ubik_root: UBIK project root (unused, kept for interface compat).
 
         Returns:
             ``True`` when ChromaDB is confirmed healthy; ``False`` on error or
             timeout.
         """
-        # Pre-flight: node check
         identity = detect_node()
         if identity.node_type not in (NodeType.HIPPOCAMPAL, NodeType.UNKNOWN):
             logger.error(
@@ -156,24 +166,28 @@ class ChromaDbService(UbikService):
             )
             return False
 
-        # Pre-flight: compose file must exist
-        compose_file = ubik_root / "docker-compose.yml"
-        if not compose_file.exists():
-            logger.error(
-                "chromadb: docker-compose.yml not found: %s", compose_file
-            )
+        # Idempotent: already healthy → nothing to do
+        probe_result = await self.probe("localhost")
+        if probe_result.healthy:
+            logger.info("chromadb: already healthy, skipping bootstrap")
+            return True
+
+        if not self._plist_path.exists():
+            logger.error("chromadb: plist not found: %s", self._plist_path)
             return False
 
-        logger.info("chromadb: docker compose up -d (file=%s)", compose_file)
+        uid = os.getuid()
+        logger.info("chromadb: launchctl bootstrap gui/%d %s", uid, self._plist_path)
         try:
             rc, _, stderr = await _run_proc(
-                "docker", "compose", "-f", str(compose_file),
-                "up", "-d", "chromadb",
-                timeout=60.0,
+                "launchctl", "bootstrap",
+                f"gui/{uid}",
+                str(self._plist_path),
+                timeout=30.0,
             )
             if rc != 0:
                 logger.warning(
-                    "chromadb: compose up failed (rc=%d): %s",
+                    "chromadb: bootstrap failed (rc=%d): %s",
                     rc, stderr.strip()[:200],
                 )
                 return False
@@ -184,22 +198,28 @@ class ChromaDbService(UbikService):
         return await self._wait_for_healthy("localhost")
 
     async def stop(self) -> bool:
-        """Stop chromadb via ``docker compose stop chromadb``.
+        """Stop ChromaDB via ``launchctl bootout``.
+
+        Uses ``bootout`` (not ``stop``) so launchd removes the service label
+        entirely — otherwise KeepAlive=true would restart it immediately.
 
         Returns:
-            ``True`` when the stop command completed without error.
+            ``True`` when the bootout command completed without error.
         """
-        compose_file = self._ubik_root / "docker-compose.yml"
-        logger.debug("chromadb: docker compose stop (file=%s)", compose_file)
+        uid = os.getuid()
+        logger.debug(
+            "chromadb: launchctl bootout gui/%d %s", uid, _LAUNCHD_LABEL
+        )
         try:
             rc, _, stderr = await _run_proc(
-                "docker", "compose", "-f", str(compose_file),
-                "stop", "chromadb",
+                "launchctl", "bootout",
+                f"gui/{uid}",
+                _LAUNCHD_LABEL,
                 timeout=30.0,
             )
             if rc != 0:
                 logger.warning(
-                    "chromadb: stop failed (rc=%d): %s", rc, stderr.strip()[:200]
+                    "chromadb: bootout failed (rc=%d): %s", rc, stderr.strip()[:200]
                 )
                 return False
             return True

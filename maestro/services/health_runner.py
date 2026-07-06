@@ -175,7 +175,15 @@ async def run_all_checks(
     services = {r.service_name: r for r in results}
 
     # Docker health is inferred from neo4j + chromadb results (no SSH/remote API).
-    docker_result = await check_docker(services["neo4j"], services["chromadb"])
+    try:
+        docker_result = await check_docker(services["neo4j"], services["chromadb"])
+    except Exception as exc:
+        docker_result = ServiceResult(
+            service_name="docker",
+            status=ServiceStatus.UNHEALTHY,
+            latency_ms=0.0,
+            error=str(exc),
+        )
     services["docker"] = docker_result
 
     healthy = [n for n, r in services.items() if r.is_healthy]

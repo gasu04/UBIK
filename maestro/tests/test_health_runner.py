@@ -38,6 +38,7 @@ _ALL_HEALTHY = {
     "vllm": _result("vllm", ServiceStatus.HEALTHY),
     "tailscale": _result("tailscale", ServiceStatus.HEALTHY),
     "docker": _result("docker", ServiceStatus.HEALTHY),
+    "whisperx": _result("whisperx", ServiceStatus.HEALTHY),
 }
 
 _PATCH_BASE = "maestro.services.health_runner"
@@ -72,6 +73,7 @@ def mock_checks(app_config):
         patch(f"{_PATCH_BASE}.check_vllm", mocks["vllm"]),
         patch(f"{_PATCH_BASE}.check_tailscale", mocks["tailscale"]),
         patch(f"{_PATCH_BASE}.check_docker", mocks["docker"]),
+        patch(f"{_PATCH_BASE}.check_whisperx", mocks["whisperx"]),
     ):
         yield mocks
 
@@ -91,10 +93,10 @@ class TestRunAllChecks:
         assert cluster.is_healthy is True
 
     @pytest.mark.asyncio
-    async def test_all_six_services_present(self, mock_checks, app_config):
+    async def test_all_services_present(self, mock_checks, app_config):
         cluster = await run_all_checks(app_config)
         assert set(cluster.services.keys()) == {
-            "neo4j", "chromadb", "mcp", "vllm", "tailscale", "docker"
+            "neo4j", "chromadb", "mcp", "vllm", "tailscale", "docker", "whisperx"
         }
 
     @pytest.mark.asyncio
@@ -172,4 +174,4 @@ class TestRunAllChecks:
         cluster = await run_all_checks(app_config)
         parsed = json.loads(cluster.to_json())
         assert parsed["overall_status"] == "healthy"
-        assert parsed["total_count"] == 6
+        assert parsed["total_count"] == 7

@@ -203,8 +203,13 @@ class MaestroLogger:
         # Prevent double-emission into the root / structlog chain.
         self._logger.propagate = False
 
-        # Idempotency guard: only attach handlers once per logger instance.
-        if self._logger.handlers:
+        # Idempotency guard: only skip if our file handler is already attached.
+        # Checking any handler (not just ours) would falsely trigger when pytest
+        # installs its LogCaptureHandler between tests.
+        if any(
+            isinstance(h, logging.handlers.TimedRotatingFileHandler)
+            for h in self._logger.handlers
+        ):
             return
 
         self._attach_file_handler(log_dir)

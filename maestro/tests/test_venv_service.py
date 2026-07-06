@@ -163,6 +163,7 @@ class TestGetVenvRunPrefix:
         assert "bash" in prefix
 
     def test_hippocampal_fallback_when_no_venv_path(self):
+        from maestro.services.venv_service import _hippocampal_venv_path
         node = NodeIdentity(
             node_type=NodeType.HIPPOCAMPAL,
             hostname="mac.lan",
@@ -170,12 +171,12 @@ class TestGetVenvRunPrefix:
             ubik_root=_FAKE_UBIK_ROOT,
             is_wsl=False,
             tailscale_ip=None,
-            python_venv_path=None,  # no explicit path
+            python_venv_path=None,  # no explicit path → uses hardcoded DeepSeek venv
             python_activate_cmd=None,
         )
         prefix = get_venv_run_prefix(node)
-        # Should fall back to ubik_root / hippocampal / venv
-        expected = str(_FAKE_UBIK_ROOT / "hippocampal" / "venv")
+        # Falls back to the shared DeepSeek venv (hardcoded in venv_service)
+        expected = str(_hippocampal_venv_path(node))
         assert expected in prefix[2]
 
 
