@@ -515,3 +515,18 @@
 - Before/at next real Somatic inference use: confirm `vllm_server.py` starts cleanly and serves a request under torch 2.9.1; watch specifically for CUDA-extension ABI errors on first load. If it breaks, rollback is `pip install torch==2.9.0+cu128 torchaudio==2.9.0+cu128 torchvision==0.24.0+cu128 --extra-index-url https://download.pytorch.org/whl/cu128`.
 - Everything else carried over from the 2026-07-06 audit entry above (vLLM upgrade re-scoped to 0.24.0, chromadb version alignment across 3 envs, single-venv doc correction, plus the older backlog).
 ---
+
+## Session: 2026-07-06 (c) — Node: Hippocampal
+**Goal:** Evict two more dead-weight items flagged by the same-day audit: `evernote-sdk-python` and the redundant `UBIKParallax-source-v5`.
+**Completed:**
+- Verified both untracked by the UBIK git repo and no cross-references to `evernote-sdk-python` elsewhere in the tree (its use is via the `evernote` PyPI package pulled in transitively by `Cross-Platform-Workflow-Orchestrator/geeknote` — a separate dependency, unaffected by removing this vendored SDK checkout).
+- Confirmed `UBIKParallax-source-v5` and `-v6` are independent git clones of `github.com/gasu04/UBIKParallax.git`; `diff -qr` showed differences confined to `.git` internals, `.DS_Store`, and one extra file only in v6 (`scripts/clean-html.py`) — v6 is a strict superset, v5 has nothing unique.
+- Moved both to Trash (not hard-deleted, for reversibility): `evernote-sdk-python` (2.7 MB) → `~/.Trash/evernote-sdk-python_evicted_20260706`; `UBIKParallax-source-v5` (1.5 MB) → `~/.Trash/UBIKParallax-source-v5_evicted_20260706`. Confirmed both gone from the UBIK tree.
+**State left in:**
+- UBIK tree is smaller by ~4.2 MB; no functional impact (both were vendored/duplicate, unreferenced).
+- `UBIKParallax-source-v6` remains as the sole, current copy of the actual UBIK frontend.
+**Files changed:**
+- SESSIONS.md: this entry (no repo code changes — Trash moves only, both outside git)
+**Next session should:**
+- Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
+---
