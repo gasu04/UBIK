@@ -591,3 +591,18 @@
 **Next session should:**
 - Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
 ---
+
+## Session: 2026-07-06 (h) — Node: Hippocampal
+**Goal:** Evict the last three low-concern items flagged by the same-day audit: `helloworld`, `pythonProject`, `test-setup`.
+**Completed:**
+- Verified all three untracked by the UBIK git repo. Unlike the last several evictions, none of these three have their own git remote (no nested `.git` at all — plain scratch folders) — Trash is the only safety net here, appropriate given the content.
+- Confirmed all trivial: `helloworld/main.py` is a PyCharm default template ("Hi, PyCharm"); `pythonProject/{helloworld,ProjectEuler,santiago}` are scratch/practice subfolders (10–12 MB each, no manifests); `test-setup/system_info.py` is a one-off script that prints platform info and pings httpbin.org. Zero word-boundary references to any of the three names found elsewhere in the tree.
+- Moved all three to Trash (not hard-deleted): `~/.Trash/helloworld_evicted_20260706` (10 MB), `~/.Trash/pythonProject_evicted_20260706` (34 MB), `~/.Trash/test-setup_evicted_20260706` (4 KB). Confirmed all gone from the UBIK tree.
+**State left in:**
+- UBIK tree is smaller by ~44 MB.
+- Remaining untracked items in the tree are now limited to UBIK's own legitimate artifacts (`chromadb_data/`, `backups/`, `Ingested_data/`, etc.), `open-notebook` (Docker-based, no local manifest), and the pre-existing unstaged `maestro/services/docker_service.py` / `maestro/tests/test_orchestrator.py` edits.
+**Files changed:**
+- SESSIONS.md: this entry (no repo code changes — Trash moves only, all outside git)
+**Next session should:**
+- Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
+---
