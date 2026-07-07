@@ -560,3 +560,18 @@
 **Next session should:**
 - Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
 ---
+
+## Session: 2026-07-06 (f) — Node: Hippocampal
+**Goal:** Evict two more vendored checkouts flagged by the same-day audit: `nifi` and `automatisch`.
+**Completed:**
+- Verified both untracked by the UBIK git repo. Both have `gasu04`-owned GitHub remotes (`github.com/gasu04/nifi.git`, `github.com/gasu04/automatisch.git`) — likely forks, backed up independently of the local Trash copy.
+- Checked for real cross-references: an initial substring grep for "nifi"/"automatisch" returned dozens of hits, but a word-boundary re-check showed those were false positives (the substring "nifi" appears inside words like "unified", "significant", "magnificent"). The only genuine word-boundary hits for "nifi" were two files in `.tmp.driveupload/` (Google Drive Desktop's own upload-staging cache) — Java source snippets that are remnants of nifi's own files mid-sync, not references from UBIK code. No real dependency on either project found anywhere.
+- Moved both to Trash (not hard-deleted): `~/.Trash/nifi_evicted_20260706` (470 MB), `~/.Trash/automatisch_evicted_20260706` (34 MB). Confirmed both gone from the UBIK tree.
+**State left in:**
+- UBIK tree is smaller by ~504 MB.
+- Both projects remain recoverable via `git clone` from their `gasu04` GitHub remotes even after Trash empties.
+**Files changed:**
+- SESSIONS.md: this entry (no repo code changes — Trash moves only, both outside git)
+**Next session should:**
+- Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
+---
