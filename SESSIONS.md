@@ -575,3 +575,19 @@
 **Next session should:**
 - Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
 ---
+
+## Session: 2026-07-06 (g) — Node: Hippocampal
+**Goal:** Evict two more vendored checkouts flagged by the same-day audit: `claude-code` and `gastos-promed`.
+**Completed:**
+- Verified both untracked by the UBIK git repo. Both have `gasu04`-owned GitHub remotes (`github.com/gasu04/claude-code.git`, `github.com/gasu04/gastos-promed.git`) — recoverable via `git clone` independent of the local Trash copy.
+- `claude-code`: a vendored checkout of `@anthropic-ai/claude-code` pinned at v1.0.83 (stale relative to current releases). The only word-boundary match for "claude-code" elsewhere in the tree was a table-of-contents heading in `Claudemdv2.md` ("Claude Code Session Management") referring to the tool itself, not this directory — not a real dependency.
+- `gastos-promed`: a single personal script (`analyze_expenses.py`) with no manifest; no references found elsewhere.
+- Moved both to Trash (not hard-deleted): `~/.Trash/claude-code_evicted_20260706` (229 MB), `~/.Trash/gastos-promed_evicted_20260706` (132 KB). Confirmed both gone from the UBIK tree.
+**State left in:**
+- UBIK tree is smaller by ~229 MB.
+- Both projects remain recoverable via `git clone` from their `gasu04` GitHub remotes even after Trash empties.
+**Files changed:**
+- SESSIONS.md: this entry (no repo code changes — Trash moves only, both outside git)
+**Next session should:**
+- Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
+---
