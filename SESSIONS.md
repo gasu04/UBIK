@@ -498,3 +498,20 @@
 5. Correct the "two venvs on Somatic" claim wherever else it may be documented (e.g. `platform_detect.py` comments/memory referencing Somatic conda/pytorch_env as distinct from `ubik/venv`).
 6. Carried over: TradingAgents Python 3.10→3.12 before Oct 2026 EOL; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units as installed `.service` files; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token); consider evicting `evernote-sdk-python` and the redundant `UBIKParallax-source-v5`.
 ---
+
+## Session: 2026-07-06 (b) — Node: Hippocampal
+**Goal:** Act on two items from the same-day audit: evict the dead `rag_env` venv (Hippocampal) and close the free-win torch CVE on Somatic.
+**Completed:**
+- **`rag_env` evicted**: moved `/Volumes/990PRO 4T/UBIK/rag_env` (718 MB, untracked by git) to `~/.Trash/rag_env_evicted_20260706` rather than a hard delete, in case anything unexpected surfaces. Confirmed it's gone from the UBIK tree.
+- **Somatic torch upgrade**: confirmed via SSH that nothing (`vllm`/`whisperx`) was running and the GPU was idle (602 MiB / 2%) before touching the shared env. Upgraded `~/pytorch_env` (== `~/ubik/venv`) from `torch 2.9.0`/`torchaudio 2.9.0`/`torchvision 0.24.0` to the versions already pinned in `requirements-frozen.txt`: `torch==2.9.1+cu128`, `torchaudio==2.9.1+cu128`, `torchvision==0.24.1+cu128` (via `pip install --extra-index-url https://download.pytorch.org/whl/cu128`; pulled in `triton 3.5.1` as a dependency, up from 3.5.0). Closes `CVE-2025-2999`.
+- **Compatibility check surfaced by pip's resolver** (not by us): `vllm 0.13.0` hard-pins `torch==2.9.0` / `torchaudio==2.9.0` / `torchvision==0.24.0` exactly — the upgrade is technically a declared-dependency violation for vllm. Verified functional impact: `python -c "import torch"` → OK, `cuda available: True`; `python -c "import vllm"` → OK, reports `0.13.0`. Patch-level torch bumps are normally ABI-stable within a minor version (2.9.x), consistent with the clean import. **Not verified**: an actual vLLM server start / model load / inference call — that's a heavier operation with VRAM allocation and was out of scope for this pass. The pip resolver also flagged two **pre-existing** mismatches unrelated to this change (already present before today): `transformers 5.13.0` vs vllm's declared `<5,>=4.56.0`, and `xgrammar 0.2.3` vs vllm's declared `==0.1.27`.
+**State left in:**
+- `rag_env` no longer in the UBIK tree (recoverable from Trash until emptied).
+- Somatic `pytorch_env`/`ubik/venv`: torch stack now matches `requirements-frozen.txt` exactly; `CVE-2025-2999` closed. The other 3 torch CVEs, all 18 vllm CVEs, and the 3 no-fix-available CVEs (chromadb/diskcache/nltk) are unchanged — this pass only touched the one free-win item.
+- vLLM has NOT been started/tested end-to-end since the torch bump — first real use should be watched for import/runtime errors, even though the risk is assessed as low.
+**Files changed:**
+- SESSIONS.md: this entry (no repo code changes — venv eviction + remote pip upgrade, both outside git)
+**Next session should:**
+- Before/at next real Somatic inference use: confirm `vllm_server.py` starts cleanly and serves a request under torch 2.9.1; watch specifically for CUDA-extension ABI errors on first load. If it breaks, rollback is `pip install torch==2.9.0+cu128 torchaudio==2.9.0+cu128 torchvision==0.24.0+cu128 --extra-index-url https://download.pytorch.org/whl/cu128`.
+- Everything else carried over from the 2026-07-06 audit entry above (vLLM upgrade re-scoped to 0.24.0, chromadb version alignment across 3 envs, single-venv doc correction, plus the older backlog).
+---
