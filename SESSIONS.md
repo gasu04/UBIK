@@ -475,3 +475,26 @@
   7. Rollback if needed: `pip install vllm==0.13.0 xgrammar==0.1.27`
 - Also carried over: TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader.
 ---
+
+## Session: 2026-07-06 — Node: Hippocampal
+**Goal:** Package version / deprecation-status assessment across both UBIK nodes (Hippocampal + Somatic), as a refresh of the 2026-07-05 CVE remediation work.
+**Completed:**
+- Dispatched parallel read-only audits of every dependency manifest/venv under UBIK on both nodes.
+- **Somatic connectivity incident**: the `windows-server` SSH alias resolved to Tailscale IP `100.92.95.39` (`adrian-1`, identity `gasu04@`), which `tailscale status` showed offline ~22h — genuinely unreachable, not a credentials/syntax issue. Investigation of `tailscale status` revealed this tailnet has **multiple `adrian*`-named devices under two different identities** (`gasu04@` and `acefesan@`), some belonging to a different person's devices sharing the tailnet. Confirmed with the user that the correct current device is `100.75.228.46` (`adrian`, Windows, `acefesan@`); updated `~/.ssh/config` `windows-server` `HostName` to this IP and re-verified SSH + `wsl bash -s` non-interactive access works. The old IP `100.79.166.114` (previously logged as "Somatic") belongs to yet another device (`adrian-wsl`, `acefesan@`) and was never actually Somatic — that mapping in memory was stale.
+- **Hippocampal audit**: shared DeepSeek venv (Python 3.13.7, serves `hippocampal/`/`maestro/`/`ingestion/`/`deepseek/`) still carries the same 4 no-fix-available CVEs from 2026-07-05 (`chromadb 1.4.1`, `diskcache 5.6.3`, `lupa 2.6`, `nltk 3.9.4`); `ubik-chromadb-venv` (native Chroma server) runs an older `chromadb 1.3.7`. `rag_env` confirmed **dead**: shebangs point at a moved/nonexistent path, nothing runs, zero references anywhere in the tree — same disposition as the FinRobot/TradingAgents eviction. Vendored third-party dirs skimmed: `evernote-sdk-python` is dead (Python-2-only, last commit 2024), pulled in transitively by `Cross-Platform-Workflow-Orchestrator/geeknote`. Confirmed `UBIKParallax-source-v6` is the user's real frontend (`github.com/gasu04/UBIKParallax`) with real pending majors (vite 7→8, typescript 5.6→6.0, express 4→5); `-v5` is a redundant 9-minutes-older duplicate.
+- **Somatic audit — corrects a standing error in the 2026-07-05(d) log**: `~/ubik/venv` is a **symlink to `~/pytorch_env`**, not a second layered environment — there has only ever been ONE venv on Somatic. vLLM's CVE exposure **grew since 07-05**: 15→**18** distinct CVEs on the still-installed `vllm 0.13.0`; latest upstream is now **0.24.0** (the 07-05e plan's "0.22.x" target is stale). `torch` is installed at **2.9.0** even though `requirements-frozen.txt` already pins `2.9.1` — an env/manifest drift that trivially closes one CVE (`CVE-2025-2999`) once applied. `ray` confirmed holding at 2.56.0/0 CVEs (07-05e upgrade stuck). No `vllm`/`whisperx` process running during the audit; GPU idle (602 MiB/32607 MiB) — nothing was started, stopped, or modified.
+**State left in:**
+- Read-only audit only — no packages, services, or repo code changed on either node.
+- `~/.ssh/config` `windows-server` `HostName` corrected to `100.75.228.46` (local machine config, not in git).
+- Local Claude Code memory (`MEMORY.md`) updated with the corrected Tailscale device mapping and a note to always re-verify via `tailscale status` before trusting a cached IP for Somatic.
+- All findings above (torch drift, vllm CVE growth, `rag_env` eviction, chromadb version misalignment across 3 envs, single-venv correction) are unactioned — captured here for the next session.
+**Files changed:**
+- SESSIONS.md: this entry (no repo code changes this session — audit + local SSH config only)
+**Next session should:**
+1. Bump Somatic `torch` 2.9.0→2.9.1 (matches the existing `requirements-frozen.txt` pin, closes CVE-2025-2999, no compatibility risk, independent of the vLLM decision).
+2. Re-scope the vLLM upgrade plan from 0.22.x to **0.24.0** given the CVE growth, then execute the existing 7-step procedure (freeze state → install → verify `destroy_model_parallel`/`cleanup_dist_env_and_memory` import path → test FA3 → validate startup → confirm graceful VRAM release → rollback path if needed).
+3. Evict `rag_env` on Hippocampal (dead, zero references, same treatment as FinRobot/TradingAgents).
+4. Align `chromadb` versions across the three environments (Somatic 1.5.1, Hippocampal shared 1.4.1, `ubik-chromadb-venv` 1.3.7).
+5. Correct the "two venvs on Somatic" claim wherever else it may be documented (e.g. `platform_detect.py` comments/memory referencing Somatic conda/pytorch_env as distinct from `ubik/venv`).
+6. Carried over: TradingAgents Python 3.10→3.12 before Oct 2026 EOL; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units as installed `.service` files; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token); consider evicting `evernote-sdk-python` and the redundant `UBIKParallax-source-v5`.
+---
