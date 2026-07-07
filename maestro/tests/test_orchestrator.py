@@ -359,7 +359,7 @@ class TestStartHealthWait:
 
 class TestMaxWaitSDefaults:
     def test_docker_default(self):
-        assert DockerService().max_wait_s == 60.0
+        assert DockerService().max_wait_s == 180.0
 
     def test_neo4j_default(self):
         assert Neo4jService(ubik_root=_FAKE_ROOT).max_wait_s == 60.0

@@ -26,7 +26,7 @@ from maestro.services.base import ProbeResult, UbikService, _run_proc
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MAX_WAIT_S = 60.0
+_DEFAULT_MAX_WAIT_S = 180.0
 
 
 class DockerService(UbikService):
