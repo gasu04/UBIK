@@ -606,3 +606,24 @@
 **Next session should:**
 - Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
 ---
+
+## Session: 2026-07-06 (i) — Node: Hippocampal
+**Goal:** Session wrap-up. Consolidate the day's pending backlog into one place for the next working session.
+**Completed:**
+- Committed and pushed one last loose end unrelated to the audit: `maestro/services/docker_service.py`'s `DockerService` default `max_wait_s` 60.0→180.0 (Docker Desktop can take longer than 60s to report healthy on cold start), with the matching `test_orchestrator.py` assertion update. Verified `TestMaxWaitSDefaults` passes before committing (`85d1d2e`).
+- No new investigation this session — just closing out the day's pending list below so nothing from today's audit/eviction work gets lost before the next session picks it up.
+**State left in:**
+- `master` = `85d1d2e` on both local and origin; working tree clean except legitimate untracked items (`chromadb_data/`, `backups/`, `Ingested_data/`, `UBIKParallax-source-v6/`, `open-notebook/`, etc.).
+- Somatic: torch stack at 2.9.1+cu128 (matches `requirements-frozen.txt`), `vllm` still 0.13.0 (import-verified OK post-torch-bump, but no live server/inference test run), `ray` at 2.56.0. No `vllm`/`whisperx` process running; GPU idle.
+- Hippocampal UBIK tree substantially decluttered today: evicted `rag_env`, `evernote-sdk-python`, `UBIKParallax-source-v5`, `AutoGPT`, `Cross-Platform-Workflow-Orchestrator`, `nifi`, `automatisch`, `claude-code`, `gastos-promed`, `helloworld`, `pythonProject`, `test-setup`, and the orphaned root `install.sh` — all moved to dated folders under `~/.Trash/`, none hard-deleted.
+**Files changed:**
+- SESSIONS.md: this entry
+**Pending — to work on next session (nothing actioned yet on any of these):**
+1. **vLLM upgrade (Somatic)** — re-scoped target **0.24.0** (was 0.22.x; CVE count grew 15→18 while the plan sat unexecuted). Execute the existing 7-step procedure: freeze state → install → verify `destroy_model_parallel`/`cleanup_dist_env_and_memory` import path (version-sensitive, critical for VRAM release on shutdown) → test FA3 → validate startup → confirm graceful VRAM release → rollback path (`pip install vllm==0.13.0 xgrammar==0.1.27`) if needed.
+2. **Live-verify vLLM under torch 2.9.1** — import checks passed today, but no actual server start / model load / inference call has been run since the torch bump. Rollback if it breaks: `pip install torch==2.9.0+cu128 torchaudio==2.9.0+cu128 torchvision==0.24.0+cu128 --extra-index-url https://download.pytorch.org/whl/cu128`.
+3. **Align chromadb versions** across the three environments: Somatic `pytorch_env` (1.5.1), Hippocampal shared DeepSeek venv (1.4.1), `ubik-chromadb-venv` (1.3.7).
+4. **Correct the "two venvs on Somatic" documentation** — confirmed today `~/ubik/venv` is a symlink to `~/pytorch_env`, not a separate layered environment (contradicts the 2026-07-05(d) log and `platform_detect.py` comments referencing Somatic conda/pytorch_env as distinct from `ubik/venv`).
+5. **No-fix CVEs, monitor only** (no upstream fix exists as of 2026-07-06): Hippocampal `chromadb`/`diskcache`/`lupa`/`nltk`; Somatic `chromadb`/`diskcache`/`nltk`.
+6. **Older backlog, still open**: TradingAgents Python 3.10→3.12 before Oct 2026 EOL; FinRobot requirements refresh (stale langchain/aiohttp/pdfkit); per-service `maestro shutdown --service NAME`; WhisperX health tests; persist vLLM/WhisperX systemd user units as installed `.service` files; retire the `ubik-memory-sweep` skill; update the ingestion loader (new fields + `EPISODIC` token).
+7. **Lower priority, not yet decided**: `UBIKParallax-source-v6` major-version bumps (Vite 7→8, TypeScript 5.6→6.0, Express 4→5, Vitest 2→4, Recharts 2→3); `pandas 2.3→3.0` on the Hippocampal shared venv (breaking-change risk, needs testing before committing to it).
+---
