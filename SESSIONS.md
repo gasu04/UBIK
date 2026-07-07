@@ -548,3 +548,15 @@
 - Decide whether to remove the now-orphaned root `install.sh`.
 - Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
 ---
+
+## Session: 2026-07-06 (e) — Node: Hippocampal
+**Goal:** Clean up the last remnant from the AutoGPT eviction: the now-orphaned root `install.sh`.
+**Completed:**
+- Confirmed `install.sh` was untracked by the UBIK git repo, then moved it to `~/.Trash/install.sh_evicted_20260706` (not hard-deleted). It was AutoGPT's own upstream setup/clone script, harmless but pointless without `AutoGPT/` present.
+**State left in:**
+- UBIK root no longer has any AutoGPT-related files.
+**Files changed:**
+- SESSIONS.md: this entry (no repo code changes — Trash move only, outside git)
+**Next session should:**
+- Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
+---
