@@ -530,3 +530,21 @@
 **Next session should:**
 - Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
 ---
+
+## Session: 2026-07-06 (d) — Node: Hippocampal
+**Goal:** Evict two more items flagged by the same-day audit: `AutoGPT` and `Cross-Platform-Workflow-Orchestrator`.
+**Completed:**
+- Verified both untracked by the UBIK git repo before touching anything.
+- **`AutoGPT`** (620 MB): confirmed its git remote is the upstream third-party repo (`Significant-Gravitas/AutoGPT`) — a pure vendored checkout, contains both the deprecated `classic/` tree and the current `autogpt_platform/`, neither imported or referenced by any UBIK code. Only loose reference found was the top-level `install.sh` (AutoGPT's own upstream setup/clone script, copied to the UBIK root) — now orphaned but harmless (would just re-clone AutoGPT if ever run); left in place, not evicted.
+- **`Cross-Platform-Workflow-Orchestrator`** (456 MB): **not vendored third-party** — checked and found it's the user's own project, already pushed to its own GitHub repo (`gasu04/Cross-Platform-Workflow-Orchestrator`, one commit) via a `gh repo create` recorded in `.claude/settings.local.json`. Fully recoverable via `git clone` independent of the local Trash copy. Its bundled `geeknote` dependency on the (already-evicted) `evernote` SDK is moot now.
+- Moved both to Trash (not hard-deleted): `~/.Trash/AutoGPT_evicted_20260706`, `~/.Trash/Cross-Platform-Workflow-Orchestrator_evicted_20260706`. Confirmed both gone from the UBIK tree.
+**State left in:**
+- UBIK tree is smaller by ~1.07 GB.
+- `install.sh` at the UBIK root is now an orphaned AutoGPT setup script — flagged, not removed.
+- `Cross-Platform-Workflow-Orchestrator` still exists as its own repo on GitHub under `gasu04` — the eviction here only removed the local co-located copy, not the project itself.
+**Files changed:**
+- SESSIONS.md: this entry (no repo code changes — Trash moves only, both outside git)
+**Next session should:**
+- Decide whether to remove the now-orphaned root `install.sh`.
+- Carried over: vLLM upgrade re-scoped to 0.24.0 (+ live server verification after the torch 2.9.1 bump); chromadb version alignment across 3 envs; single-venv doc correction; TradingAgents Python 3.10→3.12; FinRobot requirements refresh; per-service `maestro shutdown --service NAME`; WhisperX health tests; persist systemd units; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token).
+---
