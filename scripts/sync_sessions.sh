@@ -5,7 +5,7 @@
 
 UBIK_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$UBIK_ROOT/SESSIONS.md"
-DST="$HOME/Library/CloudStorage/GoogleDrive-gsanchezurrutia@gmail.com/My Drive/Ubik/SESSIONS.md"
+DST="$HOME/Library/CloudStorage/GoogleDrive-gsanchezurrutia@gmail.com/My Drive/Ubik_drive/SESSIONS.md"
 DST_DIR="$(dirname "$DST")"
 
 if [[ ! -f "$SRC" ]]; then
@@ -18,4 +18,4 @@ if [[ ! -d "$DST_DIR" ]]; then
     exit 0
 fi
 
-cp "$SRC" "$DST" && echo "sync_sessions: SESSIONS.md → gsanchezurrutia@gmail.com/Ubik ✓"
+cp "$SRC" "$DST" && echo "sync_sessions: SESSIONS.md → gsanchezurrutia@gmail.com/Ubik_drive ✓"
