@@ -627,3 +627,27 @@
 6. **Older backlog, still open**: TradingAgents Python 3.10→3.12 before Oct 2026 EOL; FinRobot requirements refresh (stale langchain/aiohttp/pdfkit); per-service `maestro shutdown --service NAME`; WhisperX health tests; persist vLLM/WhisperX systemd user units as installed `.service` files; retire the `ubik-memory-sweep` skill; update the ingestion loader (new fields + `EPISODIC` token).
 7. **Lower priority, not yet decided**: `UBIKParallax-source-v6` major-version bumps (Vite 7→8, TypeScript 5.6→6.0, Express 4→5, Vitest 2→4, Recharts 2→3); `pandas 2.3→3.0` on the Hippocampal shared venv (breaking-change risk, needs testing before committing to it).
 ---
+
+## Session: 2026-07-09 — Node: Hippocampal
+**Goal:** Diagnose and fix the SESSIONS.md → Google Drive sync (claude.ai reported reading a stale copy ending at 2026-07-05(e)), and fix a stale Somatic IP found along the way.
+**Completed:**
+- **Root-caused the Drive sync break**: the `gsanchezurrutia@gmail.com` Google Drive Desktop account hit a recurring OAuth token-refresh failure (`DEADLINE_EXCEEDED`, logged repeatedly from 2026-07-06 23:20 through 07-07 03:01) shortly after our last sync that evening, which meant none of that day's 9 commits' worth of SESSIONS.md revisions reached Google's cloud — confirmed independently by claude.ai reading the cloud-side `modifiedTime` via the Drive API (frozen at 2026-07-05T04:37:38Z).
+- By 07-09, the account had recovered and Drive Desktop ran a large catch-up resync (thousands of queued changes). That resync's own conflict-resolution **renamed the target folder** (same underlying item-id `1VrGIgeTmjL-8vFMERV7w9DS_w3Mnv1a1`) from `Ubik` to **`Ubik_drive`** — silently breaking `scripts/sync_sessions.sh`'s hardcoded path (its own directory-exists guard made it no-op quietly rather than error).
+- Also surfaced, not yet acted on: the same resync appears to have created `(1)`-suffix duplicates of dozens of unrelated top-level folders across the whole Drive account (`Promed`, `Correspondencia`, `23andme DNA data`, etc.) — a wider issue flagged to the user, out of scope for this fix.
+- Chased a red herring: the user pointed at a Drive folder link (`1e3Y_dwXVHNtzm15xRooX4mSqHyyU8Brs`) that turned out to be `Computers > Mini M1 2022 > UBIK` — Google Drive's legacy Backup-and-Sync "Computers" section for a different, retired machine, not locally writable/mounted on this Mac under either Google account. Not used as the sync target.
+- **Fix applied**: repointed `scripts/sync_sessions.sh`'s `DST` to `.../My Drive/Ubik_drive/SESSIONS.md` (commit `8f1ba90`). Ran it manually and verified byte-identical to the canonical file. claude.ai independently re-read the same file/folder (file ID `107eFrHa1HBTEU0Eh3hDWN8ipAL4tki3g`, parent `1VrGIgeTmjL...`) and confirmed it now sees the 07-06(i) wrap-up correctly, updating its own memory to match.
+- **Side fix, flagged by claude.ai while re-reading the log**: `ingestion/.env` and `.env.example` had `SOMATIC_HOST=100.79.166.114` — the same stale/wrong Tailscale IP identified on 2026-07-06 (belongs to `adrian-wsl` under a different tailnet identity, never actually Somatic). Corrected both to `100.75.228.46` (commit `1a0a74b`). Left the separate, older CP2 blocker alone per user's explicit choice: `ingestion/.env` still has no `SOMATIC_VLLM_URL`/`SOMATIC_TAILSCALE_IP`/`VLLM_PORT`/`UBIK_ENRICHMENT_MODEL` — that gap has been open since 2026-06-20 and needs a model-name decision from the user, not just an IP fix.
+**State left in:**
+- `master` = `1a0a74b` on both local and origin; working tree clean except legitimate untracked items.
+- SESSIONS.md → Drive sync confirmed working end-to-end (local write → repo commit → post-commit hook → `Ubik_drive` copy → claude.ai read), verified from both the Hippocampal side and claude.ai's independent Drive API read.
+- The account-wide `(1)`-duplicate-folder issue on Drive is unresolved and un-investigated beyond the initial discovery.
+- CP2/Phase 3 enrichment still blocked on Somatic vLLM endpoint config in `ingestion/.env` (unchanged by this session, by choice).
+**Files changed:**
+- `scripts/sync_sessions.sh`: `DST` path `Ubik` → `Ubik_drive` (`8f1ba90`)
+- `ingestion/.env.example`: `SOMATIC_HOST` stale IP fix (`1a0a74b`); local `ingestion/.env` updated to match (gitignored, not committed)
+- SESSIONS.md: this entry
+**Next session should:**
+- Investigate the wider Drive `(1)`-duplicate-folder issue (dozens of top-level folders affected) — separate from anything UBIK-code-related, but worth a look via Drive's web UI before more content is added anywhere in that account.
+- Decide on the CP2 enrichment endpoint config (`SOMATIC_VLLM_URL`/`SOMATIC_TAILSCALE_IP`=`100.75.228.46`/`VLLM_PORT=8002`/`UBIK_ENRICHMENT_MODEL`=?) to unblock Phase 3 enrichment, dormant since 2026-06-20.
+- Everything else carried over from the 2026-07-06(i) pending list above (vLLM 0.24.0 upgrade, live vLLM verification under torch 2.9.1, chromadb version alignment, single-venv doc correction, no-fix CVEs, older backlog).
+---
