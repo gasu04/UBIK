@@ -669,3 +669,27 @@
 - Start vLLM on Somatic and run `run_phase3.py --stage 2 --dry-run --limit 8`, hand-score per `qa/rubric.md` (gate: confidence ≥0.7 on ≥6/8) — the original CP2 gate from 2026-06-20, now finally unblocked config-wise.
 - Everything else carried over from the 2026-07-06(i)/07-09 pending lists (vLLM 0.24.0 upgrade, live vLLM verification under torch 2.9.1, chromadb version alignment, single-venv doc correction, no-fix CVEs, older backlog).
 ---
+
+## Session: 2026-07-11 (b) — Node: Hippocampal
+**Goal:** Actually start vLLM on Somatic and run the CP2 dry-run now that config is unblocked; fix whatever breaks along the way.
+**Completed:**
+- **WSL idle-shutdown fixed**: first two `maestro start --service vllm` attempts got the unit killed ~15-20s after start. Root-caused to WSL2's default VM idle-timeout tearing down the *entire* VM (not just the vllm unit) between short-lived SSH sessions — the systemd `--user` manager and its lingering session don't survive a full VM shutdown, only a login-session logout. Fixed by adding `vmIdleTimeout=-1` to `/mnt/c/Users/gasu.Adrian/.wslconfig` (backed up original first) and forcing a `wsl --shutdown` via the Windows-shell SSH path (`RemoteCommand=none` override) to apply it.
+- **Separate, transient WSL bug hit on the next attempt**: vLLM still got killed ~20s in, but this time the *whole system* did a clean `poweroff.target` shutdown (not an idle-timeout — happened only 2 min after the fresh restart). Journal showed the actual trigger: `WSL (427) ERROR: CheckConnection: getaddrinfo() failed: -5` / `Operation canceled @p9io.cpp:258 (AcceptAsync)` immediately followed by `systemd-logind: The system will power off now!` — WSL2's own internal Windows↔VM health-check (p9io/Plan9 transport) lost its connection and the VM shut itself down in response. This is a Windows-host/WSL-platform issue, not fixable from inside the VM. Retried once more and it worked cleanly — 3rd attempt succeeded, so this specific failure mode appears to be intermittent (tied to boot-time network/DNS settling?), not fixed, just not hit again this session. Flagged for awareness, not resolved.
+- **vLLM confirmed healthy**: `/health` → 200, `/v1/models` reports exactly the configured `UBIK_ENRICHMENT_MODEL` path, GPU shows 31.2 GB/32.6 GB loaded, systemd unit `active`, VM uptime stayed stable afterward (24+ min, no further unplanned restarts).
+- **MCP server found down, root-caused, and fixed** (a separate, pre-existing break unrelated to today's other work): `mcp_server.py` was crash-failing on `from fastmcp import FastMCP` with `ImportError: cannot import name 'FastMCP' from 'fastmcp' (unknown location)`. Diagnosed as a genuinely corrupted install, not an API change: `fastmcp` 3.4.2 is a split package (`fastmcp` + `fastmcp-slim`), and `fastmcp-slim`'s `__init__.py` — which the package's own install record claims should exist — was physically missing from `site-packages/fastmcp/` (only a stale `__pycache__` entry remained), so Python fell back to treating it as an empty PEP 420 namespace package. Fixed with `pip install --force-reinstall --no-deps fastmcp==3.4.2 fastmcp-slim==3.4.2` (restored the missing file; no code changes needed — `mcp_server.py`'s import was always correct). Restarted via `run_mcp.sh restart`: listening on :8080, clean startup log, `GET /mcp` → 406 (the established correct/healthy response for that endpoint).
+- **CP2 dry-run itself was not run this session** — got to the point of having both vLLM and MCP healthy, but the actual `run_phase3.py --stage 2 --dry-run --limit 8` invocation was interrupted by the user twice and the session moved to wrap-up before it was retried.
+**State left in:**
+- vLLM running on Somatic (systemd unit `ubik-vllm`, healthy, model loaded).
+- MCP server running on Hippocampal (PID from this session, healthy, port 8080).
+- No repo code changes this session — both fixes were environment-level (`.wslconfig` on the Windows host, `pip install --force-reinstall` in the shared DeepSeek venv).
+- `.wslconfig` backup left at `/mnt/c/Users/gasu.Adrian/.wslconfig.bak.<timestamp>` on Somatic.
+- CP2 dry-run still not actually executed — config and infra are both ready, just needs the command run.
+**Files changed:**
+- None in the repo. Environment only: Somatic `.wslconfig` (`vmIdleTimeout=-1`), Hippocampal DeepSeek venv (`fastmcp`/`fastmcp-slim` reinstalled).
+- SESSIONS.md: this entry
+**Next session should:**
+- Run `run_phase3.py --stage 2 --dry-run --limit 8` (both blockers now cleared) and hand-score per `qa/rubric.md` (gate: confidence ≥0.7 on ≥6/8).
+- Keep an eye out for the intermittent WSL `p9io`/`CheckConnection` poweroff-on-boot bug recurring — if it becomes frequent, needs Windows-side investigation (Event Viewer, WSL version, network adapter behavior around boot), not just a retry.
+- Consider whether `run_mcp.sh`/health-check tooling should proactively detect the "process running but import-crashed" pattern (stale PID file, no port listener) rather than relying on manual log inspection.
+- Everything else carried over from the 2026-07-06(i)/07-09/07-11(a) pending lists (vLLM 0.24.0 upgrade, live vLLM verification under torch 2.9.1, chromadb version alignment, single-venv doc correction, no-fix CVEs, older backlog).
+---
