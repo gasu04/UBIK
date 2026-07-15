@@ -693,3 +693,29 @@
 - Consider whether `run_mcp.sh`/health-check tooling should proactively detect the "process running but import-crashed" pattern (stale PID file, no port listener) rather than relying on manual log inspection.
 - Everything else carried over from the 2026-07-06(i)/07-09/07-11(a) pending lists (vLLM 0.24.0 upgrade, live vLLM verification under torch 2.9.1, chromadb version alignment, single-venv doc correction, no-fix CVEs, older backlog).
 ---
+
+## Session: 2026-07-13 — Node: Hippocampal
+**Goal:** Run the actual CP2 dry-run now that vLLM/MCP were confirmed healthy in 2026-07-11(b). Discovered CP2 was never really reachable — found and started fixing a deeper Somatic networking problem instead.
+**Completed:**
+- **Ran CP2 for real — all 8 files quarantined**: `run_phase3.py --stage 2 --dry-run --limit 8` failed every file with `All enrichment endpoints failed: transport error: All connection attempts failed` against `http://100.75.228.46:8002`, despite vLLM's own `/health` (checked from inside WSL) returning 200 moments earlier.
+- **Root-caused: WSL2 NAT networking never exposed vLLM externally.** `netstat` on the Windows host showed vLLM's port only bound to `127.0.0.1`/`[::1]:8002` via `wslrelay.exe` (WSL's `localhostForwarding` mechanism) — which only forwards Windows' own loopback, never external interfaces like the Tailscale IP. No `netsh interface portproxy` rule existed to bridge that gap. (A prior successful external test from 2026-07-04(b) most likely relied on a portproxy rule that has since gone stale — WSL's internal IP changes on every restart, and we forced several restarts this week.)
+- **Fixed by switching to mirrored networking mode**: added `networkingMode=mirrored` to `/mnt/c/Users/gasu.Adrian/.wslconfig` (backed up first) and `wsl --shutdown` to apply. Confirmed working: WSL's `eth2` interface now shows `100.75.228.46` directly — the same Tailscale IP as the Windows host, no relay needed.
+- **Hit a follow-on blocker from the switch**: restarting vLLM under the new mode got silently skipped by maestro's own "already running" guard (`curl ... && echo ALREADY_RUNNING_UNMANAGED`) — something was already answering (with 404, not connection-refused) on port 8002. Traced to an **orphaned `wslrelay.exe` (PID 4204) still running on the Windows host from before the mode switch**, still squatting on `127.0.0.1:8002`. Under mirrored mode, WSL shares Windows' network namespace entirely, so this Windows-side leftover blocks the port for the Linux side too.
+- **Could not kill it via SSH**: `taskkill /PID 4204 /F` → `Access denied` (wslrelay.exe runs under the WSL platform service, not the SSH user's privilege level). Needs a manual kill on the physical machine (Task Manager or admin PowerShell) — handed off to the user, not resolved this session.
+- **Side effect discovered**: a manual `systemd-run` test (run to see raw output past maestro's early-exit guard) got far enough to load ~20 GB into GPU memory before crashing on the port-bind conflict, **without running vllm_server.py's graceful CUDA cleanup** — `nvidia-smi` shows 20.3 GB used with **zero** owning processes in `--query-compute-apps` (a real VRAM leak, not just a stopped service). Plan: one more `wsl --shutdown` after the port is freed should clear this, since it fully reinitializes WSL's GPU passthrough.
+**State left in:**
+- vLLM is NOT running. Port 8002 on Windows is stuck held by orphaned `wslrelay.exe` (PID 4204) pending manual user kill.
+- GPU has ~20 GB leaked/orphaned VRAM, expected to clear on the next `wsl --shutdown` (not yet done — waiting on the port fix first).
+- `.wslconfig` now has both `vmIdleTimeout=-1` (from 07-11) and `networkingMode=mirrored` (new today), with a fresh timestamped backup taken before this edit.
+- CP2 dry-run has still never successfully run — now blocked on infrastructure (port + VRAM), not config; the enrichment config itself (from 2026-07-11(a)) is confirmed correct.
+- MCP server (fixed 07-11(b)) was not re-checked this session; assume unaffected since no work touched Hippocampal.
+**Files changed:**
+- None in the repo — all changes were Windows-host (`.wslconfig`) and runtime state on Somatic.
+- SESSIONS.md: this entry
+**Next session should:**
+1. Confirm the user killed the orphaned `wslrelay.exe`, then run one more `wsl --shutdown` + restart to both keep the port clear and reclaim the leaked ~20 GB VRAM.
+2. Start vLLM, verify `curl http://100.75.228.46:8002/health` succeeds **directly from Hippocampal** (not just from inside WSL) before declaring it fixed — that's the actual gap that's bitten us twice now.
+3. Once confirmed reachable, run `run_phase3.py --stage 2 --dry-run --limit 8` again and hand-score per `qa/rubric.md` (gate: confidence ≥0.7 on ≥6/8).
+4. Watch for whether mirrored networking mode reintroduces the intermittent `p9io`/`CheckConnection` poweroff bug from 07-11(b), or resolves it (mirrored mode changes the network stack significantly, could go either way).
+5. Everything else carried over from the 2026-07-06(i)/07-09/07-11(a) pending lists (vLLM 0.24.0 upgrade, live vLLM verification under torch 2.9.1, chromadb version alignment, single-venv doc correction, no-fix CVEs, older backlog).
+---
