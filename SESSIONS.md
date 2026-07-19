@@ -817,3 +817,22 @@
 **Next session should:**
 - On next `claude` launch from the UBIK root, confirm no "Invalid or malformed JSON" warning appears for `.claude/settings.json`.
 ---
+
+## Session: 2026-07-18 23:22 — Node: Hippocampal
+**Goal:** Confirm the settings fix was the only source of the malformed-JSON warning by auditing every settings file Claude Code reads.
+**Completed:**
+- Committed the settings fix + prior log entry as `1657a3b` and pushed to `origin/master` (`dc4157f..1657a3b`). Post-commit hook mirrored SESSIONS.md to Drive.
+- Read-only validated all remaining settings files with `json.load`:
+  - `.claude/settings.local.json` (project) → VALID
+  - `~/.claude/settings.json` (global) → VALID
+  - `~/.claude/settings.local.json` (global) → VALID
+  - `/Library/Application Support/ClaudeCode/managed-settings.json` (enterprise policy) → absent (no managed policy)
+- Conclusion: the project `.claude/settings.json` (fixed in the prior entry) was the sole source of the warning. No other config file is malformed.
+**State left in:**
+- All settings files Claude Code reads are valid JSON. Warning expected to be gone on next launch; still not re-verified from within a live restart (session relaunch is a user action — cannot self-restart).
+**Files changed:**
+- No config changed this entry (audit was read-only).
+- SESSIONS.md: this entry.
+**Next session should:**
+- Nothing outstanding on the settings issue; resume the carried-over vLLM/CP2 backlog from the earlier entries when ready.
+---
