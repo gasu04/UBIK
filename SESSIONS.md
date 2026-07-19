@@ -719,3 +719,45 @@
 4. Watch for whether mirrored networking mode reintroduces the intermittent `p9io`/`CheckConnection` poweroff bug from 07-11(b), or resolves it (mirrored mode changes the network stack significantly, could go either way).
 5. Everything else carried over from the 2026-07-06(i)/07-09/07-11(a) pending lists (vLLM 0.24.0 upgrade, live vLLM verification under torch 2.9.1, chromadb version alignment, single-venv doc correction, no-fix CVEs, older backlog).
 ---
+
+## Session: 2026-07-15 — Node: Somatic (Adrian / WSL2 Ubuntu)
+**Goal:** Fix vLLM failing to start via `maestro start` ("vllm did not become healthy within 300s"). Working from Hippocampal over SSH into the Somatic WSL box (`ssh windows-server` → `wsl`, driven non-interactively via `ssh -o RemoteCommand=none ... 'wsl -e bash -l'` and base64-encoded PowerShell for Windows-side calls).
+
+> **CORRECTION TO THE 2026-07-13 ENTRY ABOVE:** that entry's diagnosis ("orphaned `wslrelay.exe` squatting on 8002 + ~20 GB VRAM leak blocking vLLM") was **wrong**. The real root cause is a **port collision on 8002**, found and fixed this session (see below). The "VRAM leak" framing is refuted — vLLM died in ~1s and never touched the GPU. This entry supersedes the 2026-07-13 root-cause claim; the 2026-07-13 entry is retained as the honest record of what was believed at the time.
+
+**ROOT CAUSE FOUND (this was a port collision, NOT VRAM/model/GPU):**
+- vLLM's real crash, captured by launching `python -m vllm.entrypoints.openai.api_server` manually with the config args: **`OSError: [Errno 98] Address already in use` on port 8002.** It died in ~1s, never touched the GPU — which is why every `maestro start` hit the 300s health timeout.
+- Port 8002 was held by a stray **nginx/1.29.5 serving a "Rotating Cube" demo page** — this is the **"unrelated nginx site"** already documented in SESSIONS.md 2026-06-12 (*"100.79.166.114:8002 is an unrelated nginx site"*). It is NOT part of UBIK.
+- **The trigger:** `~/.wslconfig` (on Windows, `C:\Users\gasu.Adrian\.wslconfig`) had `networkingMode=mirrored` (added ~2026-07-11, same edit as `vmIdleTimeout=-1`). Mirrored mode collapses WSL + Windows onto one shared localhost, so vLLM-in-WSL:8002 and the pre-existing Windows/stray nginx:8002 — which coexisted fine under NAT (different IPs) back in June — now collided on a single shared socket.
+- Confirmed the 8002 holder is a **leaked/zombie hvsocket binding**: `netstat` attributed it to "wslrelay" PID 9512, but that PID had NO path, NO start time, and NO CIM record, and it **survived `wsl --shutdown`** (twice) — so it is owned by the Windows HNS layer, not the WSL VM. Non-admin `gasu` cannot restart HNS; only admin/reboot clears the stuck socket itself.
+
+**FIX APPLIED:**
+- Reverted `~/.wslconfig`: `networkingMode=mirrored` → `networkingMode=NAT` (backup: `C:\Users\gasu.Adrian\.wslconfig.bak-nat-fix-20260715-190055`). This restores June's topology: WSL gets its own IP (`172.27.177.90/20` confirmed), so vLLM binds 8002 in WSL's OWN namespace, independent of the stuck Windows-side :8002 zombie.
+- **VERIFIED vLLM now starts cleanly under NAT:** manual launch got all the way through model load, GPU alloc, KV cache, CUDA-graph capture, to `Starting vLLM API server 0 on http://0.0.0.0:8002` → `Application startup complete` → `Started server process`. No more Errno 98. (It only stopped because MY 90s test `timeout` killed it — not a vLLM fault. GPU was clean ~31GB free; model files present; vllm 0.13.0 / torch 2.9.1+cu128 / RTX 5090 sm_120 all fine.)
+
+**STILL BROKEN — the remaining problem for next session:**
+- **`maestro start` STILL fails vLLM at 300s even though manual launch succeeds.** After a maestro attempt, NO vllm process survives and 8002 is empty — so maestro's launch differs from a plain manual launch, OR maestro health-checks vLLM at an address that NAT mode broke.
+- Strong lead: `maestro status` reports **`Somatic: 100.92.95.39`** and checks vllm health over that **Tailscale IP**, not localhost. Under NAT, WSL no longer shares the host Tailscale IP, so `100.92.95.39:8002` likely no longer routes into WSL → health check times out even if vLLM is up. i.e. the NAT fix may have traded a bind-collision for a reachability gap that maestro's health check depends on.
+- Was about to read maestro's vLLM service source to see its exact launch command + health-check URL when we wrapped. maestro = bash wrapper `~/.local/bin/maestro` → `python -m maestro` with `PYTHONPATH=/home/gasu/ubik`, using venv `~/pytorch_env`. Package dir under `/home/gasu/ubik` (exact path not yet confirmed; `~/ubik/maestro/services/` did NOT exist — need to locate the real `maestro` package dir and its `*vllm*` / health files).
+
+**Other findings (context):**
+- No `~/ubik/.env` or `~/ubik/ingestion/.env` currently exist (the 2026-06-20 "set UBIK_ENRICHMENT_MODEL in ingestion/.env" item — that file is absent).
+- vllm_config.yaml: model `~/ubik/models/deepseek-awq/DeepSeek-R1-Distill-Qwen-14B-AWQ`, quant `awq_marlin`, dtype float16, gpu_memory_utilization 0.93, max_model_len 98304, port 8002. Model files present and valid.
+- The external reachability check `curl http://100.75.228.46:8002/health` (the never-passed item) was NOT reached — blocked upstream by the maestro-vs-manual issue. Note 100.75.228.46 is the Hippocampal-facing IP; SESSIONS.md June entries used Somatic 100.92.95.39 — clarify which IP is canonical for the somatic vLLM endpoint next session.
+- SSH/zellij nesting fix from earlier today is unrelated to this and already applied on the WSL side (SSH_CONNECTION forwarding via WSLENV + .bashrc guard; VNC autostart disabled).
+
+**State left in:**
+- `.wslconfig` = NAT (mirrored reverted); WSL rebooted into NAT (IP 172.27.177.90). vLLM proven startable manually on 8002. NOT currently running (test instances were killed). maestro still cannot bring vLLM to healthy.
+- Zombie :8002 hvsocket binding (PID 9512) still stuck on the Windows host — harmless to WSL-namespace vLLM under NAT, but will need admin HNS-restart or a Windows reboot to fully clear if it ever interferes.
+- neo4j/chromadb/mcp/whisperx all unhealthy in `maestro status` — those are Hippocampal-side services (Mac), expected down from here; not this session's target.
+
+**Files changed:**
+- `C:\Users\gasu.Adrian\.wslconfig`: networkingMode mirrored → NAT (backup `.bak-nat-fix-20260715-190055`)
+- SESSIONS.md: this entry
+
+**Next session should:**
+1. Read maestro's vLLM service source (locate the real `maestro` package dir under `/home/gasu/ubik`; find its `*vllm*`/health-check file). Determine (a) the exact launch command maestro uses vs. the manual one that works, and (b) the health-check URL/host — confirm whether it targets `100.92.95.39:8002` (Tailscale) vs `localhost:8002`.
+2. If maestro health-checks over the Tailscale IP: under NAT, either (a) re-add WSL port-forwarding so `<host-tailscale-IP>:8002` reaches WSL `172.27.177.90:8002` (netsh portproxy or WSL localhostForwarding), or (b) point maestro's vllm health check at `localhost:8002`. Decide with Gines — this is the mirrored-vs-NAT tradeoff (mirrored gave free external reach but caused the collision; NAT fixes the collision but needs explicit forwarding).
+3. Then re-run `maestro start`, confirm vLLM healthy, and finally run the external reachability check (`curl http://<canonical-somatic-IP>:8002/health` from Hippocampal) — the item that has never passed.
+4. Clarify canonical somatic vLLM IP (`100.92.95.39` vs `100.75.228.46`) and recreate `ingestion/.env` with VLLM host/port + `UBIK_ENRICHMENT_MODEL`.
+---
