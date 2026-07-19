@@ -800,3 +800,20 @@
 3. Watch for the `ubik-vllm` unit disappearing again after any `wsl --shutdown` (transient units don't survive VM teardown) — re-run `maestro start --service vllm` to recreate. Consider persisting it as an installed `.service` file (long-standing backlog item).
 4. Everything else carried over from the 2026-07-06(i)/07-09/07-11(a) pending lists (vLLM 0.24.0 upgrade, live vLLM verification under torch 2.9.1, chromadb version alignment, single-venv doc correction, no-fix CVEs, older backlog).
 ---
+
+## Session: 2026-07-18 23:18 — Node: Hippocampal
+**Goal:** Fix the Claude Code startup warning "Settings (.claude/settings.json): Invalid or malformed JSON".
+**Completed:**
+- Diagnosed the fault: `.claude/settings.json` parsed cleanly through the closing `}` (line 21), then failed with `json.JSONDecodeError: Extra data: line 22`. Root cause was a leaked heredoc delimiter — a stray `EOF ` line (with a trailing space, so the shell never matched it as the terminator) written into the file, most likely from a `cat > settings.json <<EOF … EOF` creation.
+- The permissions block itself (defaultMode acceptEdits; allow git add/commit, pytest, pip install, docker compose/ps; ask git push, rm -rf; deny tccutil, sudo) was valid and left untouched.
+- Removed the stray `EOF ` line and its trailing blank line via a surgical edit (no shell command; permissions config unchanged).
+- Re-validated with `python3 -c "json.load(...)"` → **VALID JSON**.
+**State left in:**
+- `.claude/settings.json` is valid on disk and confirmed parseable. The startup "malformed JSON" warning should be gone; a definitive check requires a session relaunch (the warning only fires when the harness reads the file at boot) — not yet done from within this session.
+- No other settings issues found or touched. Global `~/.claude/` config not modified.
+**Files changed:**
+- `.claude/settings.json`: removed leaked heredoc `EOF ` delimiter + trailing blank line (JSON body unchanged).
+- SESSIONS.md: this entry.
+**Next session should:**
+- On next `claude` launch from the UBIK root, confirm no "Invalid or malformed JSON" warning appears for `.claude/settings.json`.
+---
