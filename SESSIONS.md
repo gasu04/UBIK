@@ -761,3 +761,42 @@
 3. Then re-run `maestro start`, confirm vLLM healthy, and finally run the external reachability check (`curl http://<canonical-somatic-IP>:8002/health` from Hippocampal) — the item that has never passed.
 4. Clarify canonical somatic vLLM IP (`100.92.95.39` vs `100.75.228.46`) and recreate `ingestion/.env` with VLLM host/port + `UBIK_ENRICHMENT_MODEL`.
 ---
+
+## Session: 2026-07-15 (b) — Node: Hippocampal (driving Somatic over SSH)
+**Goal:** Resolve the last open item from 2026-07-15 — why `maestro start --service vllm` still failed at 300s after the NAT revert, while manual launch worked. User instinct: "it's most likely a simple thing (venv)." It was — in the sense that there was nothing left to fix; vLLM only needed starting.
+
+**Investigated and RULED OUT (all red herrings):**
+- **venv**: not the problem. `vllm_server.py`'s shebang is `#!/home/gasu/pytorch_env/bin/python`, so it runs under the venv regardless of how maestro/systemd-run invokes it (system `/usr/bin/python3` lacks vllm but is never reached). venv has `vllm 0.13.0` + a valid `vllm` binary; import works.
+- **maestro's probe IP `100.92.95.39` "stale"**: not stale — CORRECT. Discovered **Tailscale runs INSIDE WSL** as a separate tailnet node (`tailscale0` interface holds `100.92.95.39/32`, device `adrian-1`, identity `gasu04@`). So vLLM binding `0.0.0.0:8002` in WSL is directly reachable at `http://100.92.95.39:8002` via Tailscale — no portproxy/localhostForwarding/Windows-host hop needed. This **corrects the 2026-07-06 entry** which called `100.92.95.39` stale/offline; it was reachable all along. Distinct from the Windows host's Tailscale IP `100.75.228.46` (device `adrian`, `acefesan@`, what `ssh windows-server`/`windows-plain` target) — two tailnet identities on one physical box.
+- **health-check reachability under NAT**: structurally fine. Pre-flight `curl http://100.92.95.39:8002/health` returned instant (0 ms) "connection refused" — proves the route is intact; only failed because nothing was listening yet.
+
+**Actual root cause (confirmed): the 2026-07-15 diagnosis was right and is now fully resolved.** The only real fault was the `networkingMode=mirrored` port collision (Windows stray nginx:8002 vs vLLM:8002), fixed by the 07-15 NAT revert. vLLM had simply not been started again since, because the `wsl --shutdown` (to apply NAT) wiped the transient `ubik-vllm` systemd user unit, and nothing re-ran `maestro start` until now. The "maestro fails at 300s while manual works" gap closed on its own once the port was clear under NAT — the 07-15 hypothesis that NAT broke the health-check IP was wrong.
+
+**RESOLVED — vLLM is up:**
+- Pre-flight all green: port 8002 free in WSL, no orphan procs, GPU 72 MiB/32 GB free, `loginctl show-user gasu` → `Linger=yes`, reachability path proven (instant conn-refused).
+- `python -m maestro start --service vllm` → **`✓ vllm started`** (no 300s timeout). vLLM confirmed healthy and serving by the user.
+- This means the **never-passed external reachability check is structurally closed**: `curl http://100.92.95.39:8002/health` from Hippocampal now routes correctly. (Did not capture a final 200 curl in this session — user confirmed healthy before the verification curl ran.)
+
+**Cleanup done:**
+- `maestro/.env.example`: `SOMATIC_TAILSCALE_IP` default `100.79.166.114` (the genuinely-stale `adrian-wsl` IP) → `100.92.95.39`, with an explanatory comment that this is the WSL-internal Tailscale IP, not the Windows host's. `maestro/.env` was already correct at `100.92.95.39`.
+- Added `windows-plain` SSH alias to `~/.ssh/config` (same host/user/key as `windows-server`, but `RequestTTY no` + `RemoteCommand none` → lands in the Windows shell instead of auto-entering WSL). For Windows-side admin (`taskkill`, `Restart-Service hns/LxssManager`, `netsh`, `Get-NetTCPConnection`). Verified: `ver` → Windows 10.0.26200.8875, `whoami` → `adrian\gasu`. Runs non-elevated; admin-only ops still need interactive admin PowerShell at the box.
+- Wrote a Claude memory (`somatic-vllm-networking-tailscale.md`) capturing the Tailscale-runs-inside-WSL fact + the correct "vLLM won't start" diagnostic flow (check port + NAT first, don't chase venv/IP theories). Indexed in `MEMORY.md`.
+
+**State left in:**
+- vLLM running and healthy on Somatic (`ubik-vllm` systemd user unit, recreated by maestro this session).
+- `.wslconfig` = NAT (mirrored reverted 07-15). WSL IP `172.27.177.90` internal / `100.92.95.39` Tailscale.
+- Zombie :8002 hvsocket binding may still exist on the Windows host (harmless under NAT); not re-checked this session.
+- Maestro web panel / Docker / Neo4j / ChromaDB / MCP on Hippocampal: not touched this session (Docker was fixed earlier in the day by restarting Docker Desktop after its VM died).
+
+**Files changed:**
+- `maestro/.env.example`: `SOMATIC_TAILSCALE_IP` stale default corrected + explanatory comment
+- `~/.ssh/config` (local, not in repo): added `windows-plain` alias
+- SESSIONS.md: this entry
+- (local Claude memory, not in repo): `somatic-vllm-networking-tailscale.md` + MEMORY.md index
+
+**Next session should:**
+1. Capture the final 200 from `curl http://100.92.95.39:8002/health` from Hippocampal (the never-passed check) as explicit confirmation — a 5-second sanity check now that vLLM is up.
+2. Run **CP2**: `run_phase3.py --stage 2 --dry-run --limit 8`, hand-score per `qa/rubric.md` (gate: confidence ≥0.7 on ≥6/8) — the original gate from 2026-06-20, now genuinely unblocked (vLLM reachable at the IP maestro/ingestion both use).
+3. Watch for the `ubik-vllm` unit disappearing again after any `wsl --shutdown` (transient units don't survive VM teardown) — re-run `maestro start --service vllm` to recreate. Consider persisting it as an installed `.service` file (long-standing backlog item).
+4. Everything else carried over from the 2026-07-06(i)/07-09/07-11(a) pending lists (vLLM 0.24.0 upgrade, live vLLM verification under torch 2.9.1, chromadb version alignment, single-venv doc correction, no-fix CVEs, older backlog).
+---
