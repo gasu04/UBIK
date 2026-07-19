@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(pytest*)",
+      "Bash(pip install *)",
+      "Bash(docker compose *)",
+      "Bash(docker ps*)"
+    ],
+    "ask": [
+      "Bash(git push *)",
+      "Bash(rm -rf *)"
+    ],
+    "deny": [
+      "Bash(tccutil *)",
+      "Bash(sudo *)"
+    ]
+  }
+}
+EOF 
