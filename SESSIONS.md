@@ -836,3 +836,22 @@
 **Next session should:**
 - Nothing outstanding on the settings issue; resume the carried-over vLLM/CP2 backlog from the earlier entries when ready.
 ---
+
+## Session: 2026-07-19 21:04 — Node: Hippocampal
+**Goal:** Remove TradingAgents and FinRobot from UBIK and ensure they don't share UBIK's venv.
+**Key finding — they were never in the UBIK repo.** TradingAgents and FinRobot are independent projects with their own GitHub remotes (`gasu04/TradingAgents`, `gasu04/FinRobot`) — not git-tracked by UBIK, no submodule, no code/config reference in the tree. The only tie to UBIK was a **misattributed backlog line** in this log ("TradingAgents 3.10→3.12", "FinRobot requirements refresh"), which is being dropped here as out of scope.
+**Completed:**
+- Located the actual copies: two physical checkouts each on the 990PRO volume — `FinanceAI/{TradingAgents,FinRobot}` and `Claude/{TradingAgents,FinRobot}`. (`~/Claude` is a symlink → `/Volumes/990PRO 4T/Claude`, so the apparent "third copy" in the home dir was the same inodes, not a separate copy.) All at identical git HEADs (TradingAgents `a438acd`, FinRobot `e86ba85`).
+- Verified before deleting: no uncommitted tracked changes except benign `.DS_Store`/`config_api_keys` on FinRobot; **secrets files byte-identical across copies** (`config_api_keys`, `OAI_CONFIG_LIST` same sha256 — nothing unique lost); untracked `results/` outputs identical and present in the keeper; no `.env`/key files in TradingAgents.
+- **De-duplicated to one copy each:** kept `FinanceAI/{TradingAgents,FinRobot}` (dedicated finance folder); moved the redundant `Claude/` copies to `~/.Trash` (dated, reversible): `TradingAgents_volClaude_dedup_20260719` (1.5G), `FinRobot_volClaude_dedup_20260719` (26M). Both projects remain on GitHub regardless.
+- **Venv isolation confirmed:** the remaining copies use their own venvs (TradingAgents: uv Py3.10 `.venv` + Homebrew Py3.13 `venv`; FinRobot: none). UBIK uses `DeepSeek/venv` + `~/ubik-chromadb-venv`. No symlinks or overlap — they never shared UBIK's venv and still don't.
+**State left in:**
+- One copy each of TradingAgents/FinRobot remains, at `/Volumes/990PRO 4T/FinanceAI/`. Redundant copies in `~/.Trash` (empty Trash to reclaim ~1.5G once satisfied).
+- No change to the UBIK repo tree (these were never in it). `~/Claude` symlink untouched.
+- **Backlog correction:** TradingAgents/FinRobot maintenance items are dropped from UBIK's carried-over backlog — they are separate projects, not UBIK work.
+**Files changed:**
+- No UBIK repo files changed on disk (TradingAgents/FinRobot were external).
+- SESSIONS.md: this entry.
+**Next session should:**
+- Resume the genuine UBIK backlog (vLLM/CP2 and the housekeeping items), now free of the misattributed TradingAgents/FinRobot lines.
+---
