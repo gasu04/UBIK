@@ -871,3 +871,59 @@
 **Next session should:**
 - Resume the genuine UBIK backlog (vLLM/CP2 and the housekeeping items).
 ---
+
+## Session: 2026-07-19 21:18 — Node: Hippocampal
+**Goal:** Run CP2 (Phase 3 enrichment quality gate), the gate blocked since 2026-06-20, now that vLLM is reachable. Predecessor: 2026-07-15(b).
+
+**Completed:**
+
+**Step 0 — IP hypothesis CONFIRMED (empirically, from Hippocampal):**
+- `curl http://100.92.95.39:8002/health` → **HTTP/1.1 200 OK** (server: uvicorn, content-length: 0, time_total=0.28–0.40s; reached from Hippocampal `100.103.242.91` over Tailscale). vLLM is up and serving.
+- `curl http://100.75.228.46:8002/health` → **timeout (5s, http_code 000)**. The Windows-host Tailscale IP does NOT route into the WSL namespace under networkingMode=NAT. No undocumented portproxy exists — the two-tailnet-identity model in 07-15(b) is correct as written. This reproduces the 07-13 CP2 failure cause live, so it is the confirmed root cause, not a coincidence.
+
+**Step 1 — never-passed health check now captured (verbatim):**
+```
+HTTP/1.1 200 OK
+date: Mon, 20 Jul 2026 01:55:08 GMT
+server: uvicorn
+content-length: 0
+```
+`/v1/models` also probed: served id `/home/gasu/ubik/models/deepseek-awq/DeepSeek-R1-Distill-Qwen-14B-AWQ` — matches `UBIK_ENRICHMENT_MODEL` exactly.
+
+**Step 2 — `ingestion/.env` IP reconciliation — live config ALREADY correct; template was stale:**
+- **Correction to the brief's premise:** the brief's table predicted *both* `ingestion/.env` and `.env.example` held `100.75.228.46`. In fact the gitignored **live `ingestion/.env` was already at `100.92.95.39`** (both `SOMATIC_HOST` and `SOMIC_TAILSCALE_IP`) — already corrected at some prior point. Only the **committed `ingestion/.env.example`** still showed `100.75.228.46` in two places.
+- Edited `ingestion/.env.example` only: `SOMATIC_HOST` and `SOMATIC_TAILSCALE_IP` → `100.92.95.39`, with comments mirroring `maestro/.env.example` (this is the WSL-internal tailnet node `adrian-1`/`gasu04@`, not the Windows host `adrian`/`acefesan@`; the Windows IP does not route into WSL under NAT). No active var now holds `100.75.228.46`; only explanatory comments mention it.
+- Verified through the **real code path** (`load_config()`, not the bare `EndpointConfig.from_env()` the brief's snippet used — which bypasses `.env` loading and misleads by falling through to the unresolved `ubik-somatic` hostname): `sensitive_endpoint=standard_endpoint=for_tier("therapy")=for_tier("business")=http://100.92.95.39:8002/v1`; `model=/home/gasu/ubik/models/deepseek-awq/DeepSeek-R1-Distill-Qwen-14B-AWQ`. Matches the brief's expectation. (Hostname `ubik-somatic` does not resolve on this Mac — NXDOMAIN — so the explicit-IP config is load-bearing; do not remove `SOMATIC_TAILSCALE_IP`.)
+
+**Step 3 — CP2 run and hand-scoring:**
+- Prereq: **no Hippocampal Python env existed** for ingestion. `venv` symlink at repo root → `/home/gasu/pytorch_env` (Somatic Linux path, unreachable from Mac; this is the "single-venv doc correction" backlog item made concrete). `ENVIRONMENT.md` also documents the Somatic env only. Created a dedicated Hippocampal venv `~/.virtualenvs/ubik-ingestion` (uv, Python 3.12.12) and installed the stage-2 subset: python-docx, httpx, openai, pydantic, python-dotenv, PyYAML, jsonschema. Skipped openai-whisper / pdfplumber / pytesseract / pdf2image / google-* (not exercised by stage-2 on .docx; need system binaries). **Flagging as a new backlog item:** ingestion needs a documented/installed Hippocampal env (this venv is ad-hoc, not yet committed as a Make/README step).
+- `python run_phase3.py --stage 2 --dry-run --limit 8` → **Stage 2: 3 processed, 0 skipped, 0 quarantined** (70s wall; all three `/v1/chat/completions` returned 200). Note: `--limit` is applied **per source directory** inside `enrich_directory`, but only `sources/tactiq/` has files (3), so exactly 3 ran. The other 5 buckets (gemini/fireflies/letters/memory_notes/constitution) are empty.
+- No reasoning-chain leak: 0 `<think>`/`<reasoning>` tags in any enriched body (Tier 1 stripping held).
+
+**CP2 scoring table (hand-judged against qa/rubric.md — model conf ≠ rubric verdict):**
+
+| # | File | meeting_type | diarization_status | voice_corpus_eligible | conf | band | my verdict |
+|---|------|-------------|--------------------|-----------------------|------|------|------------|
+| 1 | 12 23-12-2025 Khaled…actinium 225 RFCA | business ✓ | mono ✓ | false ✓ (mono hard-rule) | 0.95 | auto-approve | **PASS** — real multi-party dialogue (clinical isotopes); participants inferred from filename not diarization (112 generic "Speaker:" labels), names plausible but unverified |
+| 2 | 3 Protocolo de Entregas…03-12-2025 | business ✓ | multi ⚠️ | false ✓ | 0.85 | auto-approve | **PASS (caveat)** — ⚠️ body is NOT a transcript: Tactiq metadata stub + one AI summary paragraph, no dialogue. `diarization:multi` reflects 3 colon markers but is misleading; participants `[Ginés Sanchez Urrutia]` = creator field, not attendees. Metadata extraction correct; conf 0.85 overstates a record with no verbatim content |
+| 3 | Meeting Transcription 16-12-2025 | business ✓ | multi ✓ | false ✓ | 0.95 | auto-approve | **PASS** — real long dialogue, Fabio Robledo named; clean |
+
+- All 3 confidences ≥ 0.7 (actually all ≥ 0.85, auto-approve band). Hard rules all hold: no therapy, mono file 1 voice-blocked, Ginés/Ginés Alberto not collapsed (bare "Ginés" = father only).
+- **GATE JUDGEMENT — pass with a denominator caveat that needs a decision, not a silent pass.** Gate is "conf ≥0.7 on ≥6 of 8." I have **3 of 3 ≥0.7**, but only **3 source files exist** (not 8). Per Step 4's "don't loosen a gate to pass" rule, I am NOT declaring this a clean 6/8 pass; I'm reporting 3/3 quality passes against a denominator of 3, and flagging that the corpus is too small to exercise the 6/8 threshold as written. Decision needed (Gines): is CP2 "passed" on the strength of 3/3 clean enrichments, or does the gate require populating ≥6 source files first?
+
+**State left in:**
+- vLLM healthy on Somatic (`100.92.95.39:8002`). `ubik-vllm` transient unit still up (watch for disappearance after any `wsl --shutdown`).
+- New Hippocampal venv `~/.virtualenvs/ubik-ingestion` (Python 3.12, stage-2 deps only) — ad-hoc, not yet a committed setup step.
+- 3 enriched outputs in `ingestion/enriched/*.transcript`; `quarantine/enrichment/` empty. Nothing written to ChromaDB/Neo4j (dry-run held).
+- `ingestion/.env.example` IP corrected (uncommitted, in the Step-2 commit below).
+
+**Files changed:**
+- `ingestion/.env.example`: `SOMATIC_HOST` + `SOMATIC_TAILSCALE_IP` `100.75.228.46` → `100.92.95.39` + explanatory comments (mirrors `maestro/.env.example`).
+- SESSIONS.md: this entry.
+- (local, not in repo): `~/.virtualenvs/ubik-ingestion` created.
+
+**Next session should:**
+1. Get Gines's decision on the CP2 denominator (3/3 quality-pass vs the "≥6 of 8" threshold). If "pass on 3/3": proceed to plan CP3. If "needs ≥6 files": populate `sources/` from the Ingested_data / Drive corpus first, then re-run.
+2. Investigate File 2's content-classification oddity (a no-dialogue Tactiq summary stub scored as `diarization:multi` with 0.85 conf) — likely warrants a content-type rule or a confidence penalty for near-empty transcripts. Diagnosis only; do not silently tune.
+3. Persist/document the Hippocampal ingestion env (`~/.virtualenvs/ubik-ingestion` → a committed setup step; fold into the "single-venv doc correction" backlog item — `ENVIRONMENT.md` currently describes Somatic only).
+4. Carried backlog, unchanged: vLLM 0.24.0 upgrade (18 CVEs, plan ready); live vLLM inference verification under torch 2.9.1 (partially done this session — chat completions + models endpoints confirmed); chromadb version alignment across three envs (1.5.1/1.4.1/1.3.7); single-venv doc correction; persist `ubik-vllm`/`ubik-whisperx` as installed `.service` files; per-service `maestro shutdown --service NAME`; WhisperX health tests; retire `ubik-memory-sweep` skill; update ingestion loader (new fields + `EPISODIC` token); TradingAgents Python 3.10→3.12 before October EOL.
