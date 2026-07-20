@@ -106,6 +106,7 @@ select { background: #fff; }
   border-radius: 6px; padding: 10px 16px; box-shadow: 0 4px 0 rgba(0,0,0,0.4);
 }
 .links a.neo4j { background: var(--yellow); }
+.links a.parallax { background: var(--red); color: #fff; }
 .links a:hover { transform: translateY(-1px); }
 
 /* ── Console ────────────────────────────────────────────── */

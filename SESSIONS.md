@@ -927,3 +927,36 @@ content-length: 0
 2. Investigate File 2's content-classification oddity (a no-dialogue Tactiq summary stub scored as `diarization:multi` with 0.85 conf) — likely warrants a content-type rule or a confidence penalty for near-empty transcripts. Diagnosis only; do not silently tune.
 3. Persist/document the Hippocampal ingestion env (`~/.virtualenvs/ubik-ingestion` → a committed setup step; fold into the "single-venv doc correction" backlog item — `ENVIRONMENT.md` currently describes Somatic only).
 4. Carried backlog, unchanged: vLLM 0.24.0 upgrade (18 CVEs, plan ready); live vLLM inference verification under torch 2.9.1 (partially done this session — chat completions + models endpoints confirmed); chromadb version alignment across three envs (1.5.1/1.4.1/1.3.7); single-venv doc correction; persist `ubik-vllm`/`ubik-whisperx` as installed `.service` files; per-service `maestro shutdown --service NAME`; WhisperX health tests; retire `ubik-memory-sweep` skill; update ingestion loader (new fields + `EPISODIC` token); TradingAgents Python 3.10→3.12 before October EOL.
+
+---
+
+## Session: 2026-07-19 22:19 - Node: Hippocampal
+**Goal:** Troubleshoot WhisperX on Somatic (unhealthy); make maestro manage the new install; surface WhisperX + UBIKParallax on the :8090 web panel.
+**Root cause (WhisperX):** unit `ubik-whisperx` had run 1+ day but `/health` reported `model_loaded:false` - neither `whisperx` nor `whisper` was installed in the shared venv (`~/ubik/venv` -> `~/pytorch_env`). Every startup since Jul 15 failed at import; the logged "No module named 'whisper'" was the fallback masking the missing primary. GPU was also 98% full (vLLM gpu_memory_utilization 0.93), so CUDA was not viable regardless.
+**Completed (decisions: isolated venv + CPU):**
+- Built `~/ubik-whisperx-venv` on Somatic: whisperx 3.8.6 (+ faster-whisper/ctranslate2), fastapi/uvicorn/python-multipart, and pip `static-ffmpeg` (symlinked ffmpeg/ffprobe into the venv bin). Runs CPU/int8.
+- Made `somatic/whisperx_server.py` device/compute env-driven (`WHISPERX_DEVICE`/`WHISPERX_COMPUTE_TYPE`; defaults still cuda/float16). Applied on the Mac (committed) and patched in-place on the Somatic copy (backup `.bak.20260719`).
+- Recreated the `ubik-whisperx` systemd user unit on the new venv with `WHISPERX_DEVICE=cpu`, `WHISPERX_COMPUTE_TYPE=int8`, PATH incl. venv bin. large-v2 downloaded to HF cache; `/health` -> `model_loaded:true, device:cpu`.
+- maestro now targets the isolated venv: added `SomaticConfig.whisperx_venv/whisperx_device/whisperx_compute_type` (env-overridable), threaded into `WhisperXService`, and `_remote_start` launches the new venv python with the CPU env + PATH. status/stop were already venv-independent.
+- Fixed a real display bug: `maestro status` counted whisperx (7/7) but never rendered its row - `_SERVICE_ORDER`/`_SERVICE_NODES` in `display.py` omitted it. Added; CLI + web now show whisperx healthy.
+- Web panel (:8090): added config-driven UBIKParallax link (`MaestroConfig.parallax_url`, env `UBIK_PARALLAX_URL`, default live GitHub Pages `https://gasu04.github.io/UBIKParallax/`) in `/api/config` + app.js (red accent), plus a `Cache-Control: no-cache` middleware so the panel stops serving stale JS/CSS. Restarted the launchd web agent.
+**State left in:**
+- WhisperX healthy on Somatic (CPU, isolated venv); shows healthy in `maestro status` and the web panel. vLLM untouched/healthy.
+- The Mac `maestro` command is the alias `cd UBIK && DeepSeek/venv/bin/python -m maestro` (runs repo source); web served by launchd `com.ubik.maestro-web` via `~/ubik-bin/ubik-maestro-python`.
+- Web panel http://100.103.242.91:8090/ up to date + UBIKParallax button (browser needs ONE hard refresh to clear old cached app.js).
+- ffmpeg exists only in the whisperx venv (pip static-ffmpeg); system ffmpeg still absent (torchcodec warning is harmless for the ctranslate2 path).
+- Somatic `/home/gasu/ubik` has an in-place edit to `somatic/whisperx_server.py` (canonical change committed on the Mac).
+**Files changed:**
+- `somatic/whisperx_server.py`: device/compute env-driven
+- `maestro/config.py`: whisperx venv/device/compute + parallax_url
+- `maestro/services/__init__.py`: pass whisperx config through
+- `maestro/services/whisperx_service.py`: remote_venv/device/compute params + `_remote_start` venv+env
+- `maestro/display.py`: whisperx added to status table order + node map
+- `maestro/web/server.py`: parallax link in /api/config + no-cache middleware
+- `maestro/web/static/app.js`, `maestro/web/static/style.css`: UBIKParallax link + accent
+- SESSIONS.md: this entry
+**Next session should:**
+- Optional: finish per-service `maestro shutdown --service NAME` (started, deferred) so whisperx can be stopped in isolation; add WhisperX health/lifecycle tests.
+- Persist `ubik-whisperx`/`ubik-vllm` as installed `.service` files (transient units vanish on `wsl --shutdown`).
+- First whisperx model load pulls large-v2 (~3GB) to the HF cache; later loads are fast.
+---

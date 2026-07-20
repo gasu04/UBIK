@@ -73,6 +73,7 @@ async function loadConfig() {
     const mk = (label, url, cls) =>
       `<a class="${cls||''}" href="${url}" target="_blank" rel="noopener">${label} ↗</a>`;
     L.innerHTML =
+      (cfg.links.parallax ? mk("UBIKParallax", cfg.links.parallax, "parallax") : "") +
       mk("Neo4j browser", cfg.links.neo4j, "neo4j") +
       mk("ChromaDB", cfg.links.chromadb) +
       mk("MCP server", cfg.links.mcp) +

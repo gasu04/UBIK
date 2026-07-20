@@ -88,6 +88,19 @@ def build_app() -> FastAPI:
     """Construct and return the Maestro Web FastAPI application."""
     app = FastAPI(title="UBIK Maestro", docs_url="/api/docs")
 
+    @app.middleware("http")
+    async def _no_cache(request, call_next):
+        """Force browsers to revalidate the panel's HTML/JS/CSS.
+
+        The static assets carry ETags but no ``Cache-Control``; without this,
+        browsers heuristically cache ``app.js``/``style.css`` and miss UI
+        updates (e.g. a newly added link) until a hard refresh. ``no-cache``
+        still allows cheap 304 revalidation when the file is unchanged.
+        """
+        response = await call_next(request)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
     def _registry() -> ServiceRegistry:
         # Fresh registry per call so a mid-session config reload is honoured;
         # get_config() is cached so this is cheap.
@@ -108,6 +121,7 @@ def build_app() -> FastAPI:
                 "chromadb": cfg.hippocampal.chromadb_url,
                 "mcp": cfg.hippocampal.mcp_url,
                 "vllm": cfg.somatic.vllm_url,
+                "parallax": cfg.maestro.parallax_url,
             },
             "services": sorted(s.name for s in _registry().get_all()),
         }

@@ -101,6 +101,9 @@ class WhisperXService(UbikService):
         remote: Optional[RemoteExecutor] = None,
         remote_ubik_root: Optional[str] = None,
         probe_ip: Optional[str] = None,
+        remote_venv: Optional[str] = None,
+        device: Optional[str] = None,
+        compute_type: Optional[str] = None,
     ) -> None:
         self._port = port
         self._conda_env = conda_env
@@ -110,6 +113,14 @@ class WhisperXService(UbikService):
         self._remote = remote
         self._remote_ubik_root = remote_ubik_root
         self._probe_ip = probe_ip
+        # Isolated WhisperX venv on the Somatic node (absolute path, valid both
+        # over SSH and locally on Somatic) plus the device / compute-type the
+        # server should run with. When set, these override the legacy
+        # ``{root}/venv`` + cuda/float16 defaults so WhisperX runs from its own
+        # environment on CPU without contending with vLLM for GPU VRAM.
+        self._remote_venv = remote_venv
+        self._device = device
+        self._compute_type = compute_type
 
     def _is_remote(self) -> bool:
         """Whether this service must be controlled over SSH from another node."""
@@ -315,7 +326,24 @@ class WhisperXService(UbikService):
         """
         root = self._remote_ubik_root or "/home/gasu/ubik"
         server = f"{root}/somatic/whisperx_server.py"
-        python = f"{root}/venv/bin/python"
+        # Prefer the isolated WhisperX venv; fall back to the legacy shared
+        # ``{root}/venv`` only when no dedicated venv was configured.
+        venv = self._remote_venv or f"{root}/venv"
+        python = f"{venv}/bin/python"
+
+        # Extra environment for the systemd unit. PATH is set so the server's
+        # audio-decode subprocess finds the venv's ffmpeg; device / compute-type
+        # switch WhisperX to CPU (int8) so it never contends with vLLM's VRAM.
+        setenvs = [
+            f"--setenv=WHISPERX_PORT={self._port}",
+            f"--setenv=PATH={venv}/bin:/usr/bin:/bin",
+        ]
+        if self._device:
+            setenvs.append(f"--setenv=WHISPERX_DEVICE={self._device}")
+        if self._compute_type:
+            setenvs.append(f"--setenv=WHISPERX_COMPUTE_TYPE={self._compute_type}")
+        setenv_flags = " ".join(setenvs)
+
         script = f"""
 set -u
 {_USER_SYSTEMD_ENV}
@@ -334,7 +362,7 @@ systemd-run --user --unit={_WHISPERX_UNIT} \
     --property=KillSignal=SIGTERM \
     --property=KillMode=mixed \
     --property=TimeoutStopSec={_REMOTE_STOP_GRACE_S} \
-    --setenv=WHISPERX_PORT={self._port} \
+    {setenv_flags} \
     "$PYTHON" "$SERVER" 2>&1
 echo "STARTED_UNIT={_WHISPERX_UNIT} rc=$?"
 """

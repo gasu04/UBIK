@@ -142,6 +142,9 @@ class ServiceRegistry:
             remote=somatic_remote,
             remote_ubik_root=somatic.remote_ubik_root,
             probe_ip=somatic.tailscale_ip,
+            remote_venv=somatic.whisperx_venv,
+            device=somatic.whisperx_device,
+            compute_type=somatic.whisperx_compute_type,
         ))
 
     @property

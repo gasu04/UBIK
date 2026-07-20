@@ -47,8 +47,12 @@ app = FastAPI(title="WhisperX Transcription Service", version="0.1.1", lifespan=
 # ---------------------------------------------------------------------------
 _model = None          # ("whisperx"|"whisper", model_object)
 _model_lock = asyncio.Lock()
-_DEVICE = "cuda"
-_COMPUTE_TYPE = "float16"   # RTX 5090 / Blackwell — float16 is optimal
+# Device and compute type are env-driven so the same server can run on the
+# RTX 5090 (cuda/float16, the default) or on CPU (WHISPERX_DEVICE=cpu,
+# WHISPERX_COMPUTE_TYPE=int8) when the GPU is reserved by another service
+# such as vLLM. On CPU, ctranslate2 does not support float16 — use int8.
+_DEVICE = os.getenv("WHISPERX_DEVICE", "cuda")
+_COMPUTE_TYPE = os.getenv("WHISPERX_COMPUTE_TYPE", "float16")   # cuda: float16 (Blackwell); cpu: int8
 _MODEL_NAME = os.getenv("WHISPERX_MODEL", "large-v2")
 
 

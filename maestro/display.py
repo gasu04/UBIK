@@ -60,6 +60,7 @@ _SERVICE_NODES: dict[str, str] = {
     "chromadb": "hippocampal",
     "mcp": "hippocampal",
     "vllm": "somatic",
+    "whisperx": "somatic",
     "tailscale": "mesh",
     "docker": "hippocampal",
 }
@@ -70,6 +71,7 @@ _SERVICE_ORDER: tuple[str, ...] = (
     "chromadb",
     "mcp",
     "vllm",
+    "whisperx",
     "tailscale",
     "docker",
 )

@@ -113,6 +113,13 @@ class MaestroConfig(BaseSettings):
     log_dir: Optional[str] = None
     check_interval_s: int = 300
     log_level: str = "INFO"
+    # External link surfaced in the web control panel: the UBIKParallax digital
+    # garden (React/Vite notes app, published to GitHub Pages). Override with
+    # the UBIK_PARALLAX_URL env var if the deployment location changes.
+    parallax_url: str = Field(
+        "https://gasu04.github.io/UBIKParallax/",
+        validation_alias="UBIK_PARALLAX_URL",
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="MAESTRO_",
@@ -265,6 +272,16 @@ class SomaticConfig(BaseSettings):
         validation_alias="VLLM_MODEL_PATH",
     )
     whisperx_port: int = Field(9100, validation_alias="WHISPERX_PORT")
+    # WhisperX runs in its OWN isolated venv on Somatic (deliberately separate
+    # from the shared vLLM/torch env) and on CPU by default so it never contends
+    # with vLLM for GPU VRAM. These drive the remote systemd unit maestro starts.
+    whisperx_venv: str = Field(
+        "/home/gasu/ubik-whisperx-venv", validation_alias="WHISPERX_VENV",
+    )
+    whisperx_device: str = Field("cpu", validation_alias="WHISPERX_DEVICE")
+    whisperx_compute_type: str = Field(
+        "int8", validation_alias="WHISPERX_COMPUTE_TYPE",
+    )
 
     model_config = SettingsConfigDict(
         env_prefix="SOMATIC_",
