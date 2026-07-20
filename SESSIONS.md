@@ -855,3 +855,19 @@
 **Next session should:**
 - Resume the genuine UBIK backlog (vLLM/CP2 and the housekeeping items), now free of the misattributed TradingAgents/FinRobot lines.
 ---
+
+## Session: 2026-07-19 21:08 — Node: Hippocampal
+**Goal:** Empty the Trash to reclaim disk space after the TradingAgents/FinRobot de-dup.
+**Completed:**
+- Emptied `~/.Trash` entirely — **~4.0G reclaimed** (verified 0B / empty afterward). This is a **permanent, irreversible** delete, confirmed by the user at full scope.
+- Permanently removed: today's de-dup copies (TradingAgents 1.5G, FinRobot 26M) + the 2026-07-06 evictions (rag_env, AutoGPT, nifi, automatisch, Cross-Platform-Workflow-Orchestrator, claude-code, evernote-sdk-python, gastos-promed, pythonProject, helloworld, test-setup, UBIKParallax-source-v5, install.sh) + a stray `Google Drive.app`.
+- Note: the GitHub-backed projects among those (AutoGPT, nifi, automatisch, claude-code, Cross-Platform-Workflow-Orchestrator, gastos-promed; plus TradingAgents/FinRobot which still live under `FinanceAI/`) remain re-clonable from `gasu04`. Nothing UBIK depends on was in Trash.
+**State left in:**
+- `~/.Trash` empty (0B). The reversibility safety net from the 2026-07-06/07-19 evictions is now gone by design — those items are only recoverable via their GitHub remotes (where they have one).
+- No UBIK repo files changed on disk (Trash cleanup is outside the repo).
+**Files changed:**
+- No repo files changed (disk-only cleanup).
+- SESSIONS.md: this entry.
+**Next session should:**
+- Resume the genuine UBIK backlog (vLLM/CP2 and the housekeeping items).
+---
