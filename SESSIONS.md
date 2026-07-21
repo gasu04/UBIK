@@ -983,3 +983,53 @@ content-length: 0
 - Await user go-ahead to commit `maestro/services/vllm_service.py` (Blackwell/FlashInfer vLLM env) as its own commit.
 - Remaining carried backlog: persist ubik-vllm/ubik-whisperx as installed .service files; WhisperX health/lifecycle tests; retire ubik-memory-sweep; update ingestion loader; vLLM 0.24.0 upgrade; chromadb version alignment; single-venv doc correction.
 ---
+
+## Session: 2026-07-20 20:53 — Node: Hippocampal (driving Somatic over SSH)
+**Goal:** Upgrade Somatic vLLM 0.13.0 → 0.24.0 (Option B: parallel venv, zero-risk rollback) and wire maestro to manage 0.24. Clears the 38 vLLM CVEs (9 require 0.24.0). Predecessor: 2026-07-19 (CP2) + the concurrent 2026-07-20 per-service-shutdown session.
+
+**Investigation findings (correcting the stale 07-05e plan):**
+- Live Somatic (verified): vllm 0.13.0, **torch already 2.9.1+cu128** (the "torch 2.9.0 drift" backlog item is stale — already fixed), cuda 12.8, ray 2.56.0 (clean). Only vLLM itself left to upgrade.
+- Fresh `pip-audit`: **52 vulns, 38 in vllm 0.13.0** (~24 distinct; grew from the logged "18"). 9 CVEs require **0.24.0** as the floor — the old plan's "0.22.x" target is stale. Latest upstream is now 0.25.1.
+- **0.24.0 publishes NO cu128 wheel** (only +cpu, +cu129, and a default/cu13 build). Our working 0.13 stack is cu128 → **0.24.0 forces a move to CUDA 12.9** (user chose cu129 wheel + torch cu129). Driver 591.86 / max CUDA 13.1 supports it.
+- The Tier-1 VRAM-cleanup import (`destroy_model_parallel`/`cleanup_dist_env_and_memory` from `vllm.distributed.parallel_state`) is **stable through current main** — the 07-05e worry was unfounded; no `vllm_server.py` patching needed. `awq_marlin` still registered; model loads fine.
+
+**Completed — upgrade (Option B):**
+- `~/pytorch_env_vllm_0.13_freeze.txt` created (rollback snapshot; was absent). Installed `uv` on Somatic (was Hippocampal-only).
+- Built `~/pytorch_env_vllm024` (Python 3.12.3) + `vllm==0.24.0+cu129` wheel + torch 2.11.0+cu129 + cuda 12.9 + triton 3.6.0 (194 pkgs). First attempt with default wheel failed (`libcudart.so.13` — cu13 build vs cu128 torch); the cu129 wheel from GitHub releases fixed it.
+- **Crash #1 (root cause pinned):** FlashInfer 0.6.12 misdetects Blackwell sm_120 → `RuntimeError: FlashInfer requires GPUs with sm75 or higher` in the sampler profile run. vLLM 0.24 routes sampling through FlashInfer by default.
+- **Crash #2 (my bug):** retry with `VLLM_USE_FLASHINFER_SAMPLER=false` failed on `int('false')` ValueError — the flag wants `0`/`1`, not `false`.
+- **Fix:** `VLLM_USE_FLASHINFER_SAMPLER=0` → `/health` 200 in ~90s. CP2 acceptance vs the 0.13 baseline: identical on all scored rubric fields (meeting_type/diarization/voice_eligible/conf all match; conf 0.95/0.95), ~2.4× faster (29s vs 70s), 0 reasoning-tag leaks. One file quarantined on a `25-12-2025` date-format slip — schema correctly trapping a model error, not a defect.
+
+**Completed — maestro wiring (proper fix, mirrors the WhisperX pattern from the 07-19 session):**
+- **First attempt was wrong:** I read `os.environ["VLLM_VENV_PATH"]` directly in `_remote_start`. Maestro's CLI only loads `maestro/.env` into `os.environ` when `--config` is passed — so `VLLM_VENV_PATH` was absent at runtime → fell back to `vllm_server.py`'s 0.13 shebang → unit launched `vllm_server.py vllm_server.py …` (`unrecognized arguments`), 300s health timeout.
+- **Corrected to the WhisperX pattern:** (a) `config.py: SomaticConfig.vllm_venv` typed Field (alias `VLLM_VENV_PATH`, default the 0.24 venv) — populated via `get_config()` which auto-loads `.env`; (b) `vllm_service.py: VllmService.__init__` gains `remote_venv` → `self._remote_venv`, and `_remote_start` uses it with the `"$PYTHON" "$SERVER"` form + `--setenv` from `_BLACKWELL_ENV` (incl. the FlashInfer flag); (c) `__init__.py` passes `remote_venv=somatic.vllm_venv`. No raw `os.environ`.
+- `_BLACKWELL_ENV` now carries `VLLM_USE_FLASHINFER_SAMPLER: "0"` and is applied to **both** local + remote paths (previously local-only). Updated the stale `VLLM_FLASH_ATTN_VERSION` comment (no-op on ≥0.24, kept for 0.13).
+
+**Live-verified (end-to-end through maestro):**
+- `maestro start --service vllm` → ✓ healthy; process is `pytorch_env_vllm024/bin/python` (not the 0.13 shebang); unit `Environment` includes `VLLM_USE_FLASHINFER_SAMPLER=0`; `/health` 200.
+- `maestro shutdown --service vllm` → VRAM 131 MiB (graceful Tier-1 cleanup held), no survivors.
+- `maestro start --service vllm` (2nd cycle) → ✓ healthy (repeatable).
+- CP2 through the maestro-managed instance: 3 processed / 0 quarantined, conf 0.95/0.90/0.95 (File 2 passed this run — confirms the earlier quarantine was non-deterministic, not systematic).
+- maestro test suite: 171 passed in the relevant files (vllm/shutdown/orchestrator); full suite 225 passed + 1 pre-existing `test_logger.py` stderr-teardown flake (documented, unrelated).
+
+**State left in:**
+- **vLLM 0.24.0 is the active, maestro-managed version** on Somatic (`ubik-vllm` unit, `~/pytorch_env_vllm024`). 0.13 rollback intact at `~/pytorch_env` + `~/pytorch_env_vllm_0.13_freeze.txt`; flip `VLLM_VENV_PATH` to revert.
+- WhisperX unaffected (its own venv).
+- Maestro web panel / other services untouched.
+
+**Files changed (uncommitted):**
+- `maestro/config.py`: +`SomaticConfig.vllm_venv` Field.
+- `maestro/services/vllm_service.py`: `remote_venv` param + `_remote_venv`; `_remote_start` mirrors WhisperX (explicit venv python + `--setenv`); `_BLACKWELL_ENV` gains FlashInfer flag + applies remotely.
+- `maestro/services/__init__.py`: pass `remote_venv=somatic.vllm_venv`.
+- `maestro/.env` (gitignored): `VLLM_VENV_PATH=/home/gasu/pytorch_env_vllm024`.
+- `maestro/.env.example`: default → 0.24 venv + two-venv comment.
+- `ingestion/enriched_baseline_013/` (gitignored): 0.13 CP2 outputs preserved for comparison.
+- SESSIONS.md: this entry.
+- (Somatic, not in repo): `~/pytorch_env_vllm024`, `~/pytorch_env_vllm_0.13_freeze.txt`, `uv` installed at `~/.local/bin`.
+
+**Next session should:**
+1. **Commit** the 4 maestro files + `.env.example` as one focused "vLLM 0.24 + maestro venv-aware wiring" commit (the concurrent shutdown session deliberately left `vllm_service.py` unstaged for this). Suggested message references the FlashInfer sm_120 workaround + the WhisperX-pattern mirror.
+2. Optional: chase a FlashInfer build with sm_120 cubins to re-enable the FlashInfer sampler (faster) and drop the workaround — separate task.
+3. Optional: FA2/FA3/FA-default benchmarking on 0.24 (`VLLM_FLASH_ATTN_VERSION` is a no-op on 0.24; engine auto-selects).
+4. Carried backlog, unchanged: persist `ubik-vllm`/`ubik-whisperx` as installed `.service` files (transient units vanish on `wsl --shutdown`); WhisperX health/lifecycle tests; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token); chromadb version alignment across three envs (1.5.1/1.4.1/1.3.7); single-venv doc correction (`ENVIRONMENT.md` still describes Somatic only); the `test_logger.py` stderr-teardown flake.
+5. The 0.24 upgrade **closes the 38 vLLM CVEs** — re-run `pip-audit` next session to confirm the new count (expect the vllm/torch rows gone; chromadb/diskcache/nltk no-fix remain).

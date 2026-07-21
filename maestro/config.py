@@ -271,6 +271,17 @@ class SomaticConfig(BaseSettings):
         "/home/gasu/ubik/models/deepseek-awq/DeepSeek-R1-Distill-Qwen-14B-AWQ",
         validation_alias="VLLM_MODEL_PATH",
     )
+    # Which venv vLLM runs in on the Somatic node. The remote launcher
+    # (VllmService._remote_start) invokes ``<vllm_venv>/bin/python`` explicitly,
+    # overriding ``somatic/inference/vllm_server.py``'s shebang — so this
+    # selects the vLLM version + CUDA stack. Two venvs coexist on Somatic:
+    # ``pytorch_env_vllm024`` (vLLM 0.24.0 + torch 2.11 +cu129, the active
+    # install since the 2026-07-20 upgrade) and ``pytorch_env`` (vLLM 0.13.0 +
+    # cu128, retained as the rollback). Flip this to switch versions without
+    # reinstalling. Mirrors ``whisperx_venv``.
+    vllm_venv: str = Field(
+        "/home/gasu/pytorch_env_vllm024", validation_alias="VLLM_VENV_PATH",
+    )
     whisperx_port: int = Field(9100, validation_alias="WHISPERX_PORT")
     # WhisperX runs in its OWN isolated venv on Somatic (deliberately separate
     # from the shared vLLM/torch env) and on CPU by default so it never contends

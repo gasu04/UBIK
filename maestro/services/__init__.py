@@ -136,6 +136,7 @@ class ServiceRegistry:
             remote=somatic_remote,
             remote_ubik_root=somatic.remote_ubik_root,
             probe_ip=somatic.tailscale_ip,
+            remote_venv=somatic.vllm_venv,
         ))
         self.register(WhisperXService(
             port=somatic.whisperx_port,

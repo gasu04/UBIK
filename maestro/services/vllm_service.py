@@ -208,12 +208,27 @@ def _build_vllm_serve_args(ubik_root: Path) -> list[str]:
     return flags
 
 
-# Environment variables required for RTX 5090 / Blackwell (SM120) compatibility.
-# FA3 does not yet support SM120; FA2 must be forced.
+# Environment variables for RTX 5090 / Blackwell (SM120) compatibility.
+# Applied to BOTH the local start() path (subprocess env overlay) and the
+# remote systemd-run unit (via --setenv in _remote_start).
 _BLACKWELL_ENV: dict[str, str] = {
+    # vLLM <= 0.13: forces FlashAttention 2 (FA3 lacked SM120 kernels).
+    # No-op on vLLM >= 0.24 (the var is unrecognized and logged as "Unknown
+    # vLLM environment variable"; the engine auto-selects an attention
+    # backend). Kept for 0.13 compatibility.
     "VLLM_FLASH_ATTN_VERSION": "2",
     "PYTORCH_ALLOC_CONF": "expandable_segments:True",
     "CUDA_MODULE_LOADING": "LAZY",
+    # vLLM >= 0.24 routes top-k/top-p sampling through FlashInfer by default.
+    # FlashInfer 0.6.12 misdetects SM120 (Blackwell) — its check_cuda_arch()
+    # fails ("SM 12.x requires CUDA >= 12.9") and raises
+    # "RuntimeError: FlashInfer requires GPUs with sm75 or higher" during
+    # engine init, crashing startup. Setting this to 0 makes vLLM use its
+    # native sampler and skip the broken FlashInfer probe entirely. The
+    # value MUST be 0/1 (parsed as bool(int(...))), NOT "false" —
+    # int("false") raises ValueError. Workaround pending a FlashInfer
+    # release that detects sm_120; revisit then.
+    "VLLM_USE_FLASHINFER_SAMPLER": "0",
 }
 
 
@@ -276,6 +291,7 @@ class VllmService(UbikService):
         remote: Optional[RemoteExecutor] = None,
         remote_ubik_root: Optional[str] = None,
         probe_ip: Optional[str] = None,
+        remote_venv: Optional[str] = None,
     ) -> None:
         if model_path is None:
             from maestro.config import get_config
@@ -291,6 +307,14 @@ class VllmService(UbikService):
         self._remote = remote
         self._remote_ubik_root = remote_ubik_root
         self._probe_ip = probe_ip
+        # Isolated vLLM venv on the Somatic node (absolute path, valid there
+        # even though this Maestro runs on Hippocampal). When set, the remote
+        # launcher invokes ``<remote_venv>/bin/python`` explicitly, overriding
+        # ``somatic/inference/vllm_server.py``'s shebang — selecting the vLLM
+        # version + CUDA stack (e.g. 0.24+cu129 vs the 0.13+cu128 rollback).
+        # Mirrors WhisperXService._remote_venv. Populated from
+        # SomaticConfig.vllm_venv (env ``VLLM_VENV_PATH``) via __init__.py.
+        self._remote_venv = remote_venv
 
     def _is_remote(self) -> bool:
         """Whether this service must be controlled over SSH from another node.
@@ -513,11 +537,27 @@ class VllmService(UbikService):
         """
         root = self._remote_ubik_root or "/home/gasu/ubik"
         server = f"{root}/somatic/inference/vllm_server.py"
+        # Use the configured isolated venv (selects vLLM version + CUDA stack);
+        # ``somatic/inference/vllm_server.py``'s shebang (~/pytorch_env = 0.13)
+        # is the fallback only when no venv is configured. Mirrors WhisperXService.
+        venv = self._remote_venv or f"{root}/../pytorch_env"
+        python = f"{venv}/bin/python"
+
+        # Inject the Blackwell env vars (incl. VLLM_USE_FLASHINFER_SAMPLER=0,
+        # required by vLLM 0.24 on SM120) into the transient unit. The local
+        # path overlays these on the subprocess env; the remote path does the
+        # equivalent via systemd-run --setenv.
+        setenv_flags = " ".join(
+            f"--setenv={shlex.quote(k)}={shlex.quote(v)}"
+            for k, v in _BLACKWELL_ENV.items()
+        )
         script = f"""
 set -u
 {_USER_SYSTEMD_ENV}
 SERVER={shlex.quote(server)}
+PYTHON={shlex.quote(python)}
 if [ ! -f "$SERVER" ]; then echo "MISSING_SERVER:$SERVER"; exit 3; fi
+if [ ! -x "$PYTHON" ]; then echo "MISSING_PYTHON:$PYTHON"; exit 3; fi
 mkdir -p {shlex.quote(root)}/logs/inference
 if systemctl --user is-active --quiet {_VLLM_UNIT}; then echo "ALREADY_ACTIVE"; exit 0; fi
 if curl -s -o /dev/null --max-time 3 http://localhost:{self._port}/health; then
@@ -532,7 +572,8 @@ systemd-run --user --unit={_VLLM_UNIT} \
     --property=KillSignal=SIGTERM \
     --property=KillMode=mixed \
     --property=TimeoutStopSec={_REMOTE_STOP_GRACE_S} \
-    "$SERVER" --rtx5080 --skip-checks $CONFIG_ARG \
+    {setenv_flags} \
+    "$PYTHON" "$SERVER" --rtx5080 --skip-checks $CONFIG_ARG \
     --model {shlex.quote(self._model_path)} --port {self._port} 2>&1
 echo "STARTED_UNIT={_VLLM_UNIT} rc=$?"
 """
@@ -541,8 +582,8 @@ echo "STARTED_UNIT={_VLLM_UNIT} rc=$?"
         if not res.connected:
             logger.error("vllm: remote start failed — cannot reach Somatic: %s", res.stderr.strip()[:200])
             return False
-        if "MISSING_SERVER" in res.stdout:
-            logger.error("vllm: remote server script not found: %s", res.stdout.strip())
+        if "MISSING_" in res.stdout:
+            logger.error("vllm: remote prerequisite missing: %s", res.stdout.strip())
             return False
         logger.info("vllm: remote launch — %s", res.stdout.replace("\n", " ").strip())
         # Poll /health over Tailscale until the model loads + compiles.
