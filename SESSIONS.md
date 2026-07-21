@@ -1033,3 +1033,22 @@ content-length: 0
 3. Optional: FA2/FA3/FA-default benchmarking on 0.24 (`VLLM_FLASH_ATTN_VERSION` is a no-op on 0.24; engine auto-selects).
 4. Carried backlog, unchanged: persist `ubik-vllm`/`ubik-whisperx` as installed `.service` files (transient units vanish on `wsl --shutdown`); WhisperX health/lifecycle tests; retire `ubik-memory-sweep`; update ingestion loader (new fields + `EPISODIC` token); chromadb version alignment across three envs (1.5.1/1.4.1/1.3.7); single-venv doc correction (`ENVIRONMENT.md` still describes Somatic only); the `test_logger.py` stderr-teardown flake.
 5. The 0.24 upgrade **closes the 38 vLLM CVEs** — re-run `pip-audit` next session to confirm the new count (expect the vllm/torch rows gone; chromadb/diskcache/nltk no-fix remain).
+
+---
+
+**Addendum 2026-07-20 21:00 — CVE verification done (same session).**
+
+`pip-audit` on the 0.24 venv hit a limitation: vllm/torch/torchvision/torchaudio all carry `+cu129` local-version tags, which pip-audit **skips** ("Dependency not found on PyPI") — so it reported only 2 vulns (diskcache, setuptools) and couldn't speak to the vLLM/torch CVEs at all. The `-r` resolver path then choked on a `cuda-toolkit==12.9.1` dependency conflict. **Worked around it by querying OSV.dev directly** (the same DB pip-audit uses), which has no local-version problem:
+
+| Package | Before (0.13 env) | After (0.24 venv) | Note |
+|---|---|---|---|
+| **vllm** | 0.13.0 → **42 vulns** | 0.24.0 → **0** | ✅ all cleared. Sanity: OSV returns 42 for 0.13.0, confirming it indexes vLLM advisories — "0.24.0 → 0" is real, not a DB gap. |
+| **torch** | 2.9.1 → **4 vulns** | 2.11.0 → **1** | ✅ 3 of 4 cleared. Remaining: **CVE-2025-3000** (`torch.jit.script` memory corruption, CVSS ~3.4 low) — was present on 2.9.1 too (not a regression); fixed only in torch 2.13.0, not yet released. |
+| setuptools | 80.10.2 → 1 (PYSEC-2026-3447) | reverted to 80.10.2 | see below |
+| diskcache | 5.6.3 → 1 (PYSEC-2026-2447) | unchanged | no upstream fix |
+| ray / triton / flashinfer / torchaudio / torchvision | — | **0** each | clean |
+
+**Net: 52 → 3 vulns, all 3 non-actionable** (1 torch low-sev pre-existing pending 2.13.0; 2 no-fix/not-in-scope). **Headline confirmed: the 38–42 vLLM CVEs are gone.**
+
+**setuptools bump attempted then reverted:** tried `setuptools>=83.0.0` to clear PYSEC-2026-3447 — it cleared the CVE but **violated vLLM's declared `<81.0.0` and torch's `<82` constraints** (no version satisfies both the fix ≥83 and the caps <81). Reverted to 80.10.2 (dependency-clean, vLLM import + `/health` re-verified). The CVE is a `MANIFEST.in` Unicode-glob exclude-evasion bug exploitable only when building an sdist from attacker-controlled filenames — not in scope for a serving inference server that never builds packages. Revisit when vLLM/torch relax their caps or a constraint-valid fix exists. **No repo change from this** (setuptools is in the Somatic venv, not git-tracked); the 0.24 venv on Somatic now has setuptools 80.10.2.
+
