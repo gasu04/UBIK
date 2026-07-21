@@ -960,3 +960,26 @@ content-length: 0
 - Persist `ubik-whisperx`/`ubik-vllm` as installed `.service` files (transient units vanish on `wsl --shutdown`).
 - First whisperx model load pulls large-v2 (~3GB) to the HF cache; later loads are fast.
 ---
+
+## Session: 2026-07-20 20:26 - Node: Hippocampal
+**Goal:** Finish the per-service `maestro shutdown --service NAME` feature (carried over, deferred last session).
+**Completed:**
+- `shutdown.py`: added an optional `service_filter: set[str]` to `_services_in_shutdown_order`, `orderly_shutdown`, and `_verify_all_down` so a single service can be stopped without touching the rest of the cluster. In `orderly_shutdown` the parameter is named `service_filter` (not `services`) to avoid shadowing the local `services` list var - thread carefully if touching this.
+- `cli.py`: added `shutdown --service NAME` (click.Choice-validated against ALL_SERVICE_NAMES), symmetric with the existing `start --service`. `--service` + `--emergency` are mutually exclusive (exits 2); dry-run output now names the scope (service name / local / cluster).
+- `web/server.py`: `ShutdownRequest` gains `service: Optional[str]`; `/api/shutdown` honors it (stops one service) and rejects service+emergency with HTTP 400.
+- Tests: +8 in `test_shutdown.py` (4 service-filter unit tests incl. unknown-name-empty and filter+local_only composition; 4 CLI tests incl. mutual-exclusion and unknown-name rejection).
+- **Live-verified:** `shutdown --service whisperx` stopped only whisperx (curl /health -> unreachable) while vLLM stayed HTTP 200; `start --service whisperx` brought it back healthy (`model_loaded:true, device:cpu`). Full maestro suite: 225 passed, 1 pre-existing error (`test_logger.py::TestConfigureLogging::test_creates_log_directory` teardown `lost sys.stderr`, already documented - unrelated).
+**State left in:**
+- Feature shipped: committed `9d337f1`, pushed to origin/master.
+- WhisperX currently healthy on Somatic (restarted during verification).
+- **`maestro/services/vllm_service.py` is intentionally UNSTAGED** - it carries pre-existing Blackwell/FlashInfer env changes (`VLLM_USE_FLASHINFER_SAMPLER=0` workaround, `_BLACKWELL_ENV` applied to remote start, VLLM_VENV_PATH resolution in _remote_start) from other work, NOT part of this feature. Held per user instruction - commit only when told.
+**Files changed:**
+- `maestro/shutdown.py`: service_filter across order/verify paths
+- `maestro/cli.py`: shutdown --service option + emergency guard
+- `maestro/web/server.py`: ShutdownRequest.service + handler
+- `maestro/tests/test_shutdown.py`: +8 tests
+- SESSIONS.md: this entry
+**Next session should:**
+- Await user go-ahead to commit `maestro/services/vllm_service.py` (Blackwell/FlashInfer vLLM env) as its own commit.
+- Remaining carried backlog: persist ubik-vllm/ubik-whisperx as installed .service files; WhisperX health/lifecycle tests; retire ubik-memory-sweep; update ingestion loader; vLLM 0.24.0 upgrade; chromadb version alignment; single-venv doc correction.
+---
