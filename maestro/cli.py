@@ -694,20 +694,36 @@ def watch_cmd(
     default=False,
     help="Only stop services hosted on this node (skip the remote node).",
 )
-def shutdown_cmd(dry_run: bool, emergency: bool, local_only: bool) -> None:
+@click.option(
+    "--service",
+    "service_name",
+    default=None,
+    type=click.Choice(sorted(ALL_SERVICE_NAMES), case_sensitive=False),
+    metavar="NAME",
+    help=(
+        "Stop only this specific service (e.g. whisperx), leaving the rest of "
+        "the cluster untouched.  When omitted, all services are stopped in "
+        "reverse dependency order."
+    ),
+)
+def shutdown_cmd(
+    dry_run: bool, emergency: bool, local_only: bool, service_name: Optional[str]
+) -> None:
     """Stop UBIK services across the cluster in reverse dependency order.
 
     Default: graceful ordered stop (MCP → ChromaDB → Neo4j → Docker on
     Hippocampal; vLLM/WhisperX on Somatic, stopped over SSH), escalating to
     SIGKILL per service if the graceful stop does not complete within 30
     seconds.  Somatic vLLM is stopped via its graceful wrapper so GPU VRAM is
-    released.  Use --local-only to stop only this node's services.
+    released.  Use --local-only to stop only this node's services, or
+    --service NAME to stop a single service.
 
     \b
     Examples:
         maestro shutdown
         maestro shutdown --dry-run
         maestro shutdown --local-only
+        maestro shutdown --service whisperx
         maestro shutdown --emergency
     """
     from maestro.platform_detect import detect_node
@@ -729,21 +745,34 @@ def shutdown_cmd(dry_run: bool, emergency: bool, local_only: bool) -> None:
 
     try:
         if emergency:
+            if service_name:
+                console.print(
+                    "[bold red]--service and --emergency are mutually "
+                    "exclusive:[/bold red] --emergency kills ALL UBIK processes."
+                )
+                sys.exit(2)
             asyncio.run(ctrl.emergency_shutdown())
             console.print("[bold red]Emergency shutdown complete.[/bold red]")
         else:
+            service_filter = {service_name} if service_name else None
             stopped = asyncio.run(
-                ctrl.orderly_shutdown(dry_run=dry_run, local_only=local_only)
+                ctrl.orderly_shutdown(
+                    dry_run=dry_run,
+                    local_only=local_only,
+                    service_filter=service_filter,
+                )
             )
+            scope = service_name or ("local" if local_only else "cluster")
             if dry_run:
                 console.print(
                     f"[bold yellow]DRY RUN[/bold yellow] — would stop "
-                    f"{len(stopped)} service(s): {', '.join(stopped) or 'none'}"
+                    f"{len(stopped)} service(s) ({scope}): "
+                    f"{', '.join(stopped) or 'none'}"
                 )
             else:
                 console.print(
                     f"[bold green]Shutdown complete[/bold green] — "
-                    f"stopped {len(stopped)} service(s)"
+                    f"stopped {len(stopped)} service(s) ({scope})"
                 )
     except KeyboardInterrupt:
         console.print("\n[dim]Shutdown interrupted.[/dim]")

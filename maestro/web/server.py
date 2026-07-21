@@ -60,6 +60,7 @@ class ShutdownRequest(BaseModel):
     dry_run: bool = False
     local_only: bool = False
     emergency: bool = False
+    service: Optional[str] = None       # stop a single service (e.g. "whisperx")
     confirm: bool = False              # required for a real (non-dry-run) stop
 
 
@@ -213,6 +214,11 @@ def build_app() -> FastAPI:
         ctrl = ShutdownController(registry, identity)
 
         if req.emergency:
+            if req.service:
+                raise HTTPException(
+                    status_code=400,
+                    detail="emergency shutdown ignores 'service' (kills all local ports)",
+                )
             if not req.confirm:
                 raise HTTPException(status_code=400, detail="emergency shutdown requires confirm=true")
             await ctrl.emergency_shutdown()
@@ -221,9 +227,14 @@ def build_app() -> FastAPI:
         if not req.dry_run and not req.confirm:
             raise HTTPException(status_code=400, detail="shutdown requires confirm=true (or use dry_run)")
 
-        stopped = await ctrl.orderly_shutdown(dry_run=req.dry_run, local_only=req.local_only)
+        service_filter = {req.service} if req.service else None
+        stopped = await ctrl.orderly_shutdown(
+            dry_run=req.dry_run,
+            local_only=req.local_only,
+            service_filter=service_filter,
+        )
         return {"action": "shutdown", "dry_run": req.dry_run,
-                "local_only": req.local_only, "stopped": stopped}
+                "local_only": req.local_only, "service": req.service, "stopped": stopped}
 
     # ── Static UI ───────────────────────────────────────────────────────
     @app.get("/")

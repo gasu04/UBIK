@@ -201,6 +201,56 @@ class TestLocalServicesInShutdownOrder:
         assert names[-1] == "docker"
 
 
+class TestServiceFilter:
+    """``shutdown --service NAME`` restricts scope to one service."""
+
+    def test_filter_returns_only_named_service(self, app_config):
+        """A single-name filter yields exactly that service, order-preserving."""
+        ctrl = _make_ctrl(app_config, NodeType.HIPPOCAMPAL)
+        names = [
+            s.name
+            for s in ctrl._services_in_shutdown_order(
+                services={"whisperx"},
+            )
+        ]
+        assert names == ["whisperx"]
+
+    def test_filter_preserves_reverse_order_among_matches(self, app_config):
+        """A multi-name filter keeps reverse-dependency order."""
+        ctrl = _make_ctrl(app_config, NodeType.HIPPOCAMPAL)
+        names = [
+            s.name
+            for s in ctrl._services_in_shutdown_order(
+                services={"vllm", "whisperx"},
+            )
+        ]
+        assert set(names) == {"vllm", "whisperx"}
+        # Startup order is vllm then whisperx, so reverse → whisperx first.
+        assert names == ["whisperx", "vllm"]
+
+    def test_filter_with_unknown_name_is_empty(self, app_config):
+        """A filter matching no service yields an empty list (not an error)."""
+        ctrl = _make_ctrl(app_config, NodeType.HIPPOCAMPAL)
+        names = [
+            s.name
+            for s in ctrl._services_in_shutdown_order(
+                services={"does-not-exist"},
+            )
+        ]
+        assert names == []
+
+    def test_filter_combines_with_local_only(self, app_config):
+        """Filter and local_only compose: only the named LOCAL service."""
+        ctrl = _make_ctrl(app_config, NodeType.SOMATIC)
+        names = [
+            s.name
+            for s in ctrl._services_in_shutdown_order(
+                local_only=True, services={"vllm"},
+            )
+        ]
+        assert names == ["vllm"]
+
+
 # ---------------------------------------------------------------------------
 # TestWaitForDown
 # ---------------------------------------------------------------------------
@@ -832,3 +882,79 @@ class TestShutdownCLI:
             result = CliRunner().invoke(cli, ["shutdown"])
 
         assert result.exit_code == 0   # graceful — not a fatal error
+
+    def test_service_filter_passes_filter(self, app_config):
+        """``shutdown --service NAME`` threads a single-name filter through."""
+        from click.testing import CliRunner
+        from maestro.cli import cli
+
+        mock_ctrl = MagicMock()
+        mock_ctrl.orderly_shutdown = AsyncMock(return_value=["whisperx"])
+        mock_cls = MagicMock(return_value=mock_ctrl)
+
+        with (
+            patch(_PATCH_CFG, return_value=app_config),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_CTRL, mock_cls),
+        ):
+            result = CliRunner().invoke(
+                cli, ["shutdown", "--service", "whisperx"]
+            )
+
+        assert result.exit_code == 0
+        mock_ctrl.orderly_shutdown.assert_called_once()
+        kwargs = mock_ctrl.orderly_shutdown.call_args[1]
+        assert kwargs.get("service_filter") == {"whisperx"}
+
+    def test_service_without_emergency_is_none_by_default(self, app_config):
+        """No --service → service_filter is None (full cluster)."""
+        from click.testing import CliRunner
+        from maestro.cli import cli
+
+        mock_ctrl = MagicMock()
+        mock_ctrl.orderly_shutdown = AsyncMock(return_value=[])
+        mock_cls = MagicMock(return_value=mock_ctrl)
+
+        with (
+            patch(_PATCH_CFG, return_value=app_config),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_CTRL, mock_cls),
+        ):
+            result = CliRunner().invoke(cli, ["shutdown", "--dry-run"])
+
+        assert result.exit_code == 0
+        kwargs = mock_ctrl.orderly_shutdown.call_args[1]
+        assert kwargs.get("service_filter") is None
+
+    def test_service_plus_emergency_exits_2(self, app_config):
+        """``--service`` and ``--emergency`` are mutually exclusive."""
+        from click.testing import CliRunner
+        from maestro.cli import cli
+
+        mock_ctrl = MagicMock()
+        mock_ctrl.emergency_shutdown = AsyncMock()
+        mock_cls = MagicMock(return_value=mock_ctrl)
+
+        with (
+            patch(_PATCH_CFG, return_value=app_config),
+            patch(_PATCH_LOGGING),
+            patch(_PATCH_CTRL, mock_cls),
+        ):
+            result = CliRunner().invoke(
+                cli, ["shutdown", "--service", "whisperx", "--emergency"]
+            )
+
+        assert result.exit_code == 2
+        mock_ctrl.emergency_shutdown.assert_not_called()
+
+    def test_service_rejects_unknown_name(self, app_config):
+        """An unknown service name is rejected by click.Choice before running."""
+        from click.testing import CliRunner
+        from maestro.cli import cli
+
+        with patch(_PATCH_CFG, return_value=app_config):
+            result = CliRunner().invoke(
+                cli, ["shutdown", "--service", "not-a-service"]
+            )
+
+        assert result.exit_code != 0   # click usage error

@@ -175,7 +175,10 @@ class ShutdownController:
     # ── Service ordering ─────────────────────────────────────────────────
 
     def _services_in_shutdown_order(
-        self, *, local_only: bool = False
+        self,
+        *,
+        local_only: bool = False,
+        services: Optional[set[str]] = None,
     ) -> list[UbikService]:
         """Return services in reverse startup (safe shutdown) order.
 
@@ -185,6 +188,9 @@ class ShutdownController:
 
         Args:
             local_only: When ``True``, restrict to services on this node.
+            services: When given, restrict to services whose ``name`` is in this
+                set (used by ``shutdown --service NAME``).  Reverse-dependency
+                order is preserved among the selected services.
 
         Returns:
             Services to stop, with dependents first and foundations last.
@@ -195,6 +201,8 @@ class ShutdownController:
             selected = [s for s in startup_order if s.node == local_node]
         else:
             selected = list(startup_order)
+        if services:
+            selected = [s for s in selected if s.name in services]
         return list(reversed(selected))
 
     # ── Wait for service to go DOWN ──────────────────────────────────────
@@ -286,12 +294,17 @@ class ShutdownController:
     # ── Post-shutdown verification ───────────────────────────────────────
 
     async def _verify_all_down(
-        self, *, local_only: bool = False
+        self,
+        *,
+        local_only: bool = False,
+        services: Optional[set[str]] = None,
     ) -> dict[str, bool]:
         """Probe in-scope services and return a name→stopped map.
 
         Args:
             local_only: When ``True``, verify only services on this node.
+            services: When given, verify only services whose ``name`` is in
+                this set.
 
         Returns:
             Dict mapping service name to ``True`` when confirmed DOWN
@@ -302,6 +315,8 @@ class ShutdownController:
             s for s in self._registry.get_all()
             if not local_only or s.node == local_node
         ]
+        if services:
+            svcs = [s for s in svcs if s.name in services]
         if not svcs:
             return {}
         raw = await asyncio.gather(
@@ -327,8 +342,9 @@ class ShutdownController:
         timeout_per_service: float = _STOP_TIMEOUT_S,
         dry_run: bool = False,
         local_only: bool = False,
+        service_filter: Optional[set[str]] = None,
     ) -> list[str]:
-        """Stop all local services in reverse dependency order.
+        """Stop local services in reverse dependency order.
 
         For each service:
 
@@ -339,13 +355,18 @@ class ShutdownController:
         5. Log result.
 
         Pre-shutdown: stop daemon (unless *dry_run*), log metrics snapshot.
-        Post-shutdown: probe all local services, log verification report.
+        Post-shutdown: probe in-scope services, log verification report.
         Total wall-clock budget is capped at 120 seconds across all services.
 
         Args:
             timeout_per_service: Max seconds to wait per service before SIGKILL.
             dry_run: When ``True``, log planned actions without calling
                 :meth:`~UbikService.stop` or sending any signals.
+            local_only: When ``True``, restrict to services on this node.
+            service_filter: When given, stop only services whose ``name`` is in
+                this set (used by ``shutdown --service NAME``).  Lets you stop
+                one service (e.g. WhisperX) without touching the rest of the
+                cluster.
 
         Returns:
             Names of services successfully stopped (including those killed via
@@ -360,7 +381,9 @@ class ShutdownController:
         if not dry_run:
             self._stop_daemon()
 
-        services = self._services_in_shutdown_order(local_only=local_only)
+        services = self._services_in_shutdown_order(
+            local_only=local_only, services=service_filter
+        )
         if not services:
             log.info(
                 "shutdown: no services in scope on %s node",
@@ -439,7 +462,9 @@ class ShutdownController:
 
         # ── Post-shutdown verification ────────────────────────────────────
         if not dry_run:
-            verification = await self._verify_all_down(local_only=local_only)
+            verification = await self._verify_all_down(
+                local_only=local_only, services=service_filter
+            )
             if verification:
                 report_parts = [
                     f"{n}={'DOWN' if v else 'STILL_UP'}"
