@@ -1183,3 +1183,19 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 **Next session should:**
 - Field-test Layer A: start vLLM via maestro against the live Somatic node, confirm `systemctl --user status ubik-vllm` shows enabled+active and that a `kill` of the process triggers Restart. Then Layer B (Somatic Windows: `[boot] systemd=true`, `loginctl enable-linger`, boot Scheduled Task, keepalive heartbeat — needs Windows admin). See HARDENING_PLAN_2026-07-23.md §3 for order.
 ---
+
+## Session: [2026-07-23 21:52] — [Node: Hippocampal]
+**Goal:** Commit and push the Layers A+C hardening work.
+**Completed:**
+- Staged the coherent Layer A+C set only (code + both new test files + the updated `test_remote.py` assertion + SESSIONS.md + HARDENING_PLAN_2026-07-23.md + the privacy `.gitignore` hardening). Left unrelated untracked docs out (`DECISION_*.md`, `MAESTRO-0.12.0.md`, `START_HERE.md`, `UBIK_Claude_Prompts/`, `.claude/plans/`).
+- Committed to `master` as `d0af25e` — "maestro: Layers A+C — persistent self-healing vLLM unit + startup liveness eyes". `sync_sessions` hook synced SESSIONS.md → Google Drive on commit.
+- Pushed to `origin/master` (github.com/gasu04/UBIK): `d2d0751..d0af25e`.
+**State left in:**
+- Layers A+C committed and pushed. Working tree still holds unrelated untracked docs (intentionally uncommitted) and unrelated untracked data dirs (gitignored).
+- Layer A remains unit-tested only — NOT field-tested against a live Somatic node.
+- Docker: neo4j+chromadb serving; mcp + vLLM not started.
+**Files changed:**
+- (none new — this entry documents the commit/push of the prior entry's work.)
+**Next session should:**
+- Field-test Layer A against the live Somatic node (start vLLM via maestro; confirm `systemctl --user status ubik-vllm` enabled+active; verify a process kill triggers Restart). Then Layer B (Somatic Windows: systemd=true, enable-linger, boot Scheduled Task, keepalive — needs Windows admin). See HARDENING_PLAN_2026-07-23.md §3.
+---
