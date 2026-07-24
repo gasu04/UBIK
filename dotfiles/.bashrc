@@ -173,3 +173,6 @@ zellij() {
     fi
     command zellij "$@"
 }
+
+# opencode
+export PATH=/home/gasu/.opencode/bin:$PATH
