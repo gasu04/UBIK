@@ -21,11 +21,27 @@ venv/
 .vscode/
 *.swp
 
-# Database data (managed separately)
+# Database data (managed separately) — contain personal episodic/semantic
+# memory content; never commit (§2.4 privacy).
 data/
+chromadb_data/
+chromadb_data_test/
+chromadb_data*.txt
+Ingested_data/
+Artifacts/
+backups/
 
 # Model weights
 models/
+*.gguf
+
+# Google Drive sync temp dirs
+.tmp.driveupload/
+.tmp.drivedownload/
+
+# Vendored third-party apps / source snapshots (track as submodules if needed)
+open-notebook/
+UBIKParallax-source-v6/
 
 # Google OAuth credentials & tokens — never commit (Phase 2 fetch_sources)
 config/gdrive_credentials.json
@@ -37,6 +53,7 @@ config/gdrive_token.json
 ingestion/sources/*/*
 ingestion/sources/MANIFEST.jsonl
 ingestion/enriched/*
+ingestion/enriched_baseline_*/
 ingestion/pending_review/*
 ingestion/approved/*
 ingestion/quarantine/*/*

@@ -1052,3 +1052,134 @@ content-length: 0
 
 **setuptools bump attempted then reverted:** tried `setuptools>=83.0.0` to clear PYSEC-2026-3447 — it cleared the CVE but **violated vLLM's declared `<81.0.0` and torch's `<82` constraints** (no version satisfies both the fix ≥83 and the caps <81). Reverted to 80.10.2 (dependency-clean, vLLM import + `/health` re-verified). The CVE is a `MANIFEST.in` Unicode-glob exclude-evasion bug exploitable only when building an sdist from attacker-controlled filenames — not in scope for a serving inference server that never builds packages. Revisit when vLLM/torch relax their caps or a constraint-valid fix exists. **No repo change from this** (setuptools is in the Somatic venv, not git-tracked); the 0.24 venv on Somatic now has setuptools 80.10.2.
 
+
+---
+
+## Session: 2026-07-23 00:30 — Node: Hippocampal (driving Somatic over SSH)
+**Goal:** Diagnose `maestro start` failing (docker + vllm both "did not become healthy"), then per user request: verify UBIK/vLLM/WhisperX venv isolation, audit project structure for cross-repo interference, root-cause the *endemic* vLLM-start failure, and produce a deep CLAUDE.md-compliance hardening list.
+
+**Immediate incident — two INDEPENDENT failures (not one):**
+- **Docker (Hippocampal):** `docker info` → `500 Internal Server Error`; backend log → `connect tcp 192.168.65.7:2376: no route to host` + `guest-services/stats.sock: connection refused`. Docker Desktop's app/backend processes are up but its **Linux VM is wedged**. Cascades: `neo4j`/`chromadb`/`mcp` all skip on the failed `docker` dependency. Same mode as 07-22 (fixed then by restarting Docker Desktop). **Restarted Docker Desktop this session (quit + pkill + relaunch); as of wrap-up the daemon still returns HTTP 000 — needs manual attention at the machine (likely the macOS admin dialog per 06-xx line 77, or VM re-wedged). NOT yet recovered.**
+- **vLLM (Somatic):** unit launches cleanly (`STARTED_UNIT=ubik-vllm rc=0`, 3×) then systemd issues a clean **Stop** ~15s later, mid model-load (journal: `Started` → 15s → `Stopping`, no crash/OOM). WSL Ubuntu found `Stopped`; `last` showed rapid reboot churn 18:25-18:29. `.wslconfig` verified intact (`vmIdleTimeout=-1`, `networkingMode=NAT`) so NOT the idle-timeout regression — matches the intermittent **WSL2 `p9io`/`CheckConnection` VM-poweroff** bug (07-11b, line 677). Issued `wsl --shutdown` to force a clean VM reinit; VM confirmed Stopped. **Did NOT re-run `maestro start --service vllm` yet** (user redirected to the audit).
+
+**vLLM endemic root-cause (the real deliverable — synthesized across 07-11/13/15/19/23):**
+The failure is NOT one bug — it's a **fragile launch architecture with a diagnostic blind spot**. The proximate cause differed every time (idle-timeout teardown; p9io poweroff; mirrored-mode nginx:8002 collision; orphaned wslrelay hvsocket; direct-os.environ bug; tonight clean VM teardown). Three common denominators:
+1. **Transient systemd unit** (`systemd-run --unit=ubik-vllm`) — vanishes on any `wsl --shutdown`/VM teardown. Backlog since line 368; still not persisted as an installed `.service`.
+2. **WSL2 platform fragility** (p9io transport, HNS socket leaks) tears the VM down ~15s in — intermittent, host-side, unfixable from the VM.
+3. **DIAGNOSTIC BLIND SPOT (the actual code defect):** `maestro/services/base.py::_wait_for_healthy` polls `/health` for the full 300s and reports a generic *"did not become healthy within 300s"* — it **never checks `systemctl --user is-active ubik-vllm` or reads the journal**. When the unit dies mid-load, maestro is blind — which is *why every recurrence needed a fresh manual journal dig to find a different cause*.
+Durable fixes (priority): **(A)** make the health-wait detect unit death and surface the last ~20 journal lines (HIGH value, LOW risk, pure maestro code); **(B)** persist `ubik-vllm`/`ubik-whisperx` as installed+enabled `.service` files; **(C)** add a 1-2× start retry with a `wsl --shutdown` between (matches the documented "3rd attempt works"); **(D)** Windows-side p9io investigation (out of repo scope).
+
+**Venv isolation audit — VERDICT: NO dedicated UBIK venv exists.**
+- `UBIK/venv` is a **broken symlink → `/home/gasu/pytorch_env`** (Linux path, dead on macOS; violates §3.5).
+- `maestro`/`ingestion`/`hippocampal` **all run under the shared DeepSeek venv** (`/Volumes/990PRO 4T/DeepSeek/venv`, py3.13.7, 381 pkgs incl. langchain/langgraph/transformers/whisper). The `maestro` shell alias hardcodes that interpreter.
+- **Concrete interference:** hippocampal pins `fastmcp==2.14.3` but the shared venv carries **3.4.2** (major override — pin can never hold while shared; last `pip install` wins). Also `sentence-transformers` 5.1.2→5.6.0, `python-dotenv` drift.
+- **Somatic isolation is CORRECT:** `pytorch_env_vllm024` (vLLM) + `ubik-whisperx-venv` (WhisperX) are properly separate. vLLM/WhisperX isolation = GOOD, per past decisions.
+- Root `requirements.txt`/`requirements-frozen.txt` actually describe the **Somatic GPU node** (torch+cu128, CUDA) — mislocated at repo root, a trap for provisioning macOS. No `.python-version`/`tox.ini`/working setup script. Only `deepseek/` is a proper PEP-621 package.
+
+**Project-structure audit (vs §3.2) — CRITICAL privacy finding + FIXED this session:**
+- **`chromadb_data/` (37M, personal episodic/semantic memory) was NOT gitignored** — `.gitignore` covered only `data/`/`models/`. A single `git add -A` would have committed personal memory content permanently (§2.4). Same exposure: `backups/`, `Ingested_data/`, `Artifacts/`, `chromadb_data_test/`, `.tmp.drive*`, `enriched_baseline_013/` (meeting transcripts), plus vendored `open-notebook/`/`UBIKParallax-source-v6/`. Nothing tracked yet — latent trap.
+- **FIXED:** extended `.gitignore` to cover all of the above (+ `*.gguf`). Verified all 8 dirs now `git check-ignore`-clean. **This is the one code change this session.**
+- Other gaps: no subproject has `requirements.lock` (§2.7); `e2e/` and `docs/` exist nowhere; `pyproject.toml` only in deepseek; `somatic/` least §3.2-compliant; `ingestion/` has no top-level `__init__.py`.
+
+**CLAUDE.md code-compliance audit (maestro, Part 2):**
+- PASS: §2.1 Config (IP/port literals are settings-defaults/docstrings — allowed; ports DI'd from config), §2.2 Async-first (100% AsyncClient), §2.5 Docs (rich — only the Tier-classification line missing).
+- **FAIL §2.3 Resilience (headline):** NO circuit breaker, NO retry+jitter anywhere; the canonical `mcp_client/circuit_breaker.py`+`resilience.py` are **never imported**. `base.py:290-318` is a constant-3s poll — the exact probe-storm pattern §2.3 forbids. (Time source `perf_counter` OK; health checks OK.)
+- **FAIL §2.8 Code Org:** no `UbikError` hierarchy; **94 bare `except Exception`** in deep code (only top-level allowed). DI + type hints GOOD.
+- PARTIAL §2.4 (no `SafeJSONFormatter`; low risk, infra-only), §2.6 (broad per-module tests but flat dir, no unit/integration/e2e/fixtures).
+
+**Files changed:**
+- `.gitignore`: +chromadb_data/ (+test), Ingested_data/, Artifacts/, backups/, *.gguf, .tmp.drive*/, open-notebook/, UBIKParallax-source-v6/, ingestion/enriched_baseline_*/ — closes the personal-memory commit trap.
+- `SESSIONS.md`: this entry.
+
+**State left in:**
+- **Docker Desktop: NOT recovered** (daemon HTTP 000 after restart) — blocks neo4j/chromadb/mcp. Needs manual look at the machine.
+- **vLLM: NOT running.** WSL VM cleanly shut down (ready for a fresh `maestro start --service vllm`, which per history should succeed on a clean VM).
+- No maestro/ingestion/hippocampal *code* touched — audits were read-only; only `.gitignore` hardened.
+
+**Next session should (prioritized hardening backlog from tonight's audits):**
+1. **Recover Docker** (check macOS admin dialog / Docker Desktop → Troubleshoot → Restart or full quit-relaunch), confirm neo4j/chromadb/mcp come healthy. Then `maestro start --service vllm` on the clean WSL VM and verify `/health` from Hippocampal.
+2. **vLLM durable fix (A):** teach `maestro/services/base.py::_wait_for_healthy` (or vllm `_remote_start`) to detect `ubik-vllm` unit death during the wait and surface the journal tail — turns the 300s silent timeout into an instant actionable error. Highest value / lowest risk.
+3. **Give UBIK its own venv:** create `ubik-venv` (py3.13) = union of maestro+ingestion+hippocampal reqs (NO torch/langchain), resolve fastmcp 2 vs 3, fix the dead `venv` symlink, repoint the `maestro` alias, correct `ENVIRONMENT.md` (the documented single-venv-doc backlog).
+4. **§2.3 resilience:** import the canonical circuit-breaker+retry into maestro's probes/SSH (do NOT reimplement — §3.4).
+5. **Persist `ubik-vllm`/`ubik-whisperx` as installed `.service` files** (vLLM durable fix B; kills the transient-unit failure mode).
+6. Lower: §2.8 UbikError hierarchy + narrow the 94 bare excepts; §2.6 test-dir restructure; §2.5 Tier lines; §2.7 per-subproject requirements.lock; namespace/relocate the Somatic-flavored root requirements files.
+7. Carried backlog (unchanged): chromadb version alignment (client 1.4.1 vs native server 1.3.7 vs Somatic 1.5.1); retire `ubik-memory-sweep`; update ingestion loader; `test_logger.py` stderr-teardown flake.
+
+## Session: 2026-07-23 02:10 — Node: Hippocampal (continuation)
+**Goal:** Complete the "fix both now" recovery left open in the 00:30 entry (Docker was NOT recovered / vLLM not running), and re-confirm the CLAUDE.md audit on request.
+
+**Docker — RECOVERED.**
+- Prior restart had **hung**: backend log stuck on `waiting for electron to quit`; both `Docker Desktop` and `com.docker.backend` were actually DOWN (the 00:30 "HTTP 000" was a half-dead app, not a wedged VM).
+- Fix: `pkill -9 -f "Docker Desktop"; pkill -9 -f "com.docker.backend"; open -a Docker`. Daemon came up clean.
+- Verified serving (not just container-up):
+  - **neo4j** 7474 → HTTP 200, container `Up (healthy)` ✓
+  - **chromadb** 8001 `/api/v2/heartbeat` → 200 ✓ — **container shows `unhealthy` but that is a stale healthcheck still probing the deprecated `/api/v1` endpoint; the service is up.** (Cosmetic; worth fixing the compose healthcheck to hit v2.)
+  - **open-notebook** container Up ✓
+  - **mcp** 8080 → 000 — not a container; maestro-managed process, was skipped while docker was down. Not yet restarted (user redirected).
+
+**CLAUDE.md audit — re-confirmed on request** (no change from 00:30 findings): two hard FAILs — **§2.3 Resilience** (no circuit breaker / no retry+jitter; canonical `mcp_client/` never imported; `base.py:290-318` constant-3s poll) and **§2.8 Code Org** (no `UbikError`; 94 bare `except Exception`; `base.py:353` is one). PARTIAL: §2.4 (no `SafeJSONFormatter`), §2.6 (no maestro tests/). PASS: §2.1, §2.2, §2.5. The `_wait_for_healthy` diagnostic blind spot remains the #1 endemic-vLLM fix.
+
+**State left in:**
+- **Docker: healthy** — neo4j + chromadb serving, open-notebook up. chromadb container flag cosmetically `unhealthy` (v1 healthcheck vs v2 service).
+- **mcp (8080): not running** — safe to start now that docker dep is healthy.
+- **vLLM: not running.** WSL VM still cleanly shut down, ready for `maestro start --service vllm`.
+- No code changed this continuation (`.gitignore` from 00:30 remains the only code change of the day).
+
+**Next session should:**
+1. Start mcp, then `maestro start --service vllm` on the clean WSL VM; verify `/health` from Hippocampal.
+2. Fix chromadb compose healthcheck to probe `/api/v2/heartbeat` (kills the false `unhealthy`).
+3. Begin the hardening backlog — highest value first: `_wait_for_healthy` unit-death detection (endemic-vLLM fix A), then UBIK-own-venv, then §2.3 import of canonical resilience.
+---
+
+## Session: 2026-07-23 03:05 — Node: Hippocampal
+**Goal:** Implement **Layer C** of HARDENING_PLAN_2026-07-23.md — give maestro out-of-band eyes on the vLLM unit so a death mid-load is reported instantly with the journal tail, instead of a silent 300s health-wait timeout. (Highest-value / lowest-risk layer; pure diagnostic, no launch-behavior change.)
+
+**Completed:**
+- Added `UbikService._liveness_diagnostic()` hook to `maestro/services/base.py` — default returns `None` (no behavior change for any other service).
+- Wired it into `_wait_for_healthy`: after each unhealthy probe, consults the hook at most every `liveness_interval` (default 9.0s, new kwarg) so an SSH round-trip isn't paid every 3s poll; if the hook reports death, logs `"<name> died during startup wait (Ns): <journal>"` and returns `False` immediately.
+- Overrode `_liveness_diagnostic` in `VllmService` (remote path only): one SSH call runs `systemctl --user is-active ubik-vllm`; returns `None` when active/activating (still loading) or when SSH is unreachable (never false-alarm), else the `journalctl --user -u ubik-vllm -n 30` tail (truncated 2000 chars). Privacy §2.4: journal is engine output, not memory content — documented in the docstring.
+- New `maestro/tests/test_liveness.py` — 6 tests: abort-on-death (<5s wall, not 300s; diag logged), keep-waiting-while-activating, SSH-down→None, unit-active→None, dead→journal, not-remote→None (no SSH call). All green.
+
+**Verification:**
+- `pytest maestro/tests/test_liveness.py` → 6 passed.
+- Regression: `test_shutdown + test_service_probes + test_orchestrator + test_remote` → 190 passed.
+- `ast.parse` + import check on both changed modules OK; hook present on base class.
+- ruff/mypy NOT run — neither installed in the DeepSeek venv (missing lint/type CI tooling is already on the hardening backlog; noted, not fixed here).
+
+**Files changed:**
+- `maestro/services/base.py`: +`_liveness_diagnostic` no-op hook; `_wait_for_healthy` gains `liveness_interval` kwarg + throttled early-abort-on-death.
+- `maestro/services/vllm_service.py`: +`_liveness_diagnostic` remote override (systemctl is-active + conditional journal tail).
+- `maestro/tests/test_liveness.py`: new (6 tests).
+- `HARDENING_PLAN_2026-07-23.md`: (created earlier this session) the full 5-layer plan; Layer C now implemented.
+
+**State left in:**
+- Layer C DONE and green. No launch behavior changed — vLLM still starts via the transient `systemd-run` unit (Layer A not yet done); the new hook only *observes* it. Safe to deploy.
+- Docker healthy (neo4j+chromadb serving; chromadb container flag cosmetically `unhealthy`). mcp + vLLM still not started.
+
+**Next session should:**
+- Layer A (persistent, enabled `ubik-vllm.service` with `Restart=on-failure`, rendered from config; retire transient `systemd-run`), then Layer B (Somatic Windows: systemd+linger, boot Scheduled Task, keepalive heartbeat — needs Windows admin). See HARDENING_PLAN_2026-07-23.md §3 for order.
+---
+
+## Session: [2026-07-23 21:42] — [Node: Hippocampal]
+**Goal:** Implement Layer A of the hardening plan — replace the transient `systemd-run` vLLM unit with a persistent, enabled, self-healing systemd *user* unit rendered from config; verify with tests.
+**Completed:**
+- `maestro/services/vllm_service.py` (v0.7.0 → 0.8.0): added pure renderer `_render_vllm_unit(*, python, server, config, model, port, stop_grace_s)` producing the full unit file. All node-specific values are injected (no `/home/gasu`, no `pytorch_env` literals — §2.1). Unit carries the 4 Blackwell/SM120 `Environment=` lines (incl. `VLLM_USE_FLASHINFER_SAMPLER=0`), `Restart=on-failure` / `RestartSec=10` / `StartLimitBurst=4` (self-healing with storm cap), and `KillSignal=SIGTERM` + `KillMode=mixed` + `TimeoutStopSec=90` (graceful VRAM release).
+- Rewrote `_remote_start` to **install-then-start**: renders the unit, writes it under `$HOME/.config/systemd/user/ubik-vllm.service` via a quoted heredoc (`<<'__UBIK_VLLM_UNIT__'` — no bash expansion of the unit body), sha256-compares to skip a needless `daemon-reload`, then `reset-failed` / `enable` / `restart`. The transient `systemd-run --user` path is retired. `MISSING_` prerequisite and SSH-down results still short-circuit (return False) before `_wait_for_healthy`.
+- Confirmed `load_config()` in `somatic/inference/vllm_server.py` tolerates a missing config file (merges defaults) → `--config` is passed unconditionally, keeping the renderer a pure function.
+**Verification:**
+- `bash -n` on the generated install script → BASH SYNTAX OK; rendered unit inspected line-by-line.
+- New `maestro/tests/test_vllm_unit.py` — 9 tests (5 renderer: config values used / no hardcoded literals / all 4 Blackwell env / self-healing+VRAM directives / trailing newline; 4 `_remote_start`: installs+enables+restarts & no `systemd-run`, MISSING_ short-circuit, SSH-down short-circuit, healthy path awaits `_wait_for_healthy`). All green.
+- Updated the now-stale `test_remote.py::test_remote_start_drives_vllm_server_wrapper` assertion to the persistent-unit mechanism (`systemctl --user enable/restart ubik-vllm`, `Restart=on-failure`, `systemd-run` absent). WhisperX test left untouched (WhisperX still uses transient `systemd-run` — not part of Layer A).
+- Full maestro suite (excluding known `test_logger.py` stderr-teardown flake): **608 passed, 0 failed**.
+- ruff/mypy still NOT run — not installed in the DeepSeek venv (lint/type CI tooling remains on the backlog).
+**Files changed:**
+- `maestro/services/vllm_service.py`: +`_render_vllm_unit` renderer; `_remote_start` rewritten to install+enable+restart a persistent unit; version 0.8.0.
+- `maestro/tests/test_vllm_unit.py`: new (9 tests).
+- `maestro/tests/test_remote.py`: updated one vLLM assertion for the persistent-unit mechanism.
+**State left in:**
+- Layer A DONE and green. vLLM now launches as a persistent, enabled, self-healing unit — survives service crash (Restart=on-failure) and, once installed, survives a maestro restart. NOT yet field-tested against a live Somatic node (Somatic/WSL not started this session); tests are unit-level only.
+- Not deployed to Somatic yet: next real vLLM start via maestro will install the unit.
+- Docker: neo4j+chromadb serving; mcp + vLLM not started.
+**Next session should:**
+- Field-test Layer A: start vLLM via maestro against the live Somatic node, confirm `systemctl --user status ubik-vllm` shows enabled+active and that a `kill` of the process triggers Restart. Then Layer B (Somatic Windows: `[boot] systemd=true`, `loginctl enable-linger`, boot Scheduled Task, keepalive heartbeat — needs Windows admin). See HARDENING_PLAN_2026-07-23.md §3 for order.
+---

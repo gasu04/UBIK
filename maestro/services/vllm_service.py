@@ -24,7 +24,12 @@ vLLM runs ONLY on the Somatic node.  Never call start() on the
 Hippocampal node.
 
 Author: UBIK Project
-Version: 0.7.0
+Version: 0.8.0
+
+Remote-start note (v0.8.0, HARDENING_PLAN Layer A): the Somatic vLLM is now
+installed as a *persistent, enabled* systemd user unit (rendered by
+``_render_vllm_unit``) with ``Restart=on-failure``, replacing the earlier
+*transient* ``systemd-run`` unit that vanished on any WSL VM teardown.
 """
 
 import asyncio
@@ -210,7 +215,7 @@ def _build_vllm_serve_args(ubik_root: Path) -> list[str]:
 
 # Environment variables for RTX 5090 / Blackwell (SM120) compatibility.
 # Applied to BOTH the local start() path (subprocess env overlay) and the
-# remote systemd-run unit (via --setenv in _remote_start).
+# remote persistent unit (baked in as Environment= lines by _render_vllm_unit).
 _BLACKWELL_ENV: dict[str, str] = {
     # vLLM <= 0.13: forces FlashAttention 2 (FA3 lacked SM120 kernels).
     # No-op on vLLM >= 0.24 (the var is unrecognized and logged as "Unknown
@@ -230,6 +235,71 @@ _BLACKWELL_ENV: dict[str, str] = {
     # release that detects sm_120; revisit then.
     "VLLM_USE_FLASHINFER_SAMPLER": "0",
 }
+
+
+def _render_vllm_unit(
+    *,
+    python: str,
+    server: str,
+    config: str,
+    model: str,
+    port: int,
+    stop_grace_s: int = _REMOTE_STOP_GRACE_S,
+) -> str:
+    """Render the ``ubik-vllm`` systemd *user* unit file from config values.
+
+    This is the single source of truth for the persistent unit installed on
+    the Somatic node.  Every path and value is supplied by the caller (which
+    reads them from :class:`~maestro.config.SomaticConfig`), so the unit
+    contains no hardcoded node-specific literals — CLAUDE.md §2.1.
+
+    The Blackwell/SM120 environment (:data:`_BLACKWELL_ENV`) is baked in as
+    ``Environment=`` lines so it travels with the unit instead of being
+    re-declared on every start.  ``Restart=on-failure`` with a
+    ``StartLimitBurst`` cap gives self-healing within a running WSL VM while
+    preventing an infinite thrash on a genuinely broken start.
+
+    Args:
+        python: Absolute path to the venv Python interpreter on Somatic
+            (selects the vLLM version + CUDA stack).
+        server: Absolute path to ``vllm_server.py`` (the graceful wrapper).
+        config: Absolute path to ``vllm_config.yaml``.  Passed unconditionally
+            — ``load_config`` tolerates a missing file by falling back to
+            defaults, so no runtime existence check is needed.
+        model: Absolute model path on Somatic.
+        port: vLLM HTTP port.
+        stop_grace_s: ``TimeoutStopSec`` — the VRAM-release window before
+            systemd SIGKILLs the cgroup.
+
+    Returns:
+        The full unit-file text (ends with a trailing newline).
+    """
+    env_lines = "\n".join(
+        f"Environment={key}={val}" for key, val in _BLACKWELL_ENV.items()
+    )
+    exec_start = (
+        f"{python} {server} --rtx5080 --skip-checks "
+        f"--config {config} --model {model} --port {port}"
+    )
+    return f"""[Unit]
+Description=UBIK vLLM inference server (Somatic)
+After=default.target
+StartLimitIntervalSec=600
+StartLimitBurst=4
+
+[Service]
+Type=simple
+{env_lines}
+ExecStart={exec_start}
+KillSignal=SIGTERM
+KillMode=mixed
+TimeoutStopSec={stop_grace_s}
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
+"""
 
 
 def _find_vllm_pids(model_path: str) -> list[int]:
@@ -387,6 +457,51 @@ class VllmService(UbikService):
                 error=str(exc),
             )
 
+    async def _liveness_diagnostic(self) -> Optional[str]:
+        """Report vLLM unit death out-of-band, for the remote path only.
+
+        During the post-start health wait, ``/health`` staying unreachable is
+        ambiguous: the model may still be loading (30-120 s+), or the
+        ``ubik-vllm`` systemd unit may have already died (e.g. the WSL VM tore
+        itself down mid-load — the endemic failure mode).  This hook resolves
+        the ambiguity with one cheap SSH call: it reads the unit's active
+        state, and only when the unit is *not* active/activating does it pull
+        the last 30 journal lines so the operator gets an instant reason.
+
+        Returns:
+            ``None`` when the unit is ``active``/``activating`` (still loading —
+            keep waiting) OR when Somatic is unreachable (cannot tell — never
+            false-alarm on a transient SSH blip).  Otherwise the journal tail
+            (truncated) explaining why the unit died.
+
+        Note:
+            Local (non-remote) starts return ``None`` — there is no systemd
+            unit to interrogate; the parent poll handles that path.
+
+        Privacy (§2.4):
+            The journal tail is vLLM engine output — model load, CUDA backend
+            selection, tracebacks — not memory content, queries, or prompts.
+            Safe to log.  Do not widen this to capture request bodies.
+        """
+        if not self._is_remote() or self._remote is None:
+            return None
+
+        script = f"""
+{_USER_SYSTEMD_ENV}
+state=$(systemctl --user is-active {_VLLM_UNIT} 2>/dev/null || echo unknown)
+echo "STATE=$state"
+if [ "$state" != "active" ] && [ "$state" != "activating" ]; then
+    journalctl --user -u {_VLLM_UNIT} -n 30 --no-pager 2>/dev/null | tail -n 30
+fi
+"""
+        res = await self._remote.run(script, timeout=15.0)
+        if not res.connected:
+            # Cannot determine liveness — keep waiting rather than false-alarm.
+            return None
+        if "STATE=active" in res.stdout or "STATE=activating" in res.stdout:
+            return None
+        return res.stdout.strip()[:2000]
+
     async def start(self, ubik_root: Path) -> bool:
         """Launch vLLM and wait for it to become healthy.
 
@@ -517,20 +632,29 @@ class VllmService(UbikService):
         return await self._wait_for_healthy("localhost")
 
     async def _remote_start(self) -> bool:
-        """Start vLLM on the Somatic node over SSH as a systemd *user* unit.
+        """Start vLLM on the Somatic node over SSH as a *persistent* systemd unit.
 
         A plain ``nohup … &`` launched over ``wsl bash -s`` does NOT survive:
         Windows tears down the WSL command's process tree when ``wsl.exe``
-        exits.  Instead we register the graceful-lifecycle wrapper
-        (``somatic/inference/vllm_server.py``) as a transient systemd user unit
-        (``ubik-vllm``) via ``systemd-run --user``.  User lingering keeps the
-        systemd user manager alive independently of any SSH session, so the
-        unit persists.  ``KillSignal=SIGTERM`` + ``TimeoutStopSec`` give the
-        wrapper time to run vLLM's CUDA cleanup on stop (VRAM release);
-        ``KillMode=mixed`` SIGKILLs any EngineCore stragglers in the cgroup.
+        exits.  Earlier versions registered a *transient* unit via
+        ``systemd-run --user``, which recovered from that — but vanished on any
+        ``wsl --shutdown`` / VM teardown, so vLLM never came back on its own
+        (the endemic-failure root cause, HARDENING_PLAN Layer A).
 
-        This method registers the unit, then polls ``/health`` over Tailscale
-        until the model finishes loading.
+        This method now **installs** the graceful wrapper
+        (``somatic/inference/vllm_server.py``) as an *enabled* systemd user
+        unit rendered by :func:`_render_vllm_unit`.  The unit file is written
+        idempotently (a ``daemon-reload`` happens only when the content
+        actually changes), ``enable``d so it starts with the user manager
+        (given lingering — Layer B), and carries ``Restart=on-failure`` so a
+        crash or VM hiccup self-heals within a running VM.
+        ``KillSignal=SIGTERM`` + ``TimeoutStopSec`` preserve the CUDA-cleanup /
+        VRAM-release window on stop; ``KillMode=mixed`` reaps EngineCore
+        stragglers.
+
+        After installing + (re)starting the unit, it polls ``/health`` over
+        Tailscale until the model finishes loading, with out-of-band unit-death
+        detection via :meth:`_liveness_diagnostic` (Layer C).
 
         Returns:
             ``True`` when vLLM becomes healthy within :attr:`max_wait_s`.
@@ -542,42 +666,56 @@ class VllmService(UbikService):
         # is the fallback only when no venv is configured. Mirrors WhisperXService.
         venv = self._remote_venv or f"{root}/../pytorch_env"
         python = f"{venv}/bin/python"
+        config = f"{root}/config/models/vllm_config.yaml"
 
-        # Inject the Blackwell env vars (incl. VLLM_USE_FLASHINFER_SAMPLER=0,
-        # required by vLLM 0.24 on SM120) into the transient unit. The local
-        # path overlays these on the subprocess env; the remote path does the
-        # equivalent via systemd-run --setenv.
-        setenv_flags = " ".join(
-            f"--setenv={shlex.quote(k)}={shlex.quote(v)}"
-            for k, v in _BLACKWELL_ENV.items()
+        # Render the unit file (single source of truth; Blackwell env baked in).
+        unit_content = _render_vllm_unit(
+            python=python,
+            server=server,
+            config=config,
+            model=self._model_path,
+            port=self._port,
+            stop_grace_s=_REMOTE_STOP_GRACE_S,
         )
+
+        # Install-then-start.  The unit content is delivered via a *quoted*
+        # heredoc (delimiter ``__UBIK_VLLM_UNIT__``) so bash performs no
+        # expansion on it — the content is fully rendered above and must travel
+        # verbatim.  Change detection is by sha256 so an unchanged unit skips
+        # the daemon-reload.
         script = f"""
 set -u
 {_USER_SYSTEMD_ENV}
 SERVER={shlex.quote(server)}
 PYTHON={shlex.quote(python)}
+UNIT_DIR="$HOME/.config/systemd/user"
+UNIT_FILE="$UNIT_DIR/{_VLLM_UNIT}.service"
 if [ ! -f "$SERVER" ]; then echo "MISSING_SERVER:$SERVER"; exit 3; fi
 if [ ! -x "$PYTHON" ]; then echo "MISSING_PYTHON:$PYTHON"; exit 3; fi
-mkdir -p {shlex.quote(root)}/logs/inference
+mkdir -p {shlex.quote(root)}/logs/inference "$UNIT_DIR"
 if systemctl --user is-active --quiet {_VLLM_UNIT}; then echo "ALREADY_ACTIVE"; exit 0; fi
 if curl -s -o /dev/null --max-time 3 http://localhost:{self._port}/health; then
     echo "ALREADY_RUNNING_UNMANAGED"; exit 0
 fi
+cat > "$UNIT_FILE.tmp" <<'__UBIK_VLLM_UNIT__'
+{unit_content}__UBIK_VLLM_UNIT__
+NEW_HASH=$(sha256sum < "$UNIT_FILE.tmp" | cut -d' ' -f1)
+OLD_HASH=""
+[ -f "$UNIT_FILE" ] && OLD_HASH=$(sha256sum < "$UNIT_FILE" | cut -d' ' -f1)
+if [ "$NEW_HASH" != "$OLD_HASH" ]; then
+    mv "$UNIT_FILE.tmp" "$UNIT_FILE"
+    systemctl --user daemon-reload
+    echo "UNIT_INSTALLED"
+else
+    rm -f "$UNIT_FILE.tmp"
+    echo "UNIT_UNCHANGED"
+fi
 systemctl --user reset-failed {_VLLM_UNIT} 2>/dev/null || true
-CONFIG={shlex.quote(root)}/config/models/vllm_config.yaml
-CONFIG_ARG=""
-[ -f "$CONFIG" ] && CONFIG_ARG="--config $CONFIG"
-systemd-run --user --unit={_VLLM_UNIT} \
-    --property=Type=simple \
-    --property=KillSignal=SIGTERM \
-    --property=KillMode=mixed \
-    --property=TimeoutStopSec={_REMOTE_STOP_GRACE_S} \
-    {setenv_flags} \
-    "$PYTHON" "$SERVER" --rtx5080 --skip-checks $CONFIG_ARG \
-    --model {shlex.quote(self._model_path)} --port {self._port} 2>&1
+systemctl --user enable {_VLLM_UNIT} 2>&1 || true
+systemctl --user restart {_VLLM_UNIT}
 echo "STARTED_UNIT={_VLLM_UNIT} rc=$?"
 """
-        logger.info("vllm: remote start on %s as user unit %s", self._remote.ssh_host, _VLLM_UNIT)
+        logger.info("vllm: remote start on %s as persistent user unit %s", self._remote.ssh_host, _VLLM_UNIT)
         res = await self._remote.run(script, timeout=30.0)
         if not res.connected:
             logger.error("vllm: remote start failed — cannot reach Somatic: %s", res.stderr.strip()[:200])

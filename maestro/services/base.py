@@ -264,11 +264,38 @@ class UbikService(ABC):
         """
         return 30.0
 
+    async def _liveness_diagnostic(self) -> Optional[str]:
+        """Report whether the underlying process/unit is alive, out-of-band.
+
+        This complements the health *port* probe (:meth:`probe`).  A service
+        can fail to answer ``/health`` for two very different reasons: it is
+        still starting up (keep waiting), or its process has already died
+        (stop waiting — no amount of polling will help).  :meth:`probe` cannot
+        distinguish the two.  This hook can, when the service exposes an
+        out-of-band liveness signal (e.g. a systemd unit state + journal).
+
+        Returns:
+            ``None`` when the process is alive (or when liveness cannot be
+            determined — callers must treat ``None`` as "keep waiting", never
+            as a failure).  Otherwise a short human-readable diagnostic string
+            (e.g. the tail of the unit's journal) explaining why it died, so
+            the operator gets an instant, actionable reason instead of a silent
+            timeout.
+
+        Note:
+            Default implementation returns ``None`` (no out-of-band signal).
+            Services whose process can die independently of the health port —
+            notably the remote vLLM systemd unit — override this.  Overrides
+            must be cheap (one round-trip) since this is called during polling.
+        """
+        return None
+
     async def _wait_for_healthy(
         self,
         probe_host: str = "localhost",
         *,
         poll_interval: float = 3.0,
+        liveness_interval: float = 9.0,
     ) -> bool:
         """Poll :meth:`probe` until healthy or :attr:`max_wait_s` exceeded.
 
@@ -276,16 +303,28 @@ class UbikService(ABC):
         The format "Waiting for <name>... (<elapsed>s / <limit>s)" matches
         the operational logging convention.
 
+        While polling, this also consults :meth:`_liveness_diagnostic` at most
+        every *liveness_interval* seconds.  If that hook reports the underlying
+        process has died, the wait aborts immediately with the diagnostic
+        logged — turning a silent full-timeout into an instant, actionable
+        error.  This is the fix for the endemic vLLM failure mode where the
+        remote unit died mid-load and maestro waited the full 300 s blind.
+
         Args:
             probe_host: Host argument passed to :meth:`probe_with_timeout`.
             poll_interval: Seconds between consecutive probe calls.
+            liveness_interval: Minimum seconds between out-of-band liveness
+                checks (:meth:`_liveness_diagnostic`).  Kept coarser than
+                *poll_interval* so an override that costs an SSH round-trip is
+                not paid every cycle.
 
         Returns:
             ``True`` when the service becomes healthy within
-            :attr:`max_wait_s`; ``False`` on timeout.
+            :attr:`max_wait_s`; ``False`` on timeout or confirmed process death.
         """
         start_ts = time.perf_counter()
         limit = self.max_wait_s
+        last_liveness_ts = start_ts
 
         while True:
             elapsed = round(time.perf_counter() - start_ts)
@@ -304,6 +343,19 @@ class UbikService(ABC):
                     "%s became healthy after %.0fs", self.name, elapsed
                 )
                 return True
+
+            # Out-of-band liveness check (throttled).  If the process is
+            # confirmed dead, stop waiting now and surface why.
+            now = time.perf_counter()
+            if now - last_liveness_ts >= liveness_interval:
+                last_liveness_ts = now
+                diag = await self._liveness_diagnostic()
+                if diag is not None:
+                    logger.error(
+                        "%s died during startup wait (%ds): %s",
+                        self.name, round(now - start_ts), diag,
+                    )
+                    return False
 
             logger.info(
                 "Waiting for %s... (%ds / %.0fs)", self.name, elapsed, limit

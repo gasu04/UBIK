@@ -235,12 +235,17 @@ class TestVllmRemoteLifecycle:
             ok = await svc.start(Path("/local/ubik"))
         assert ok is True
         script = rx.run.await_args.args[0]
-        # Runs the graceful wrapper as a persistent systemd *user* unit.
-        assert "systemd-run --user" in script
-        assert "ubik-vllm" in script
+        # Installs + enables + restarts a *persistent* systemd user unit
+        # (Layer A: the transient ``systemd-run`` path has been retired so the
+        # unit survives a WSL VM teardown and self-heals via Restart=).
+        assert "systemd-run" not in script
+        assert "systemctl --user enable ubik-vllm" in script
+        assert "systemctl --user restart ubik-vllm" in script
+        assert "ubik-vllm.service" in script
         assert "vllm_server.py" in script
         assert "--rtx5080" in script
-        # Graceful-stop window wired into the unit (VRAM cleanup time).
+        # Self-healing + graceful-stop window baked into the unit.
+        assert "Restart=on-failure" in script
         assert "TimeoutStopSec=90" in script
 
     @pytest.mark.asyncio
