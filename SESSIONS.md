@@ -1220,4 +1220,31 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 1. Push `fdb7cc2` (local is ahead of `origin/master` by 2 commits, clean fast-forward, not yet done pending user confirmation).
 2. Install the two Scheduled Tasks on the Somatic Windows host per `somatic/windows/README.md`, then run Layer B's 4-point verification checklist — now unblocked since Layer A's `ubik-vllm` unit exists again (via `maestro/`, driven from Hippocampal).
 3. Decide on the small pending `dotfiles/.bashrc` edit (opencode PATH) and the long-standing untracked cruft at repo root — neither is part of Layer B and both were left as-is.
+
+## Session: [2026-07-25 17:59] — [Node: Hippocampal]
+**Goal:** Create a dedicated UBIK venv, separate from the DeepSeek project venv; make it the repo default (login lands on UBIK + activates it); update CLAUDE.md; validate UBIK code runs under it. Leave the three exception envs (ubik-ingestion, ubik-chromadb-venv, Somatic node venvs) untouched. Do NOT merge the two deepseek directories.
+**Completed:**
+- Created canonical repo venv at `UBIK/.venv` (Python 3.13.7) via `uv venv`. Installed from the repo's own `requirements.txt` + `maestro/requirements.txt` + `hippocampal/requirements.txt` — deliberately did NOT mirror the DeepSeek venv (it's a junk-drawer of ~300 unrelated finance/LangChain/opentelemetry packages). Saved a baseline freeze at `.venv/baseline-from-deepseek.txt` for cross-reference.
+- Repointed the hardcoded Hippocampal venv fallback from `DeepSeek/venv` to `UBIK/.venv` in `maestro/platform_detect.py::_HIPPOCAMPAL_VENV_PATH` and `maestro/services/venv_service.py::_hippocampal_venv_path` (plus docstrings + `maestro/requirements.txt` header comment). The `HIPPOCAMPAL_VENV_PATH` env-var override is retained.
+- Repointed two maestro test files that asserted the old path: `test_platform_detect.py` (test names + comments) and `test_venv_service.py` (comments). Assertions themselves are path-agnostic via the constant.
+- Fixed `~/.zshrc`: the auto-cd block (lines 57-64) was already dead — it targeted lowercase `/Volumes/990PRO 4T/deepseek` which doesn't exist. Replaced it to `cd UBIK` + `source .venv/bin/activate`. Also repointed `alias maestro` (line 68) from `DeepSeek/venv/bin/python` to `UBIK/.venv/bin/python`.
+- CLAUDE.md: added §3.5 Virtual Environments (canonical venv + the 4 exceptions table, rebuild command, rules); bumped version 3.1.0 -> 3.2.0 with Version History entry; renumbered old §3.5 -> §3.6.
+- `git rm`'d the dangling tracked symlink `UBIK/venv -> /home/gasu/pytorch_env` (a dead Linux path from an old Somatic commit; nothing referenced it at runtime — setup_maestro.sh defaults to `hippocampal/venv`, env-var otherwise).
+- Validation under `.venv`: maestro test suite 16/17 files pass (incl. the 2 repointed files, 89 tests). hippocampal 134 passed / 20 skipped (skips = integration tests needing live neo4j/chromadb). maestro CLI `--help` exits 0. Import smoke test across maestro + hippocampal package roots (incl. Tier 1 `hippocampal.mcp_server`) all OK.
+**State left in:**
+- New `.venv` is the canonical repo env; login lands on UBIK with it active (takes effect on next terminal; `source ~/.zshrc` to use now). DeepSeek dirs and all three exception envs untouched.
+- Found a PRE-EXISTING bug, NOT caused by this change: `maestro/tests/test_logger.py` crashes the pytest runner ("I/O operation on closed file / lost sys.stderr") — confirmed it crashes identically on the old DeepSeek venv. A logging-handler-vs-pytest-capture teardown bug; left untouched (out of scope).
+- Working tree: CLAUDE.md, maestro source/requirements/tests, and the `venv` symlink deletion are staged/unstaged; `.venv` is gitignored. Nothing committed yet this session until this commit.
+**Files changed:**
+- CLAUDE.md: §3.5 Virtual Environments added; version 3.1.0 -> 3.2.0 + history
+- maestro/platform_detect.py: `_HIPPOCAMPAL_VENV_PATH` + docstring repointed to `UBIK/.venv`
+- maestro/services/venv_service.py: `_hippocampal_venv_path` fallback + docstring repointed to `UBIK/.venv`
+- maestro/requirements.txt: header activate comment repointed to `UBIK/.venv`
+- maestro/tests/test_platform_detect.py: 2 test names/comments updated (assertions unchanged)
+- maestro/tests/test_venv_service.py: fallback comment updated
+- ~/.zshrc: auto-cd block repointed to UBIK + `.venv`; `alias maestro` repointed to `.venv` (NOT in this repo)
+- venv (symlink): deleted (was dangling -> /home/gasu/pytorch_env)
+- .venv/: created (gitignored); .venv/baseline-from-deepseek.txt kept locally
+**Next session should:**
+- Field-test the new login flow in a fresh terminal (confirm `pwd` == UBIK and `VIRTUAL_ENV` == `UBIK/.venv`). Then optionally fix the pre-existing `test_logger.py` crash (logging handler closes stderr during teardown). Then resume the HARDENING_PLAN Layer A field-test against the live Somatic node.
 ---

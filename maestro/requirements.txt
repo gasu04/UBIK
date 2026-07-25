@@ -2,8 +2,8 @@
 # Maestro — Python Dependencies
 # =============================================================================
 # Python 3.12+
-# Activate the DeepSeek venv before installing:
-#   source "/Volumes/990PRO 4T/DeepSeek/venv/bin/activate"
+# Activate the UBIK venv before installing:
+#   source "/Volumes/990PRO 4T/UBIK/.venv/bin/activate"
 #   pip install -r maestro/requirements.txt
 # =============================================================================
 

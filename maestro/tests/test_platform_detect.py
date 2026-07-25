@@ -267,14 +267,14 @@ class TestUbikRootAssignment:
 # ---------------------------------------------------------------------------
 
 class TestVenvPaths:
-    def test_hippocampal_venv_is_deepseek(self):
-        # Hippocampal always uses the shared DeepSeek venv regardless of ubik_root.
+    def test_hippocampal_venv_is_ubik_venv(self):
+        # Hippocampal always uses the canonical UBIK venv regardless of ubik_root.
         from maestro.platform_detect import _HIPPOCAMPAL_VENV_PATH
         with _patch_env(platform="darwin", ubik_root=Path("/tmp/ubik")):
             node = detect_node()
         assert node.python_venv_path == _HIPPOCAMPAL_VENV_PATH
 
-    def test_hippocampal_activate_cmd_references_deepseek_venv(self):
+    def test_hippocampal_activate_cmd_references_ubik_venv(self):
         from maestro.platform_detect import _HIPPOCAMPAL_VENV_PATH
         with _patch_env(platform="darwin", ubik_root=Path("/tmp/ubik")):
             node = detect_node()

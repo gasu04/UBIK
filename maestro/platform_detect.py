@@ -9,7 +9,7 @@ UBIK_ROOT, find the Python venv, reach the remote node via Tailscale).
 Nodes:
     HIPPOCAMPAL — Mac Mini M4 Pro (macOS, arm64)
                   UBIK root:  /Volumes/990PRO 4T/UBIK/
-                  Python env: /Volumes/990PRO 4T/DeepSeek/venv/
+                  Python env: /Volumes/990PRO 4T/UBIK/.venv/
     SOMATIC     — PowerSpec RTX 5090 (WSL2 Linux)
                   UBIK root:  /home/gasu/ubik/
                   Python env: conda, pytorch_env
@@ -59,9 +59,10 @@ logger = logging.getLogger(__name__)
 _MACOS_UBIK_ROOT = Path("/Volumes/990PRO 4T/UBIK")
 _LINUX_UBIK_ROOT = Path("/home/gasu/ubik")
 
-# Absolute path to the shared Python venv on the Hippocampal node.
-# All UBIK Hippocampal modules must use this venv.
-_HIPPOCAMPAL_VENV_PATH = Path("/Volumes/990PRO 4T/DeepSeek/venv")
+# Absolute path to the canonical UBIK venv on the Hippocampal node.
+# All UBIK Hippocampal modules must use this venv. It is separate from the
+# DeepSeek venv; this is the UBIK-owned default (HIPPOCAMPAL_VENV_PATH overrides).
+_HIPPOCAMPAL_VENV_PATH = Path("/Volumes/990PRO 4T/UBIK/.venv")
 
 # Hostname substrings that reliably identify each node (case-insensitive).
 _HIPPOCAMPAL_HOSTNAME_MARKERS: frozenset[str] = frozenset({"minim4", "mac.lan"})

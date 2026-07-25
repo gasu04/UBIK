@@ -171,11 +171,11 @@ class TestGetVenvRunPrefix:
             ubik_root=_FAKE_UBIK_ROOT,
             is_wsl=False,
             tailscale_ip=None,
-            python_venv_path=None,  # no explicit path → uses hardcoded DeepSeek venv
+            python_venv_path=None,  # no explicit path → uses hardcoded UBIK venv
             python_activate_cmd=None,
         )
         prefix = get_venv_run_prefix(node)
-        # Falls back to the shared DeepSeek venv (hardcoded in venv_service)
+        # Falls back to the canonical UBIK venv (hardcoded in venv_service)
         expected = str(_hippocampal_venv_path(node))
         assert expected in prefix[2]
 

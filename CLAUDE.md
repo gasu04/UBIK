@@ -1,6 +1,6 @@
 # CLAUDE.md — UBIK Coding Standards
 
-**Version:** 3.1.0 **Supersedes:** 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
+**Version:** 3.2.0 **Supersedes:** 3.1.0, 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
 
 ---
 
@@ -341,7 +341,27 @@ These modules share one property: **failure is silent, and damage compounds befo
 
 **Removing an entry:** only if the underlying failure mode has been made loud (e.g., the code now raises, fails a health check, or is monitored by an alert). Shrinking the registry through re-engineering the code is encouraged. Shrinking it by weakening the definition of "critical" is not.
 
-### 3.5 Cross-Platform & Docker
+### 3.5 Virtual Environments
+
+UBIK has **one canonical repo venv**, deliberately separate from the DeepSeek project venv (which is a junk-drawer of unrelated finance/LangChain packages and must not be inherited). It is loaded from the repo's own `requirements.txt` + `maestro/requirements.txt` + `hippocampal/requirements.txt`, not from a pip-freeze of DeepSeek.
+
+| Env | Path | Python | Used by | Scope |
+|:---:|:---:|:---:|:---:|:---:|
+| **UBIK venv (canonical)** | `/Volumes/990PRO 4T/UBIK/.venv` | 3.13.7 | `maestro`, `hippocampal`, repo-root tooling | Default; auto-activated on shell login |
+| `ubik-ingestion` | `~/.virtualenvs/ubik-ingestion` | — | `ingestion/` | **Exception** — ingestion keeps its own env |
+| `ubik-chromadb-venv` | `~/ubik-chromadb-venv` | — | ChromaDB server | **Exception** — server-side isolation |
+| Somatic vLLM venv | `pytorch_env_vllm024` (Linux) | — | `somatic` vLLM | **Exception** — GPU/CUDA, runs on the Somatic node only |
+| Somatic WhisperX venv | `ubik-whisperx-venv` (Linux) | — | `somatic` WhisperX | **Exception** — GPU/CUDA, Somatic node only |
+
+**Rules:**
+
+- The canonical fallback path lives in `maestro/platform_detect.py::_HIPPOCAMPAL_VENV_PATH` and `maestro/services/venv_service.py::_hippocampal_venv_path`. Both point at `UBIK/.venv`. The `HIPPOCAMPAL_VENV_PATH` env var still overrides this fallback (used by `setup_maestro.sh`).
+- `.venv` is gitignored (`.gitignore` line 17). Never commit a venv.
+- Do **not** mirror the DeepSeek venv into UBIK — it carries ~300 unrelated packages (`akshare`, `yfinance`, `langchain-*`, 60+ `opentelemetry-instrumentation-*`). Install only what UBIK's code imports; use the import smoke test in §1.4 to detect genuinely missing deps.
+- `somatic/` cannot be imported on this Mac — it pulls `vllm` + `whisperx`, which are GPU/Linux-only. It is validated on the Somatic node, not here.
+- Rebuild: `uv venv --python 3.13.7 .venv && source .venv/bin/activate && uv pip install -r requirements.txt -r maestro/requirements.txt -r hippocampal/requirements.txt`
+
+### 3.6 Cross-Platform & Docker
 
 - Use `pathlib.Path` for all filesystem paths. Never string concatenation, never hardcoded `/home/gasu/...` or `C:\Users\...`.
 - Detect OS via `platform.system()` when platform-specific logic is unavoidable. UBIK runs on macOS (Hippocampal, Mac Mini M4) and Linux/WSL2 (Somatic).
@@ -449,6 +469,7 @@ Run `/compact` every 20–30 turns to keep context lean.
 
 | Version | Date | Changes |
 |:---:|:---:|:---:|
+| 3.2.0 | 2026-07 | §3.5 Virtual Environments added: UBIK now has a canonical repo venv at `.venv` (Python 3.13.7), deliberately separate from the DeepSeek venv; `ubik-ingestion`, `ubik-chromadb-venv`, and the Somatic node venvs remain exceptions. `maestro/platform_detect.py` and `maestro/services/venv_service.py` repointed from `DeepSeek/venv` to `UBIK/.venv` (env-var override retained). Old §3.5 renumbered to §3.6 |
 | 3.1.0 | 2026-04 | §2.6 rewritten around tier-based coverage defined by failure mode, not module importance; §3.4.1 Tier 1 Critical-Path Registry added (6 initial entries); §2.5 requires module docstrings to declare tier classification |
 | 3.0.0 | 2026-04 | Full restructure: four principles woven structurally (not appended); resilience mandates aligned with Phase 3 v2.1 (Probe Latch circuit breaker, jitter, async-first, connection hygiene); privacy logging rule added; verbose code examples removed in favor of canonical module references; ~70% shorter |
 | 2.0.0 | 2025-01 | Derived from UBIK project learnings; Karpathy Principles appended as §11 |
