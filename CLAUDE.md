@@ -1,6 +1,6 @@
 # CLAUDE.md — UBIK Coding Standards
 
-**Version:** 3.2.0 **Supersedes:** 3.1.0, 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
+**Version:** 3.2.1 **Supersedes:** 3.2.0, 3.1.0, 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
 
 ---
 
@@ -347,11 +347,12 @@ UBIK has **one canonical repo venv**, deliberately separate from the DeepSeek pr
 
 | Env | Path | Python | Used by | Scope |
 |:---:|:---:|:---:|:---:|:---:|
-| **UBIK venv (canonical)** | `/Volumes/990PRO 4T/UBIK/.venv` | 3.13.7 | `maestro`, `hippocampal`, repo-root tooling | Default; auto-activated on shell login |
-| `ubik-ingestion` | `~/.virtualenvs/ubik-ingestion` | — | `ingestion/` | **Exception** — ingestion keeps its own env |
+| **UBIK venv (canonical)** | `/Volumes/990PRO 4T/UBIK/.venv` | 3.13.7 | `maestro`, `hippocampal`, `ingestion`, repo-root tooling | Default; auto-activated on shell login |
 | `ubik-chromadb-venv` | `~/ubik-chromadb-venv` | — | ChromaDB server | **Exception** — server-side isolation |
 | Somatic vLLM venv | `pytorch_env_vllm024` (Linux) | — | `somatic` vLLM | **Exception** — GPU/CUDA, runs on the Somatic node only |
 | Somatic WhisperX venv | `ubik-whisperx-venv` (Linux) | — | `somatic` WhisperX | **Exception** — GPU/CUDA, Somatic node only |
+
+> **Retired (2026-07-25):** the separate `~/.virtualenvs/ubik-ingestion` venv was empty/broken and is no longer maintained. `ingestion/` now runs under the canonical `.venv` (its 189-test suite passes there). The old venv was renamed to `ubik-ingestion.retired-20260725` (reversible), not hard-deleted.
 
 **Rules:**
 
@@ -469,6 +470,7 @@ Run `/compact` every 20–30 turns to keep context lean.
 
 | Version | Date | Changes |
 |:---:|:---:|:---:|
+| 3.2.1 | 2026-07 | §3.5: `ubik-ingestion` retired from the exceptions table (its venv was empty/broken; `ingestion/` now runs under `.venv`, 189 tests passing). Version-only doc update — no §3.5 rule changes beyond the table row |
 | 3.2.0 | 2026-07 | §3.5 Virtual Environments added: UBIK now has a canonical repo venv at `.venv` (Python 3.13.7), deliberately separate from the DeepSeek venv; `ubik-ingestion`, `ubik-chromadb-venv`, and the Somatic node venvs remain exceptions. `maestro/platform_detect.py` and `maestro/services/venv_service.py` repointed from `DeepSeek/venv` to `UBIK/.venv` (env-var override retained). Old §3.5 renumbered to §3.6 |
 | 3.1.0 | 2026-04 | §2.6 rewritten around tier-based coverage defined by failure mode, not module importance; §3.4.1 Tier 1 Critical-Path Registry added (6 initial entries); §2.5 requires module docstrings to declare tier classification |
 | 3.0.0 | 2026-04 | Full restructure: four principles woven structurally (not appended); resilience mandates aligned with Phase 3 v2.1 (Probe Latch circuit breaker, jitter, async-first, connection hygiene); privacy logging rule added; verbose code examples removed in favor of canonical module references; ~70% shorter |

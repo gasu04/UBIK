@@ -28,6 +28,7 @@ Coverage:
         healthy_count / total_count present
 """
 
+import io
 import json
 import logging
 import logging.handlers
@@ -53,10 +54,28 @@ def _reset_root_logger():
     saved_handlers = root.handlers[:]
     saved_level = root.level
     yield
-    # Close any handlers we added to avoid ResourceWarning
+    # Remove any handlers we added. configure_logging() wraps sys.stderr.buffer
+    # in a TextIOWrapper; if we close() that wrapper it closes pytest's capture
+    # stream, so teardown crashes with "I/O operation on closed file". Instead
+    # detach the wrapper (flush + release the buffer without closing it) and
+    # null the handler's stream so close()/GC never flush a dead capture stream.
     for h in root.handlers:
         if h not in saved_handlers:
-            h.close()
+            stream = getattr(h, "stream", None)
+            if isinstance(stream, io.TextIOBase) and hasattr(stream, "detach"):
+                try:
+                    stream.flush()
+                    stream.detach()
+                except (ValueError, OSError):
+                    pass
+            try:
+                h.setStream(None)
+            except (ValueError, TypeError):
+                pass
+            try:
+                h.close()
+            except (ValueError, OSError):
+                pass
     root.handlers = saved_handlers
     root.setLevel(saved_level)
 

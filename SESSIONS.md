@@ -1248,3 +1248,25 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 **Next session should:**
 - Field-test the new login flow in a fresh terminal (confirm `pwd` == UBIK and `VIRTUAL_ENV` == `UBIK/.venv`). Then optionally fix the pre-existing `test_logger.py` crash (logging handler closes stderr during teardown). Then resume the HARDENING_PLAN Layer A field-test against the live Somatic node.
 ---
+
+
+## Session: [2026-07-25 22:50] — [Node: Hippocampal]
+**Goal:** Fix the three pre-existing bugs surfaced by the full test-suite run (maestro test_logger runner crash; ingestion FileMover routing; broken ubik-ingestion venv).
+**Completed:**
+- **Bug #1 — maestro/tests/test_logger.py runner crash:** Root cause = `configure_logging()` wraps `sys.stderr.buffer` in a TextIOWrapper on a StreamHandler; the `_reset_root_logger` fixture teardown called `h.close()`, closing the wrapper, which closed pytest's capture buffer -> `ValueError: I/O operation on closed file` during pytest global-capture restore (crash at teardown, not in-test). Fixed the teardown to `detach()` the wrapper (flush + release without closing the buffer) and null the handler stream before close; added `import io`. No production-code change. Result: test_logger's 31 tests now run; full maestro suite 639 passed (was 608 + crash).
+- **Bug #2 — ingestion FileMover category routing (half-finished refactor):** A prior refactor made `compute_destination` ignore `source_directory` and route all files to a flat `archive_dir` (`ingested/`), updated its own docstring to say so, but never reconciled with production (`ingestion/ingest/cli.py:749` builds `{src_dir}_ingested/` directly) or the 4 tests + class docstring (both expect per-source routing). Fixed `compute_destination` to route to `{base_ingested_dir}/{source_directory}_ingested/` by default; preserved the flat `archive_dir` override via a new `_archive_dir_explicit` flag (explicit arg or UBIK_ARCHIVE_DIR env). Result: ingestion 189 passed (was 185/4).
+- **Bug #3 — retired the broken ubik-ingestion venv:** `~/.virtualenvs/ubik-ingestion` was incomplete (no pytest, missing core deps); `.venv` already runs the full 189-test ingestion suite. Renamed the venv to `ubik-ingestion.retired-20260725` (reversible, not hard-deleted). Updated CLAUDE.md §3.5: removed `ubik-ingestion` from the exceptions table, `ingestion/` now runs under `.venv`; version 3.2.0 -> 3.2.1.
+- Wrote `july2026_ubik_test.md` (full pre-fix test report + a post-fix update section documenting all three fixes).
+- Final verification: maestro 639 passed / hippocampal 134 passed 20 skipped / ingestion 189 passed = 962 passed, 0 failed across the Mac-runnable surface.
+**State left in:**
+- Mac-runnable test surface fully green. The mirrored `somatic/ubik_ingest/ingest/tracker.py` already had the correct older routing and was left untouched; the two tracker.py copies remain divergent in OTHER ways (a tombstone reprocessing-logic difference, a missing import os) — out of scope, noted in the report.
+- The retired venv lives at `~/.virtualenvs/ubik-ingestion.retired-20260725` (reversible).
+- Nothing committed yet until this commit.
+**Files changed:**
+- maestro/tests/test_logger.py: teardown detaches wrapper instead of closing it; +import io (fixes runner crash)
+- ingestion/ingest/tracker.py: compute_destination routes to {source}_ingested/ by default; archive_dir override preserved via _archive_dir_explicit flag; __init__ mkdir updated (fixes 4 routing bugs)
+- CLAUDE.md: §3.5 ubik-ingestion retired from exceptions table; version 3.2.0 -> 3.2.1 + history
+- july2026_ubik_test.md: new — full test report + post-fix update
+**Next session should:**
+- Optionally reconcile the broader ingestion/ vs somatic/ubik_ingest tracker.py mirror divergence (tombstone reprocessing logic + import os) — left as a known divergence this session. Then resume the HARDENING_PLAN Layer A field-test against the live Somatic node.
+---
