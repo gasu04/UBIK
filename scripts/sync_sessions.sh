@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Copy SESSIONS.md to the live Google Drive mount (gsanchezurrutia@gmail.com).
+# Copy ubik_sessions.md to the live Google Drive mount (gsanchezurrutia@gmail.com).
 # Google Drive for Desktop picks it up and uploads automatically.
 # Run manually or via the post-commit hook.
 
 UBIK_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-SRC="$UBIK_ROOT/SESSIONS.md"
-DST="$HOME/Library/CloudStorage/GoogleDrive-gsanchezurrutia@gmail.com/My Drive/Ubik_drive/SESSIONS.md"
+SRC="$UBIK_ROOT/ubik_sessions.md"
+DST="$HOME/Library/CloudStorage/GoogleDrive-gsanchezurrutia@gmail.com/My Drive/Ubik_drive/ubik_sessions.md"
 DST_DIR="$(dirname "$DST")"
 
 if [[ ! -f "$SRC" ]]; then
@@ -18,4 +18,4 @@ if [[ ! -d "$DST_DIR" ]]; then
     exit 0
 fi
 
-cp "$SRC" "$DST" && echo "sync_sessions: SESSIONS.md → gsanchezurrutia@gmail.com/Ubik_drive ✓"
+cp "$SRC" "$DST" && echo "sync_sessions: ubik_sessions.md → gsanchezurrutia@gmail.com/Ubik_drive ✓"

@@ -1270,3 +1270,29 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 **Next session should:**
 - Optionally reconcile the broader ingestion/ vs somatic/ubik_ingest tracker.py mirror divergence (tombstone reprocessing logic + import os) — left as a known divergence this session. Then resume the HARDENING_PLAN Layer A field-test against the live Somatic node.
 ---
+
+
+## Session: [2026-07-25 23:08] — [Node: Hippocampal]
+**Goal:** Rename the canonical session log SESSIONS.md -> ubik_sessions.md, make it canonical across all UBIK config, and update every reference (CLAUDE.md, sync script, post-commit hook, START_HERE.md, Google Drive mirror).
+**Completed:**
+- `git mv SESSIONS.md ubik_sessions.md` (history preserved; shows as rename, 0 content change).
+- Updated `scripts/sync_sessions.sh`: SRC/DST + Drive mirror filename -> `ubik_sessions.md` (script name kept as `sync_sessions.sh` per user choice). Verified: manual run copies `ubik_sessions.md` -> Drive `ubik_sessions.md`, byte-identical.
+- Updated `.git/hooks/post-commit`: grep pattern `^SESSIONS.md$` -> `^ubik_sessions.md$`. Verified: matches new name, ignores old. NOTE: hooks aren't git-tracked, so this edit is local-only on this machine (not in this commit).
+- Updated `CLAUDE.md` §Session Journaling: canonical file is now `ubik_sessions.md`; Drive mirror path updated; added a historical note that the file was named `SESSIONS.md` until 2026-07-25 (older in-file "SESSIONS.md" mentions are historical record). Version 3.2.1 -> 3.3.0 with history entry.
+- Updated `START_HERE.md` (untracked, pre-existing): 5 references `SESSIONS.md` -> `ubik_sessions.md`.
+- Renamed the Google Drive mirror `Ubik_drive/SESSIONS.md` -> `Ubik_drive/ubik_sessions.md` (Drive was mounted; clean rename).
+- End-to-end verification: sync script copies new file to new Drive name (byte-identical); post-commit hook grep matches new filename and ignores old. No live-config references to the old name remain (the 2 CLAUDE.md hits are intentional historical mentions; `.claude/plans/vllm_024_maestro_wiring.md` is a stale one-shot plan doc, left as-is).
+**State left in:**
+- Canonical session log is now `ubik_sessions.md` (repo + Drive). All new UBIK sessions write to it per CLAUDE.md §Session Journaling. The post-commit auto-sync to Google Drive is verified working under the new name.
+- The post-commit hook change lives only on this machine (`.git/hooks/` is not version-controlled). If hook-portability across machines is wanted later, the fix is committing hook scripts to a tracked dir + `core.hooksPath` — noted, not done.
+- Older entries inside `ubik_sessions.md` still say "SESSIONS.md" — that is historical record, intentionally left.
+**Files changed:**
+- SESSIONS.md -> ubik_sessions.md: renamed (git mv, history preserved)
+- scripts/sync_sessions.sh: SRC/DST + Drive filename -> ubik_sessions.md
+- .git/hooks/post-commit: grep pattern -> ^ubik_sessions.md$ (local-only, not in commit)
+- CLAUDE.md: §Session Journaling renamed; version 3.2.1 -> 3.3.0 + history
+- START_HERE.md: 5 references updated (untracked, on disk only)
+- Google Drive: Ubik_drive/SESSIONS.md -> Ubik_drive/ubik_sessions.md (on disk only)
+**Next session should:**
+- Confirm the post-commit auto-sync fires correctly on the next commit that touches `ubik_sessions.md` (the live proof). Then resume the HARDENING_PLAN Layer A field-test against the live Somatic node. Optionally, make the post-commit hook portable across machines (tracked githooks dir + core.hooksPath).
+---
