@@ -1296,3 +1296,24 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 **Next session should:**
 - Confirm the post-commit auto-sync fires correctly on the next commit that touches `ubik_sessions.md` (the live proof). Then resume the HARDENING_PLAN Layer A field-test against the live Somatic node. Optionally, make the post-commit hook portable across machines (tracked githooks dir + core.hooksPath).
 ---
+
+
+## Session: [2026-07-26 08:03] — [Node: Hippocampal]
+**Goal:** Make the post-commit hook portable across clones (it was local-only under .git/hooks/, which git does not track — so fresh clones would silently stop syncing ubik_sessions.md to Google Drive).
+**Completed:**
+- Created tracked `githooks/post-commit` (same logic as the old local hook, plus a guard: silent + safe when sync_sessions.sh or the Drive mount is unavailable, so the hook never blocks a commit). Made executable; bash -n clean.
+- Wrote `scripts/setup_hooks.sh`: one-command per-clone opt-in. Sets `core.hooksPath = githooks`, chmod +x every tracked hook, prints active hooks, checks git >= 2.9. Includes a note that setting core.hooksPath makes git ignore .git/hooks/.
+- Migrated this clone: ran setup_hooks.sh -> core.hooksPath now `githooks`. Removed the now-inert local .git/hooks/post-commit (superseded). Verified the tracked hook fires via `git hook run post-commit` -> "sync_sessions: ubik_sessions.md -> gsanchezurrutia@gmail.com/Ubik_drive ✓".
+- Documentation: CLAUDE.md §Session Journaling now documents the per-clone `bash scripts/setup_hooks.sh` step + the `git hook run post-commit` verification. INSTALL.md Quick Start gains a new step 2 ("Enable Portable Git Hooks") with renumbered follow-on steps. Version 3.3.0 -> 3.3.1 with history entry.
+**State left in:**
+- This clone uses the tracked `githooks/` hook (core.hooksPath = githooks); the old local hook is removed. Other clones (e.g. Somatic node) must run `bash scripts/setup_hooks.sh` once to enable — documented in CLAUDE.md + INSTALL.md.
+- IMPORTANT: this very commit touches ubik_sessions.md, so the tracked hook fires on it — that is the definitive post-migration proof it works.
+**Files changed:**
+- githooks/post-commit: new (tracked, portable post-commit hook)
+- scripts/setup_hooks.sh: new (per-clone enablement)
+- CLAUDE.md: §Session Journaling portable-hooks note; version 3.3.0 -> 3.3.1
+- INSTALL.md: new Quick Start step 2 + renumbered steps 3-5
+- ubik_sessions.md: this entry
+**Next session should:**
+- On the Somatic node clone, run `bash scripts/setup_hooks.sh` to enable the hook there. Then resume the HARDENING_PLAN Layer A field-test against the live Somatic node.
+---

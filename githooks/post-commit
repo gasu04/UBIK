@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Portable post-commit hook (tracked in githooks/, enabled via core.hooksPath).
+# See scripts/setup_hooks.sh to enable on a given clone.
+#
+# Syncs ubik_sessions.md to the live Google Drive mount after every commit that
+# touches it. Silent + safe when the sync script or Drive mount is unavailable,
+# so the hook never blocks a commit on a machine that doesn't sync.
+
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+
+# Only fire when this commit actually touched the session log.
+if ! git diff --name-only HEAD~1 HEAD 2>/dev/null | grep -q "^ubik_sessions\.md$"; then
+    exit 0
+fi
+
+SYNC="$REPO_ROOT/scripts/sync_sessions.sh"
+if [[ ! -x "$SYNC" ]]; then
+    exit 0
+fi
+
+"$SYNC"

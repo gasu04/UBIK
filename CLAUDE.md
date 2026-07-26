@@ -1,6 +1,6 @@
 # CLAUDE.md — UBIK Coding Standards
 
-**Version:** 3.3.0 **Supersedes:** 3.2.1, 3.2.0, 3.1.0, 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
+**Version:** 3.3.1 **Supersedes:** 3.3.0, 3.2.1, 3.2.0, 3.1.0, 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
 
 ---
 
@@ -470,6 +470,7 @@ Run `/compact` every 20–30 turns to keep context lean.
 
 | Version | Date | Changes |
 |:---:|:---:|:---:|
+| 3.3.1 | 2026-07 | Portable git hooks: post-commit hook moved to tracked `githooks/`, enabled per-clone via `scripts/setup_hooks.sh` (`core.hooksPath = githooks`). §Session Journaling documents the one-time setup; INSTALL.md Quick Start adds the step. Fixes the silent-no-sync risk on fresh clones |
 | 3.3.0 | 2026-07 | Session journaling file renamed `SESSIONS.md` → `ubik_sessions.md` (repo + Google Drive mirror). §Session Journaling updated: all new entries go to `ubik_sessions.md`; `scripts/sync_sessions.sh` SRC/DST and `.git/hooks/post-commit` grep repointed to the new name (script name unchanged). Older in-file "SESSIONS.md" mentions are now historical record |
 | 3.2.1 | 2026-07 | §3.5: `ubik-ingestion` retired from the exceptions table (its venv was empty/broken; `ingestion/` now runs under `.venv`, 189 tests passing). Version-only doc update — no §3.5 rule changes beyond the table row |
 | 3.2.0 | 2026-07 | §3.5 Virtual Environments added: UBIK now has a canonical repo venv at `.venv` (Python 3.13.7), deliberately separate from the DeepSeek venv; `ubik-ingestion`, `ubik-chromadb-venv`, and the Somatic node venvs remain exceptions. `maestro/platform_detect.py` and `maestro/services/venv_service.py` repointed from `DeepSeek/venv` to `UBIK/.venv` (env-var override retained). Old §3.5 renumbered to §3.6 |
@@ -490,6 +491,12 @@ Run `/compact` every 20–30 turns to keep context lean.
 It syncs to Google Drive automatically via `scripts/sync_sessions.sh` on every commit that touches it.
 Google Drive mirror: `My Drive/Ubik_drive/ubik_sessions.md` (account `gsanchezurrutia@gmail.com`).
 > Historical note: this file was named `SESSIONS.md` until 2026-07-25, when it was renamed to `ubik_sessions.md` to make it canonical to UBIK (the Google Drive mirror was renamed too). Older entries inside the file still say "SESSIONS.md" — that is historical record, not stale.
+
+**Portable hooks (per-clone setup):** git does not track `.git/hooks/`, so the post-commit auto-sync is implemented as a **tracked** hook in `githooks/` and enabled per-clone via `core.hooksPath`. After any fresh clone of UBIK, run once:
+```
+bash scripts/setup_hooks.sh
+```
+This sets `core.hooksPath = githooks` and makes the hooks executable. Without it, the Drive auto-sync silently won't fire on that machine. (You can verify the hook works with `git hook run post-commit`.)
 
 At the START of every session:
 - Read the last 20 lines of `ubik_sessions.md` (at the UBIK project root)

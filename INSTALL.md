@@ -17,7 +17,17 @@
 cd ~/ubik
 ```
 
-### 2. Activate Environment
+### 2. Enable Portable Git Hooks (one-time, per clone)
+
+The post-commit hook that auto-syncs `ubik_sessions.md` to Google Drive is tracked in `githooks/` and must be enabled per-clone (git does not track `.git/hooks/`):
+
+```bash
+bash scripts/setup_hooks.sh   # sets core.hooksPath = githooks
+```
+
+Without this step, the Drive auto-sync silently won't fire. Verify with `git hook run post-commit`.
+
+### 3. Activate Environment
 
 ```bash
 # Quick activation (if bashrc configured)
@@ -27,7 +37,7 @@ ubik
 source ~/pytorch_env/bin/activate
 ```
 
-### 3. Install Dependencies
+### 4. Install Dependencies
 
 #### Option A: Install from requirements.txt (Recommended)
 
@@ -45,7 +55,7 @@ pip install -r requirements-frozen.txt
 
 This installs the exact versions tested on PowerSpec AI100.
 
-### 4. Verify Installation
+### 5. Verify Installation
 
 ```bash
 # Verify CUDA setup
