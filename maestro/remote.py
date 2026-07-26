@@ -38,13 +38,26 @@ Usage::
         print(res.stdout)
 
 Author: UBIK Project
-Version: 0.1.0
+Version: 0.2.0
+
+Resilience note (v0.2.0, HARDENING_PLAN Layer D): ``run`` is now guarded by
+the canonical Probe-Latch :class:`~somatic.mcp_client.resilience.CircuitBreaker`
+(CLAUDE.md §2.3) — once open, calls are rejected without spawning ssh, so a
+flapping Somatic node is rejected fast instead of hammered.
 """
 
 import asyncio
 import logging
 from dataclasses import dataclass
 from typing import Optional
+
+# Canonical Probe-Latch circuit breaker (CLAUDE.md §2.3/§3.4 — import, never
+# reimplement). Loaded via a shim, not a plain package import — see
+# maestro/_canonical_resilience.py for why. We only ever construct
+# CircuitBreakerConfig explicitly below — never call .from_settings() — so
+# maestro's own resilience settings (maestro.config) stay the single source
+# of truth, never somatic's.
+from maestro._canonical_resilience import CircuitBreaker, CircuitBreakerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +104,10 @@ class RemoteExecutor:
             ``bash -s`` directly (native Linux host).
         connect_timeout: Seconds for ssh's ``ConnectTimeout`` — how long to
             wait for the TCP/SSH handshake before giving up.
+        circuit_breaker: Probe-Latch breaker guarding :meth:`run` (CLAUDE.md
+            §2.3).  Defaults to a breaker with the canonical config values;
+            pass an explicit instance to share one breaker across executors
+            or to override thresholds.
     """
 
     def __init__(
@@ -99,10 +116,14 @@ class RemoteExecutor:
         *,
         wsl: bool = True,
         connect_timeout: float = 8.0,
+        circuit_breaker: Optional[CircuitBreaker] = None,
     ) -> None:
         self._ssh_host = ssh_host
         self._wsl = wsl
         self._connect_timeout = connect_timeout
+        self._circuit_breaker = circuit_breaker or CircuitBreaker(
+            f"ssh-{ssh_host}", config=CircuitBreakerConfig()
+        )
 
     @classmethod
     def from_config(cls, cfg) -> "RemoteExecutor":
@@ -119,6 +140,13 @@ class RemoteExecutor:
             somatic.ssh_host,
             wsl=somatic.use_wsl,
             connect_timeout=somatic.ssh_connect_timeout,
+            circuit_breaker=CircuitBreaker(
+                f"ssh-{somatic.ssh_host}",
+                config=CircuitBreakerConfig(
+                    failure_threshold=somatic.circuit_breaker_failure_threshold,
+                    recovery_timeout_s=somatic.circuit_breaker_recovery_timeout_s,
+                ),
+            ),
         )
 
     @property
@@ -146,10 +174,14 @@ class RemoteExecutor:
         ]
 
     async def run(self, script: str, *, timeout: float = 60.0) -> RemoteResult:
-        """Execute a bash *script* on the remote node.
+        """Execute a bash *script* on the remote node, behind the circuit breaker.
 
-        The script is delivered over stdin to ``bash -s`` (see module docstring)
-        so multi-line scripts with arbitrary quoting work verbatim.
+        Guarded by a Probe-Latch :class:`CircuitBreaker` (CLAUDE.md §2.3): once
+        the breaker opens (after consecutive connection failures), calls are
+        rejected immediately — no ssh process is even spawned — until the
+        recovery timeout elapses and a single HALF_OPEN probe is allowed
+        through. This stops a flapping Somatic node from being hammered with
+        SSH attempts.
 
         Args:
             script: Bash script text.  Runs under a non-login, non-interactive
@@ -158,9 +190,34 @@ class RemoteExecutor:
                 disconnected :class:`RemoteResult` is returned.
 
         Returns:
-            :class:`RemoteResult`.  Never raises — connection failures and
-            timeouts are reported via ``connected=False`` and a non-zero
-            ``returncode``.
+            :class:`RemoteResult`.  Never raises — connection failures,
+            timeouts, and an open circuit are all reported via
+            ``connected=False`` and a non-zero ``returncode``.
+        """
+        if not await self._circuit_breaker.allow_request():
+            logger.warning(
+                "remote: circuit '%s' open, rejecting fast without contacting %s",
+                self._circuit_breaker.name, self._ssh_host,
+            )
+            return RemoteResult(
+                returncode=255,
+                stdout="",
+                stderr=f"circuit '{self._circuit_breaker.name}' open — Somatic unreachable",
+                connected=False,
+            )
+
+        result = await self._run_once(script, timeout=timeout)
+        if result.connected:
+            await self._circuit_breaker.record_success()
+        else:
+            await self._circuit_breaker.record_failure()
+        return result
+
+    async def _run_once(self, script: str, *, timeout: float = 60.0) -> RemoteResult:
+        """Execute a bash *script* on the remote node — no breaker gating.
+
+        See :meth:`run` (the public, breaker-guarded entry point) for the
+        full contract. This is the raw single-attempt implementation.
         """
         argv = self._ssh_argv()
         logger.debug("remote: running script on %s (%d bytes)", self._ssh_host, len(script))

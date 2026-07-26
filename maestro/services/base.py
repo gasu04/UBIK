@@ -34,6 +34,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+# Canonical backoff+jitter helper (CLAUDE.md §2.3/§3.4 — import, never
+# reimplement). Loaded via a shim, not a plain package import — see
+# maestro/_canonical_resilience.py for why.
+from maestro._canonical_resilience import RetryConfig, calculate_backoff_delay
 from maestro.platform_detect import NodeType
 
 logger = logging.getLogger(__name__)
@@ -310,9 +314,23 @@ class UbikService(ABC):
         error.  This is the fix for the endemic vLLM failure mode where the
         remote unit died mid-load and maestro waited the full 300 s blind.
 
+        The delay between consecutive polls is *poll_interval* plus jitter
+        (up to 20% of it), via the canonical
+        :func:`~somatic.mcp_client.resilience.calculate_backoff_delay`
+        (CLAUDE.md §2.3), rather than an exact fixed cadence. This avoids
+        hitting a still-recovering Somatic node in lockstep with another
+        poller (e.g. vLLM and WhisperX waiting concurrently) on every single
+        cycle. Deliberately *not* exponential growth: unlike a genuine
+        failure path, this loop's job is to detect "just became healthy" as
+        soon as possible during a normal startup — growing the interval over
+        time would slow that down for no benefit. The circuit breaker (on the
+        probe itself) is what actually backs off from a confirmed-down node;
+        this is purely jitter to desynchronize concurrent polls.
+
         Args:
             probe_host: Host argument passed to :meth:`probe_with_timeout`.
-            poll_interval: Seconds between consecutive probe calls.
+            poll_interval: Base seconds between consecutive probe calls
+                (actual delay is this plus up to 20% jitter).
             liveness_interval: Minimum seconds between out-of-band liveness
                 checks (:meth:`_liveness_diagnostic`).  Kept coarser than
                 *poll_interval* so an override that costs an SSH round-trip is
@@ -325,6 +343,17 @@ class UbikService(ABC):
         start_ts = time.perf_counter()
         limit = self.max_wait_s
         last_liveness_ts = start_ts
+        # max_delay_ms == base_delay_ms: calculate_backoff_delay's exponential
+        # term is always clamped straight back down to base, so every cycle
+        # is base + jitter — no growth, only desync. Jitter scales with base
+        # (20%) so a tiny poll_interval (e.g. 0.01s in tests) isn't swamped
+        # by a fixed jitter constant calibrated for the 3s production default.
+        base_delay_ms = max(1, int(poll_interval * 1000))
+        backoff_config = RetryConfig(
+            base_delay_ms=base_delay_ms,
+            max_delay_ms=base_delay_ms,
+            jitter_max_ms=max(1, base_delay_ms // 5),
+        )
 
         while True:
             elapsed = round(time.perf_counter() - start_ts)
@@ -367,7 +396,10 @@ class UbikService(ABC):
                     self.name, limit,
                 )
                 return False
-            await asyncio.sleep(min(poll_interval, remaining))
+            # attempt=0 always: max_delay_ms == base_delay_ms clamps the
+            # exponential term regardless, so this is just base + jitter.
+            delay = calculate_backoff_delay(0, backoff_config)
+            await asyncio.sleep(min(delay, remaining))
 
     async def probe_with_timeout(
         self,

@@ -113,11 +113,21 @@ class ServiceRegistry:
         remote path when the local node differs from their own — so the same
         registry works unchanged on either node.
         """
-        from maestro.remote import RemoteExecutor
+        from maestro.remote import CircuitBreaker, CircuitBreakerConfig, RemoteExecutor
 
         ubik_root = self._cfg.ubik_root
         somatic = self._cfg.somatic
         somatic_remote = RemoteExecutor.from_config(self._cfg)
+        # Separate breaker identity from the SSH one (different failure
+        # domain — HTTP /health reachability, not SSH transport) but built
+        # from the same CLAUDE.md §2.3 config values.
+        vllm_probe_breaker = CircuitBreaker(
+            "vllm-probe",
+            config=CircuitBreakerConfig(
+                failure_threshold=somatic.circuit_breaker_failure_threshold,
+                recovery_timeout_s=somatic.circuit_breaker_recovery_timeout_s,
+            ),
+        )
 
         self.register(DockerService())
         self.register(Neo4jService(ubik_root))
@@ -137,6 +147,7 @@ class ServiceRegistry:
             remote_ubik_root=somatic.remote_ubik_root,
             probe_ip=somatic.tailscale_ip,
             remote_venv=somatic.vllm_venv,
+            circuit_breaker=vllm_probe_breaker,
         ))
         self.register(WhisperXService(
             port=somatic.whisperx_port,

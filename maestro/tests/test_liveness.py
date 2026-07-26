@@ -11,10 +11,11 @@ underlying process/unit is confirmed dead — while never false-alarming when th
 process is merely still starting up or the liveness signal is unavailable.
 """
 
+import asyncio
 import logging
 import time
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -133,6 +134,82 @@ class TestWaitForHealthyLiveness:
 
         assert result is True
         assert svc.probe_calls >= 3
+
+
+# ---------------------------------------------------------------------------
+# base._wait_for_healthy poll-delay backoff+jitter (HARDENING_PLAN Layer D)
+# ---------------------------------------------------------------------------
+
+class TestWaitForHealthyPollBackoff:
+    @pytest.mark.asyncio
+    async def test_poll_delays_bounded_between_base_and_20pct_jitter(self):
+        """Each sleep is in [poll_interval, poll_interval * 1.2] — never a
+        fixed exact cadence, and never runaway exponential growth."""
+        svc = _ScriptedService(
+            probe_healthy=[False] * 5 + [True],
+            liveness=[None],
+            max_wait=30.0,
+        )
+        delays: list[float] = []
+
+        async def _capture_sleep(seconds):
+            delays.append(seconds)
+
+        with patch("maestro.services.base.asyncio.sleep", side_effect=_capture_sleep):
+            result = await svc._wait_for_healthy(
+                "somatic", poll_interval=1.0, liveness_interval=100.0
+            )
+
+        assert result is True
+        assert len(delays) >= 5
+        for d in delays:
+            assert 1.0 <= d <= 1.2, f"delay {d} outside [1.0, 1.2] bound"
+
+    @pytest.mark.asyncio
+    async def test_tiny_poll_interval_not_swamped_by_jitter(self):
+        """A 10ms poll_interval (typical in fast tests) must not balloon —
+        jitter scales with the interval, not a fixed ms constant."""
+        svc = _ScriptedService(
+            probe_healthy=[False, False, True],
+            liveness=[None],
+            max_wait=5.0,
+        )
+        wall_start = time.perf_counter()
+        result = await svc._wait_for_healthy(
+            "somatic", poll_interval=0.01, liveness_interval=100.0
+        )
+        elapsed = time.perf_counter() - wall_start
+
+        assert result is True
+        assert elapsed < 1.0, "tiny poll_interval must stay fast, not be swamped by jitter"
+
+    @pytest.mark.asyncio
+    async def test_no_growth_across_many_consecutive_failures(self):
+        """Unlike classic exponential backoff, repeated failures must not
+        grow the delay — the loop's job is fast detection of recovery, not
+        graceful degradation (the circuit breaker owns that concern)."""
+        svc = _ScriptedService(
+            probe_healthy=[False] * 20,
+            liveness=[None],
+            max_wait=1000.0,
+        )
+        delays: list[float] = []
+
+        async def _capture_sleep(seconds):
+            delays.append(seconds)
+            if len(delays) >= 15:
+                raise asyncio.CancelledError()  # stop the otherwise-infinite loop
+
+        with patch("maestro.services.base.asyncio.sleep", side_effect=_capture_sleep):
+            try:
+                await svc._wait_for_healthy(
+                    "somatic", poll_interval=2.0, liveness_interval=1000.0
+                )
+            except asyncio.CancelledError:
+                pass
+
+        assert len(delays) >= 15
+        assert max(delays) <= 2.4  # 2.0 * 1.2, never exceeds the jitter bound
 
 
 # ---------------------------------------------------------------------------

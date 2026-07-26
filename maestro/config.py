@@ -245,6 +245,10 @@ class SomaticConfig(BaseSettings):
         tailscale_hostname: Tailscale hostname of this node.
         vllm_port: vLLM HTTP server port.
         vllm_model_path: Absolute path to the loaded model *on this node*.
+        circuit_breaker_failure_threshold: Consecutive failures before the
+            SSH/probe circuit breaker opens.
+        circuit_breaker_recovery_timeout_s: Seconds an open circuit waits
+            before allowing a single HALF_OPEN probe.
 
     Example:
         >>> cfg = SomaticConfig()
@@ -264,6 +268,13 @@ class SomaticConfig(BaseSettings):
     use_wsl: bool = True                        # SOMATIC_USE_WSL
     ssh_connect_timeout: float = 8.0            # SOMATIC_SSH_CONNECT_TIMEOUT
     remote_ubik_root: str = "/home/gasu/ubik"   # SOMATIC_REMOTE_UBIK_ROOT
+
+    # Circuit breaker guarding the SSH RemoteExecutor and the vLLM health
+    # probe (CLAUDE.md §2.3) — Probe Latch pattern, canonical implementation
+    # in somatic/mcp_client/resilience.py. Opens after N consecutive failures
+    # so a flapping Somatic node is rejected fast instead of hammered.
+    circuit_breaker_failure_threshold: int = 5      # SOMATIC_CIRCUIT_BREAKER_FAILURE_THRESHOLD
+    circuit_breaker_recovery_timeout_s: int = 30    # SOMATIC_CIRCUIT_BREAKER_RECOVERY_TIMEOUT_S
 
     # Service ports — validation_alias bypasses the SOMATIC_ prefix
     vllm_port: int = Field(8002, validation_alias="VLLM_PORT")

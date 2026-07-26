@@ -165,11 +165,97 @@ class TestFromConfig:
         cfg.somatic.ssh_host = "windows-server"
         cfg.somatic.use_wsl = True
         cfg.somatic.ssh_connect_timeout = 12.0
+        cfg.somatic.circuit_breaker_failure_threshold = 5
+        cfg.somatic.circuit_breaker_recovery_timeout_s = 30
         rx = RemoteExecutor.from_config(cfg)
         assert rx.ssh_host == "windows-server"
         argv = rx._ssh_argv()
         assert argv[-1] == "wsl bash -s"
         assert "ConnectTimeout=12" in argv
+
+    def test_from_config_builds_circuit_breaker_from_somatic_fields(self):
+        cfg = MagicMock()
+        cfg.somatic.ssh_host = "windows-server"
+        cfg.somatic.use_wsl = True
+        cfg.somatic.ssh_connect_timeout = 8.0
+        cfg.somatic.circuit_breaker_failure_threshold = 2
+        cfg.somatic.circuit_breaker_recovery_timeout_s = 99
+        rx = RemoteExecutor.from_config(cfg)
+        assert rx._circuit_breaker.config.failure_threshold == 2
+        assert rx._circuit_breaker.config.recovery_timeout_s == 99
+
+
+# ---------------------------------------------------------------------------
+# Circuit breaker guarding run() (HARDENING_PLAN Layer D — CLAUDE.md §2.3)
+# ---------------------------------------------------------------------------
+
+class TestRunCircuitBreaker:
+    @pytest.mark.asyncio
+    async def test_opens_after_consecutive_connection_failures(self):
+        """After N consecutive disconnects, the breaker opens and rejects fast."""
+        from maestro._canonical_resilience import CircuitBreaker, CircuitBreakerConfig, CircuitState
+
+        breaker = CircuitBreaker(
+            "ssh-test", config=CircuitBreakerConfig(failure_threshold=2, recovery_timeout_s=60)
+        )
+        rx = RemoteExecutor("windows-server", circuit_breaker=breaker)
+        proc = _fake_proc(stderr=b"conn refused", returncode=255)
+
+        with patch(
+            "maestro.remote.asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=proc),
+        ) as spawn:
+            res1 = await rx.run("echo hi")
+            res2 = await rx.run("echo hi")
+            assert res1.connected is False
+            assert res2.connected is False
+            assert breaker.state == CircuitState.OPEN
+            assert spawn.await_count == 2
+
+            # Breaker now open: a third call must reject fast, no ssh spawned.
+            res3 = await rx.run("echo hi")
+            assert res3.connected is False
+            assert "circuit" in res3.stderr
+            assert spawn.await_count == 2  # unchanged — no new subprocess
+
+    @pytest.mark.asyncio
+    async def test_half_open_admits_exactly_one_probe(self):
+        """Once OPEN, only a single probe is let through in HALF_OPEN."""
+        from maestro._canonical_resilience import CircuitBreaker, CircuitBreakerConfig, CircuitState
+
+        breaker = CircuitBreaker(
+            "ssh-test", config=CircuitBreakerConfig(failure_threshold=1, recovery_timeout_s=0)
+        )
+        rx = RemoteExecutor("windows-server", circuit_breaker=breaker)
+        failing_proc = _fake_proc(stderr=b"refused", returncode=255)
+
+        with patch(
+            "maestro.remote.asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=failing_proc),
+        ):
+            await rx.run("echo hi")  # 1 failure -> OPEN
+        assert breaker.state == CircuitState.OPEN
+
+        # recovery_timeout_s=0 -> the very next allow_request() flips to
+        # HALF_OPEN and admits the probe. A concurrent second call must be
+        # rejected without spawning ssh, since the probe is already in flight.
+        assert await breaker.allow_request() is True   # this IS the probe
+        assert await breaker.allow_request() is False  # rejected: probe in flight
+
+    @pytest.mark.asyncio
+    async def test_success_records_and_keeps_circuit_closed(self):
+        from maestro._canonical_resilience import CircuitState
+
+        rx = RemoteExecutor("windows-server")
+        proc = _fake_proc(stdout=b"ok\n", returncode=0)
+        with patch(
+            "maestro.remote.asyncio.create_subprocess_exec",
+            new=AsyncMock(return_value=proc),
+        ):
+            for _ in range(10):
+                res = await rx.run("echo ok")
+                assert res.connected is True
+        assert rx._circuit_breaker.state == CircuitState.CLOSED
 
 
 # ---------------------------------------------------------------------------

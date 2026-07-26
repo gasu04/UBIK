@@ -549,6 +549,61 @@ class TestVllmServiceProbe:
         assert isinstance(result.latency_ms, float)
 
 
+class TestVllmServiceProbeCircuitBreaker:
+    """HARDENING_PLAN Layer D — CLAUDE.md §2.3 Probe-Latch breaker on probe()."""
+
+    @pytest.mark.asyncio
+    async def test_opens_after_consecutive_failures_and_rejects_fast(self):
+        from maestro._canonical_resilience import CircuitBreaker, CircuitBreakerConfig, CircuitState
+
+        breaker = CircuitBreaker(
+            "vllm-probe-test",
+            config=CircuitBreakerConfig(failure_threshold=2, recovery_timeout_s=60),
+        )
+        svc = VllmService(model_path="/fake/model", circuit_breaker=breaker)
+
+        with patch("maestro.services.vllm_service.httpx.AsyncClient",
+                   _http_client_mock(503)) as client_cls:
+            r1 = await svc.probe("127.0.0.2")
+            r2 = await svc.probe("127.0.0.2")
+            assert r1.healthy is False
+            assert r2.healthy is False
+            assert breaker.state == CircuitState.OPEN
+            assert client_cls.call_count == 2
+
+            # Breaker open: third probe rejected fast, no HTTP call issued.
+            r3 = await svc.probe("127.0.0.2")
+            assert r3.healthy is False
+            assert "circuit" in r3.error
+            assert client_cls.call_count == 2  # unchanged
+
+    @pytest.mark.asyncio
+    async def test_connect_error_counts_as_failure(self):
+        from maestro._canonical_resilience import CircuitBreaker, CircuitBreakerConfig, CircuitState
+
+        breaker = CircuitBreaker(
+            "vllm-probe-test",
+            config=CircuitBreakerConfig(failure_threshold=1, recovery_timeout_s=60),
+        )
+        svc = VllmService(model_path="/fake/model", circuit_breaker=breaker)
+        with patch("maestro.services.vllm_service.httpx.AsyncClient",
+                   _http_client_mock(raise_exc=httpx.ConnectError("refused"))):
+            await svc.probe("127.0.0.2")
+        assert breaker.state == CircuitState.OPEN
+
+    @pytest.mark.asyncio
+    async def test_success_keeps_circuit_closed(self):
+        from maestro._canonical_resilience import CircuitState
+
+        svc = VllmService(model_path="/fake/model")
+        with patch("maestro.services.vllm_service.httpx.AsyncClient",
+                   _http_client_mock(200)):
+            for _ in range(10):
+                result = await svc.probe("127.0.0.2")
+                assert result.healthy is True
+        assert svc._circuit_breaker.state == CircuitState.CLOSED
+
+
 class TestVllmServiceLifecycle:
     @pytest.mark.asyncio
     async def test_start_uses_conda_run(self):

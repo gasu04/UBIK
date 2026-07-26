@@ -24,12 +24,17 @@ vLLM runs ONLY on the Somatic node.  Never call start() on the
 Hippocampal node.
 
 Author: UBIK Project
-Version: 0.8.0
+Version: 0.9.0
 
 Remote-start note (v0.8.0, HARDENING_PLAN Layer A): the Somatic vLLM is now
 installed as a *persistent, enabled* systemd user unit (rendered by
 ``_render_vllm_unit``) with ``Restart=on-failure``, replacing the earlier
 *transient* ``systemd-run`` unit that vanished on any WSL VM teardown.
+
+Resilience note (v0.9.0, HARDENING_PLAN Layer D): ``probe`` is now guarded by
+the canonical Probe-Latch :class:`CircuitBreaker`
+(``somatic/mcp_client/resilience.py``, CLAUDE.md §2.3) — a flapping Somatic
+node gets rejected fast instead of hammered with repeated ``/health`` calls.
 """
 
 import asyncio
@@ -45,6 +50,7 @@ from typing import Optional
 
 import httpx
 
+from maestro._canonical_resilience import CircuitBreaker, CircuitBreakerConfig
 from maestro.platform_detect import NodeType, detect_node
 from maestro.remote import RemoteExecutor
 from maestro.services.base import ProbeResult, UbikService, _kill_port, _run_proc
@@ -362,6 +368,7 @@ class VllmService(UbikService):
         remote_ubik_root: Optional[str] = None,
         probe_ip: Optional[str] = None,
         remote_venv: Optional[str] = None,
+        circuit_breaker: Optional[CircuitBreaker] = None,
     ) -> None:
         if model_path is None:
             from maestro.config import get_config
@@ -371,6 +378,12 @@ class VllmService(UbikService):
         self._conda_env = conda_env
         self._venv_path = venv_path
         self._max_wait_s = max_wait_s
+        # Guards the /health probe (CLAUDE.md §2.3 — Probe Latch). Defaults to
+        # canonical config values; the service registry (services/__init__.py)
+        # passes one built from SomaticConfig so real thresholds apply.
+        self._circuit_breaker = circuit_breaker or CircuitBreaker(
+            "vllm-probe", config=CircuitBreakerConfig()
+        )
         # Remote-control context (used when Maestro runs on a *different* node
         # than this service — i.e. the single Hippocampal instance managing
         # the Somatic vLLM).  ``None`` → this service is managed locally.
@@ -425,7 +438,13 @@ class VllmService(UbikService):
         return []
 
     async def probe(self, host: str) -> ProbeResult:
-        """HTTP GET to ``/health``.
+        """HTTP GET to ``/health``, guarded by the Probe-Latch circuit breaker.
+
+        When the breaker is open (Somatic confirmed unreachable after
+        consecutive failures), this returns unhealthy immediately without
+        issuing an HTTP request — CLAUDE.md §2.3's "reject fast instead of
+        hammering." In HALF_OPEN, exactly one probe is allowed through to
+        test recovery; all others are rejected until it resolves.
 
         Args:
             host: IP address or hostname of the Somatic node.
@@ -435,6 +454,13 @@ class VllmService(UbikService):
             ``details["http_status"]`` when reachable.
         """
         url = f"http://{host}:{self._port}/health"
+        if not await self._circuit_breaker.allow_request():
+            return ProbeResult(
+                name=self.name, node=self.node, healthy=False,
+                latency_ms=0.0,
+                details={"url": url},
+                error=f"circuit '{self._circuit_breaker.name}' open — Somatic unreachable",
+            )
         start = time.perf_counter()
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -442,6 +468,10 @@ class VllmService(UbikService):
                 latency_ms = round((time.perf_counter() - start) * 1000, 2)
                 logger.debug("vllm: HTTP %d from %s", resp.status_code, url)
                 healthy = resp.status_code == 200
+                if healthy:
+                    await self._circuit_breaker.record_success()
+                else:
+                    await self._circuit_breaker.record_failure()
                 return ProbeResult(
                     name=self.name, node=self.node, healthy=healthy,
                     latency_ms=latency_ms,
@@ -449,6 +479,7 @@ class VllmService(UbikService):
                     error=None if healthy else f"HTTP {resp.status_code}",
                 )
         except Exception as exc:
+            await self._circuit_breaker.record_failure()
             latency_ms = round((time.perf_counter() - start) * 1000, 2)
             return ProbeResult(
                 name=self.name, node=self.node, healthy=False,
