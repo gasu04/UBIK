@@ -1374,3 +1374,39 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 - Investigate the `whisperx: device: cpu` anomaly on Somatic — confirm whether it's expected (e.g. deliberate CPU-only config) or a GPU-detection regression that should be using the RTX 5090.
 - Decide whether to delete `.venv.pre-torch-cleanup-backup/` (1.6GB), still pending from the prior session.
 ---
+
+## Session: 2026-07-27 — [Node: Claude.ai Planning Session]
+
+**Goal:** Re-verify CP2 status against the live `ubik_sessions.md` (project-knowledge snapshot was stale), confirm whether the 2026-07-27 hardening-plan sessions changed anything for the ingestion pipeline, and clarify exactly who needs to do what next.
+
+**Completed:**
+- Read `ubik_sessions.md` end-to-end. `project_knowledge_search` did not yet reflect the day's entries; `raw.githubusercontent.com` was CDN-stale and the GitHub Contents API was rate-limited, so pulled the live file via a `codeload.github.com` tarball instead.
+- Re-confirmed CP2 is still open: 3/3 files scored ≥0.7 on 2026-07-19/20, but the gate's ≥6-of-8 denominator is unmet (only 3 files exist in `sources/tactiq/`), and File 2 is a degenerate no-dialogue stub whose 0.85 score overstates it — effective clean n is 2. No session since 07-20 has touched CP2 or `ingestion/` directly.
+- Cross-checked the three newest sessions (2026-07-27 20:17, 2026-07-27 21:40, 2026-07-28 02:10) against the previously-suggested next steps:
+  - Layer A: now field-verified live (SIGKILL → auto-restart in ~57s, confirmed against the real Somatic node).
+  - Layer E: completed; closing it out also caught and fixed a real bug (Hippocampal `.venv` had absorbed Somatic's full 258-package ML training stack via a bad rebuild command documented in `CLAUDE.md` §3.5 — now clean at 155 packages, full suites green).
+  - Layer D landed (commit `efa6373`) but has no corresponding session entry anywhere in the log — flagged as a gap in the project's own journaling convention, worth a follow-up check that it actually works.
+  - Layer B remains the only unstarted hardening layer (needs Windows admin access on Somatic).
+  - `maestro status` as of 2026-07-28 02:03:53 UTC: cluster 7/7 healthy (neo4j, chromadb, mcp, vllm, whisperx, tailscale, docker). New anomaly flagged, not yet investigated: WhisperX reports `device: cpu` instead of the RTX 5090.
+  - **Conclusion:** the infrastructure reasons CP2 kept getting deferred are now resolved. The remaining blocker is a decision, not a technical one.
+- Broke the CP2 next step down by owner, since "run the 8-file test" had been sitting unclaimed across several sessions:
+  - Gines's decision: run the proper 8-file adversarial test, or revisit/lower the gate itself.
+  - Gines's input if running the test: which 8 files, or criteria for Claude Code to select against — "adversarial" needs judgment about which transcripts will actually stress the pipeline.
+  - Routine Claude Code work: the rubric confidence-floor rule, staging files, running `run_phase3.py`, first-pass hand-scoring.
+  - Back to Gines: the actual pass/fail verdict, per the project's own "never tune the rubric to manufacture a pass" rule.
+- Searched for the exact Seagate2T location of the ~1,261 raw Tactiq zip files referenced in the 2026-06-12 recon session. **Not found.** That session's note ("located raw Tactiq zips (~1,261 files, Seagate2T)") never recorded the specific subfolder, and nothing else in the repo does either — `sync_to_seagate.sh` only mirrors `/Volumes/990PRO 4T/UBIK/` → `Seagate2T/UBIK/project/` and the Docker data dir, which doesn't look like the right location for a standalone zip archive. Claude.ai has no filesystem access to check directly.
+
+**State left in:**
+- No code or config changed — read-only verification and planning from Claude.ai. Nothing committed (Claude.ai has no GitHub push access — confirmed again via `search_mcp_registry`, no GitHub connector available).
+
+**Files changed:**
+- None. This entry itself was drafted as a standalone file for manual append + commit.
+
+**Next session should (Claude Code, Hippocampal):**
+1. Locate the raw Tactiq archive on Seagate2T — path was never recorded. Something like `find /Volumes/Seagate2T -iname "*tactiq*"` before selecting anything.
+2. Await Gines's decision on the CP2 path (proper 8-file test vs. revisiting the gate).
+3. If running the test: stage the chosen/selected 8 files into `sources/tactiq/`, add the degenerate-input confidence-floor rule to `qa/rubric.md`, run `run_phase3.py --stage 2 --dry-run --limit 8`, hand-score, report back without declaring pass/fail.
+4. Confirm Layer D (commit `efa6373`) actually works — no session narrates testing it.
+5. Layer B still needs Windows admin on Somatic.
+6. Investigate the WhisperX `device: cpu` anomaly (RTX 5090 possibly not being used).
+---
