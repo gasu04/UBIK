@@ -1,6 +1,12 @@
 # Ubik Project Requirements
 # PowerSpec AI100 - RTX 5090 - CUDA 12.4
 # Python 3.12
+#
+# NOTE: this is the Somatic-node (training/fine-tuning) requirements file.
+# It is NOT part of the canonical Hippocampal `.venv` build — do not pass it
+# to `uv pip install` when rebuilding UBIK/.venv. See CLAUDE.md §3.5 and
+# ENVIRONMENT.md for the venv layout; use maestro/requirements.txt +
+# hippocampal/requirements.txt for the Hippocampal venv instead.
 
 # ============================================================================
 # Core ML Framework

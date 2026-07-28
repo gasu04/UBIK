@@ -1332,3 +1332,30 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 **Next session should:**
 - Layer B needs Windows admin on the Somatic host (`windows-plain` SSH alias or at-the-machine): B.1 systemd linger, B.2 boot Scheduled Task, B.3 keepalive heartbeat, B.4 `.wslconfig` review. This is the layer that survives a full VM/host reboot, not yet exercised. Alternatively, pick up Layer E (dedicated UBIK venv on Hippocampal) since it's Hippocampal-only and lower risk.
 ---
+
+## Session: [2026-07-27 21:40] — [Node: Hippocampal]
+**Goal:** Pick up Layer E (dedicated UBIK venv) per the prior session's suggestion, then fix a torch-pollution bug discovered while closing it out.
+**Completed:**
+- Confirmed Layer E was ~60-70% already done (commit 55f0875, 2026-07-25): canonical `.venv` existed, alias repointed, symlink removed, fastmcp isolated. Completed the two remaining checklist items: `requirements.lock` and a corrected `ENVIRONMENT.md`.
+- While writing those, discovered the canonical Hippocampal `.venv` had absorbed the full Somatic/DeepSeek ML training stack (torch, torchvision, torchaudio, transformers, trl, peft, accelerate, bitsandbytes, tensorboard, wandb, jupyter, etc. — 258 packages total), because CLAUDE.md §3.5's own documented rebuild command included the top-level `requirements.txt` (Somatic-flavored, headed "PowerSpec AI100 - RTX 5090 - CUDA 12.4").
+- Rebuilt `.venv` cleanly from only `maestro/requirements.txt` + `hippocampal/requirements.txt` (155 packages). Verified `torch==2.13.0` legitimately remains as a transitive dependency of `sentence-transformers` (hippocampal's embeddings), not leaked training-stack weight.
+- Verified the rebuilt venv via full test suites: maestro 649/649 passed, hippocampal 139 passed/15 skipped. Tier 1 import smoke test (`hippocampal.mcp_server`) OK.
+- Swapped the venv in (old one preserved at `.venv.pre-torch-cleanup-backup/`, confirmed gitignored, ~1.6GB, pending user decision on deletion). Post-swap `maestro --version` confirmed working (0.14.0).
+- Fixed the actual root cause: corrected CLAUDE.md §3.5's rebuild command to drop `-r requirements.txt`, bumped version 3.3.1 -> 3.3.2 with a changelog entry. Updated `ENVIRONMENT.md`'s "known issue (not yet fixed)" language to reflect the fix. Added a clarifying header comment to the root `requirements.txt` stating it is Somatic-only and must not be used for the Hippocampal venv build. Added `requirements.lock` pointer comments to `maestro/requirements.txt`, `hippocampal/requirements.txt`, `ingestion/requirements.txt`.
+- Identified but deliberately scoped out: `ingestion/requirements.txt`'s `openai-whisper` dependency is not installed in `.venv` at all (pre-existing gap); whether ingestion should use local whisper or the remote Somatic WhisperX service is a separate design decision, flagged as an open item in `requirements.lock`'s header.
+**State left in:**
+- `.venv` is clean (155 packages), verified working. `.venv.pre-torch-cleanup-backup/` still on disk as a reversible safety net — not yet deleted, awaiting user call.
+- Layer E is now fully complete per HARDENING_PLAN_2026-07-23.md's checklist.
+**Files changed:**
+- CLAUDE.md: §3.5 rebuild command corrected (dropped `-r requirements.txt`); version 3.3.1 -> 3.3.2 with changelog entry
+- ENVIRONMENT.md: "known issue (not yet fixed)" section rewritten to "Fixed 2026-07-27"
+- requirements.txt (root): added header note clarifying Somatic-only scope, not for Hippocampal venv build
+- requirements.lock: new file, 155-package freeze with detailed fix/verification header
+- maestro/requirements.txt, hippocampal/requirements.txt, ingestion/requirements.txt: added one-line pointer comment to requirements.lock
+- .venv: rebuilt clean (258 -> 155 packages); old venv preserved at .venv.pre-torch-cleanup-backup/ (gitignored)
+- ubik_sessions.md: this entry
+**Next session should:**
+- Decide whether to delete `.venv.pre-torch-cleanup-backup/` (1.6GB) now that the clean venv is verified stable, or keep it a while longer.
+- Layer B (WSL VM/Windows-host keepalive) remains the only unstarted HARDENING_PLAN layer — needs Windows admin access on the Somatic host.
+- Separately: resolve the ingestion/openai-whisper design question (local whisper vs. remote Somatic WhisperX) flagged in requirements.lock's header.
+---

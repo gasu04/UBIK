@@ -5,6 +5,7 @@
 # Activate the UBIK venv before installing:
 #   source "/Volumes/990PRO 4T/UBIK/.venv/bin/activate"
 #   pip install -r maestro/requirements.txt
+# Pinned versions actually installed: see ../requirements.lock (CLAUDE.md §2.7)
 # =============================================================================
 
 # -----------------------------------------------------------------------------

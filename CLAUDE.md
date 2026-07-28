@@ -1,6 +1,6 @@
 # CLAUDE.md — UBIK Coding Standards
 
-**Version:** 3.3.1 **Supersedes:** 3.3.0, 3.2.1, 3.2.0, 3.1.0, 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
+**Version:** 3.3.2 **Supersedes:** 3.3.1, 3.3.0, 3.2.1, 3.2.0, 3.1.0, 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
 
 ---
 
@@ -360,7 +360,7 @@ UBIK has **one canonical repo venv**, deliberately separate from the DeepSeek pr
 - `.venv` is gitignored (`.gitignore` line 17). Never commit a venv.
 - Do **not** mirror the DeepSeek venv into UBIK — it carries ~300 unrelated packages (`akshare`, `yfinance`, `langchain-*`, 60+ `opentelemetry-instrumentation-*`). Install only what UBIK's code imports; use the import smoke test in §1.4 to detect genuinely missing deps.
 - `somatic/` cannot be imported on this Mac — it pulls `vllm` + `whisperx`, which are GPU/Linux-only. It is validated on the Somatic node, not here.
-- Rebuild: `uv venv --python 3.13.7 .venv && source .venv/bin/activate && uv pip install -r requirements.txt -r maestro/requirements.txt -r hippocampal/requirements.txt`
+- Rebuild: `uv venv --python 3.13.7 .venv && source .venv/bin/activate && uv pip install -r maestro/requirements.txt -r hippocampal/requirements.txt`. **Do not** include the top-level `requirements.txt` — it is Somatic/DeepSeek-flavored (full ML training stack: torch, transformers, trl, peft, accelerate, bitsandbytes, tensorboard, wandb, jupyter, etc.) and including it here caused a real pollution incident (258 vs. 155 packages) fixed 2026-07-27. `torch` itself legitimately remains in the canonical venv via `sentence-transformers`, not via that file.
 
 ### 3.6 Cross-Platform & Docker
 
@@ -470,6 +470,7 @@ Run `/compact` every 20–30 turns to keep context lean.
 
 | Version | Date | Changes |
 |:---:|:---:|:---:|
+| 3.3.2 | 2026-07 | §3.5 rebuild command corrected: removed `-r requirements.txt` from the documented `.venv` rebuild — that top-level file is Somatic/DeepSeek-flavored (full ML training stack) and its inclusion had silently pulled 103 extra packages (torch/torchvision/torchaudio/trl/peft/accelerate/bitsandbytes/tensorboard/wandb/jupyter/etc.) into the canonical Hippocampal venv (258 vs. 155 packages). Rebuilt clean from `maestro/requirements.txt` + `hippocampal/requirements.txt` only; verified via full test suites (maestro 649 passed, hippocampal 139 passed/15 skipped) and Tier 1 import smoke test. `torch` itself legitimately remains via `sentence-transformers`. See `requirements.lock` header and `ENVIRONMENT.md` for full detail |
 | 3.3.1 | 2026-07 | Portable git hooks: post-commit hook moved to tracked `githooks/`, enabled per-clone via `scripts/setup_hooks.sh` (`core.hooksPath = githooks`). §Session Journaling documents the one-time setup; INSTALL.md Quick Start adds the step. Fixes the silent-no-sync risk on fresh clones |
 | 3.3.0 | 2026-07 | Session journaling file renamed `SESSIONS.md` → `ubik_sessions.md` (repo + Google Drive mirror). §Session Journaling updated: all new entries go to `ubik_sessions.md`; `scripts/sync_sessions.sh` SRC/DST and `.git/hooks/post-commit` grep repointed to the new name (script name unchanged). Older in-file "SESSIONS.md" mentions are now historical record |
 | 3.2.1 | 2026-07 | §3.5: `ubik-ingestion` retired from the exceptions table (its venv was empty/broken; `ingestion/` now runs under `.venv`, 189 tests passing). Version-only doc update — no §3.5 rule changes beyond the table row |
