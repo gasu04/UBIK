@@ -1359,3 +1359,18 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 - Layer B (WSL VM/Windows-host keepalive) remains the only unstarted HARDENING_PLAN layer — needs Windows admin access on the Somatic host.
 - Separately: resolve the ingestion/openai-whisper design question (local whisper vs. remote Somatic WhisperX) flagged in requirements.lock's header.
 ---
+
+## Session: [2026-07-28 02:10] — [Node: Hippocampal]
+**Goal:** Ad-hoc checks: verify whether `litellm` is installed anywhere in the UBIK stack, and review live cluster health via `maestro status`.
+**Completed:**
+- Confirmed `litellm` is NOT installed in the canonical `.venv` (`ModuleNotFoundError`) and is not listed in any of `maestro/requirements.txt`, `hippocampal/requirements.txt`, or `ingestion/requirements.txt` — not a UBIK dependency currently.
+- Checked `/Volumes/990PRO 4T/Trinity` (a separate, unrelated directory the user pointed to) — it contains no Python project (no `.venv`, no `requirements.txt`/`pyproject.toml`), just doc/config files (`CLAUDE_1.md`, `CODEOWNERS`, `ci.yml`, etc.). No `litellm` references found there either.
+- User ran `maestro start` then `maestro status` directly: full cluster reported 7/7 HEALTHY (neo4j, chromadb, mcp, vllm, whisperx, tailscale, docker). Flagged one anomaly for future investigation: `whisperx` (on the Somatic RTX 5090 node) reports `device: cpu` in its health details — worth checking whether the GPU path is actually being used for transcription or whether it's silently falling back to CPU.
+**State left in:**
+- No code or config changes this session — read-only investigation + a live cluster status check. Cluster was healthy at check time (2026-07-28 02:03:53 UTC).
+**Files changed:**
+- ubik_sessions.md: this entry
+**Next session should:**
+- Investigate the `whisperx: device: cpu` anomaly on Somatic — confirm whether it's expected (e.g. deliberate CPU-only config) or a GPU-detection regression that should be using the RTX 5090.
+- Decide whether to delete `.venv.pre-torch-cleanup-backup/` (1.6GB), still pending from the prior session.
+---
