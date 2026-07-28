@@ -4,13 +4,20 @@
     "allow": [
       "Bash(git add *)",
       "Bash(git commit *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
       "Bash(pytest*)",
+      "Bash(mypy *)",
+      "Bash(ruff *)",
+      "Bash(black *)",
       "Bash(pip install *)",
       "Bash(docker compose *)",
       "Bash(docker ps*)"
     ],
     "ask": [
       "Bash(git push *)",
+      "Bash(git reset --hard *)",
       "Bash(rm -rf *)"
     ],
     "deny": [
