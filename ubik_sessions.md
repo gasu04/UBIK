@@ -1317,3 +1317,18 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 **Next session should:**
 - On the Somatic node clone, run `bash scripts/setup_hooks.sh` to enable the hook there. Then resume the HARDENING_PLAN Layer A field-test against the live Somatic node.
 ---
+
+## Session: [2026-07-27 20:17] — [Node: Hippocampal]
+**Goal:** Resume the HARDENING_PLAN_2026-07-23.md Layer A field-test against the live Somatic node (persistent, self-healing `ubik-vllm` systemd unit) — the item left open at the end of the 2026-07-26 08:03 session.
+**Completed:**
+- Passive verification via SSH (`windows-server` -> `wsl bash -s`, with `-o RemoteCommand=none` to override the interactive-only `~/.ssh/config` entry): `ubik-vllm.service` is installed at `~/.config/systemd/user/ubik-vllm.service`, `enabled`, `active (running)`, matching the Layer A spec exactly (Restart=on-failure, RestartSec=10, KillSignal=SIGTERM, all 4 Blackwell env vars). Uptime at test start: ~24.5h, NRestarts=0. `maestro status --service vllm` confirmed HEALTHY (700ms, model loaded).
+- Live self-heal test (explicit user go-ahead after confirming it needs only Layer A + existing SSH access, not Layer B): `systemctl --user kill -s SIGKILL ubik-vllm` at 18:09:53 local. Systemd registered the failure (`SubState=auto-restart`) and respawned within the RestartSec=10 window (new MainPID, NRestarts 0->1). `maestro status --service vllm` confirmed HEALTHY again at 01:10:50 UTC — total observed downtime ~57s (10s systemd restart delay + ~45s vLLM model reload into VRAM), fully automatic, no manual intervention beyond the initial kill.
+- This satisfies Layer A's "definition of done" item 3 (`systemctl --user kill -s SIGKILL ubik-vllm` -> auto-restart, no human action needed) from HARDENING_PLAN_2026-07-23.md §4.
+**State left in:**
+- Somatic `ubik-vllm.service`: enabled, active, healthy, NRestarts=1 (from this test). No files changed on either node — this was verification only, no code/config edits.
+- Layer A is now field-verified (code from commit d0af25e + this live test). Layer D (circuit breaker on SSH/probe) already landed separately (commit efa6373). Layers B (WSL VM/Windows-host keepalive) and E (dedicated UBIK venv) remain not started.
+**Files changed:**
+- ubik_sessions.md: this entry
+**Next session should:**
+- Layer B needs Windows admin on the Somatic host (`windows-plain` SSH alias or at-the-machine): B.1 systemd linger, B.2 boot Scheduled Task, B.3 keepalive heartbeat, B.4 `.wslconfig` review. This is the layer that survives a full VM/host reboot, not yet exercised. Alternatively, pick up Layer E (dedicated UBIK venv on Hippocampal) since it's Hippocampal-only and lower risk.
+---
