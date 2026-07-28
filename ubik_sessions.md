@@ -1437,3 +1437,17 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 **Next session should:**
 - Drop the WhisperX device:cpu item from the outstanding list. Remaining open items: Layer B (Windows admin needed), Layer D confirmation gap, CP2 decision pending from Gines, Seagate2T Tactiq archive location unrecorded.
 ---
+
+## Session: [2026-07-28 02:50] — [Node: Hippocampal]
+**Goal:** Locate the raw Tactiq zip archive on Seagate2T (location was never recorded — flagged as an open item in the 2026-07-27 Claude.ai planning session) and check its filesystem permissions.
+**Completed:**
+- Located the archive: 7 zip files directly under `/Volumes/Seagate2T/` (not in a subfolder as the planning session guessed) — `Tactiq Summary 2023/2024/2025/2026`, `Tactiq Summary` (undated), `Tactiq Transcript 2024/2025`. Total ~24MB.
+- Checked permissions: all 7 files are `-rw-r--r--`, owned by `gasu:staff`; the Seagate2T volume itself (Journaled HFS+) is not mounted read-only. No filesystem-level protection against accidental overwrite/delete currently exists.
+- Asked the user whether to add a read-only backstop (`chmod 444`) per the CLAUDE.md §4.4 ask-first policy (action outside the UBIK project directory). User chose to leave permissions as-is — no filesystem change made.
+**State left in:**
+- Archive location now documented (see above); permissions unchanged (`-rw-r--r--`, writable).
+**Files changed:**
+- ubik_sessions.md: this entry
+**Next session should:**
+- Archive location is no longer an open item. Remaining open items: Layer B (Windows admin needed), Layer D confirmation gap, CP2 decision pending from Gines.
+---
