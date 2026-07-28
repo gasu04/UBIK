@@ -1426,3 +1426,14 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 - Consider mirroring §4.4's ask-first list into `.claude/settings.json`'s `permissions.ask` array so the policy is actually enforced, not just documented.
 - Outstanding from prior sessions: Layer B (Windows admin needed), WhisperX `device: cpu` anomaly, Layer D confirmation gap, CP2 decision pending from Gines, Seagate2T Tactiq archive location unrecorded.
 ---
+
+## Session: [2026-07-28 02:40] — [Node: Hippocampal]
+**Goal:** Close out the WhisperX `device: cpu` anomaly flagged in the 2026-07-28 02:10 session.
+**Completed:**
+- User confirmed WhisperX running on CPU (not the Somatic RTX 5090) is by design, not a regression. No action needed.
+**State left in:** No change.
+**Files changed:**
+- ubik_sessions.md: this entry
+**Next session should:**
+- Drop the WhisperX device:cpu item from the outstanding list. Remaining open items: Layer B (Windows admin needed), Layer D confirmation gap, CP2 decision pending from Gines, Seagate2T Tactiq archive location unrecorded.
+---
