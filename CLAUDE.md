@@ -1,6 +1,6 @@
 # CLAUDE.md — UBIK Coding Standards
 
-**Version:** 3.3.2 **Supersedes:** 3.3.1, 3.3.0, 3.2.1, 3.2.0, 3.1.0, 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
+**Version:** 3.4.0 **Supersedes:** 3.3.2, 3.3.1, 3.3.0, 3.2.1, 3.2.0, 3.1.0, 3.0.0, 2.0.0 (January 2025) **Scope:** Coding rules for all Claude Code sessions in the UBIK repository **Re-read from disk at every session start**
 
 ---
 
@@ -404,6 +404,40 @@ Run `/compact` every 20–30 turns to keep context lean.
 - `~/.claude/projects/*/memory/` — file-based, persist independently
 - File edits already written to disk
 
+### 4.4 Autonomy & Permissions
+
+**Default to acting. Reserve interruptions for what can't be undone.**
+
+Proceed without asking for anything reversible and scoped to the UBIK project
+directory: reading/searching the codebase, editing and creating files, running
+tests/lint/type-checks (`pytest`, `mypy`, `ruff`, `black`), `git add`/`commit`/
+`status`/`diff`/`log`, installing or updating project dependencies, iterating
+on build/test output.
+
+Ask first for anything high-risk or hard to reverse:
+- `git push --force`, `git reset --hard`, rewriting history, or pushing
+  directly to a protected branch (`main`/`master`)
+- Deleting or overwriting anything under a raw-source path (transcripts,
+  Seagate2T archive) — these are the project's irreplaceable inputs;
+  everything else regenerates from them
+- Dropping or bulk-deleting a ChromaDB collection, or Neo4j nodes/edges
+- Editing `.env` files or anything holding credentials or API keys
+- Any action outside the UBIK project directory
+
+`sudo` and `tccutil` stay hard-denied at the settings layer (below) — this
+section is for judgment calls the allow/ask/deny lists don't explicitly
+cover, not a way to route around them.
+
+**Why this matters for UBIK:** most interruptions here are for routine,
+recoverable work — cheap to allow, expensive to keep asking about. The corpus
+and git history aren't recoverable the same way; those are worth the pause.
+
+**Settings enforcement:** `.claude/settings.json` → `permissions.allow/ask/deny`
+is where this is actually enforced. Extend `allow` with the read-only/routine
+items above; extend `ask` with the high-risk items above. Keep `deny` limited
+to commands that have already caused damage (`sudo`, `tccutil`) — `deny` skips
+confirmation entirely, so it's stricter than what most of this list needs.
+
 ---
 
 ## Appendix A — Quick Reference Checklists
@@ -470,6 +504,7 @@ Run `/compact` every 20–30 turns to keep context lean.
 
 | Version | Date | Changes |
 |:---:|:---:|:---:|
+| 3.4.0 | 2026-07-28 | §4.4 Autonomy & Permissions added under Part 4 (Session Management) — codifies default-to-acting for reversible, in-repo work (edits, tests, lint, git add/commit/status/diff/log, dependency installs) and ask-first for high-risk/hard-to-reverse actions (force-push, reset --hard, history rewrites, deleting raw-source inputs, dropping DB collections/nodes, editing secrets, anything outside the UBIK directory). Placed in Part 4 rather than as a fifth operating principle, since Part 1 is explicitly scoped to "The Four Operating Principles" and Part 4 already covers session-operating mechanics. `sudo`/`tccutil` remain hard-denied at the `.claude/settings.json` layer, unaffected by this section |
 | 3.3.2 | 2026-07 | §3.5 rebuild command corrected: removed `-r requirements.txt` from the documented `.venv` rebuild — that top-level file is Somatic/DeepSeek-flavored (full ML training stack) and its inclusion had silently pulled 103 extra packages (torch/torchvision/torchaudio/trl/peft/accelerate/bitsandbytes/tensorboard/wandb/jupyter/etc.) into the canonical Hippocampal venv (258 vs. 155 packages). Rebuilt clean from `maestro/requirements.txt` + `hippocampal/requirements.txt` only; verified via full test suites (maestro 649 passed, hippocampal 139 passed/15 skipped) and Tier 1 import smoke test. `torch` itself legitimately remains via `sentence-transformers`. See `requirements.lock` header and `ENVIRONMENT.md` for full detail |
 | 3.3.1 | 2026-07 | Portable git hooks: post-commit hook moved to tracked `githooks/`, enabled per-clone via `scripts/setup_hooks.sh` (`core.hooksPath = githooks`). §Session Journaling documents the one-time setup; INSTALL.md Quick Start adds the step. Fixes the silent-no-sync risk on fresh clones |
 | 3.3.0 | 2026-07 | Session journaling file renamed `SESSIONS.md` → `ubik_sessions.md` (repo + Google Drive mirror). §Session Journaling updated: all new entries go to `ubik_sessions.md`; `scripts/sync_sessions.sh` SRC/DST and `.git/hooks/post-commit` grep repointed to the new name (script name unchanged). Older in-file "SESSIONS.md" mentions are now historical record |

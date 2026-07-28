@@ -1410,3 +1410,19 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 5. Layer B still needs Windows admin on Somatic.
 6. Investigate the WhisperX `device: cpu` anomaly (RTX 5090 possibly not being used).
 ---
+
+## Session: [2026-07-28 02:35] — [Node: Hippocampal]
+**Goal:** Add a new §4.4 Autonomy & Permissions section to CLAUDE.md, codifying when to act without asking vs. when to pause for confirmation.
+**Completed:**
+- Added §4.4 under Part 4 (Session Management), not Part 1 — Part 1 is explicitly branded "The Four Operating Principles," so a fifth section there would force a title change, and Part 4 already covers session-operating mechanics (model selection, `/compact`), so autonomy-vs-asking fits there without disturbing anything.
+- Section defines: proceed without asking for reversible, in-repo work (read/search, edit/create files, tests/lint/type-checks, `git add`/`commit`/`status`/`diff`/`log`, dependency installs, build/test iteration); ask first for high-risk/hard-to-reverse actions (force-push, `reset --hard`, history rewrites or pushing to `main`/`master`, deleting/overwriting raw-source inputs like transcripts or the Seagate2T archive, dropping/bulk-deleting ChromaDB collections or Neo4j nodes/edges, editing `.env`/secrets, anything outside the UBIK directory). Notes that `sudo`/`tccutil` remain hard-denied at the `.claude/settings.json` layer regardless, and that `.claude/settings.json`'s `permissions.allow/ask/deny` is the actual enforcement point.
+- Version bumped 3.3.2 -> 3.4.0 with a changelog entry (minor bump, not patch, since this adds a new section rather than correcting an existing one).
+**State left in:**
+- CLAUDE.md now has 4 subsections under Part 4. No other files touched.
+**Files changed:**
+- CLAUDE.md: new §4.4 Autonomy & Permissions; version 3.3.2 -> 3.4.0 with changelog entry
+- ubik_sessions.md: this entry
+**Next session should:**
+- Consider mirroring §4.4's ask-first list into `.claude/settings.json`'s `permissions.ask` array so the policy is actually enforced, not just documented.
+- Outstanding from prior sessions: Layer B (Windows admin needed), WhisperX `device: cpu` anomaly, Layer D confirmation gap, CP2 decision pending from Gines, Seagate2T Tactiq archive location unrecorded.
+---
