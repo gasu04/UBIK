@@ -1487,3 +1487,21 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 3. Field-test Layer A (persistent `ubik-vllm` unit) from Hippocampal now that Tailscale connectivity is restored.
 4. On the Somatic node clone, run `bash scripts/setup_hooks.sh` (per the 2026-07-26 08:03 Hippocampal session) to enable the portable post-commit hook here too — still outstanding.
 ---
+
+## Session: [2026-08-01 06:56] — [Node: Hippocampal]
+**Goal:** Make the Maestro Web control panel accessible from the internet.
+**Completed:**
+- Identified target: Maestro Web control panel (`maestro/web/server.py`, port 8090, currently Tailscale-only, no auth) vs. UBIKParallax (already public via GitHub Pages — no action needed there).
+- Confirmed with user: expose via Tailscale Funnel only (no router port-forward, no additional app-level auth) — user accepted the residual risk that the panel's shutdown/emergency-shutdown endpoints stay unauthenticated to anyone holding the URL.
+- Verified Maestro Web already running (PID 2193, `python -m maestro web --host 0.0.0.0 --port 8090`).
+- Diagnosed the `tailscale` CLI: the `/usr/local/bin/tailscale` symlink crashes with a Swift bundle-identifier fatal error when invoked directly; calling `/Applications/Tailscale.app/Contents/MacOS/Tailscale` directly works. Use the app binary path for all future `tailscale` CLI calls on this node.
+- Checked `tailscale serve status` / `funnel status`: no existing config.
+- Attempted `tailscale funnel 8090` → blocked: "Funnel is not enabled on your tailnet. Contact your administrator." Enabling it requires an admin-console change (HTTPS Certificates + a `nodeAttrs` Funnel grant for `ubik-hippocampal`) — account-level, outside the repo, handed back to the user.
+**State left in:**
+- Maestro Web still running locally on `0.0.0.0:8090`, Tailscale-only. No Funnel config active, no public exposure exists yet.
+**Files changed:**
+- ubik_sessions.md: this entry
+**Next session should:**
+- Once the user has enabled HTTPS Certificates + the Funnel node attribute for `ubik-hippocampal` in the Tailscale admin console, run `tailscale funnel 8090` (via the app binary path above) to publish the panel.
+- Remaining open items from prior sessions: Layer B (Windows admin needed), Layer D confirmation gap, CP2 decision pending from Gines.
+---
