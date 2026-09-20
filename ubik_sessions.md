@@ -1569,3 +1569,28 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 3. Confirm with `acefsan` that port `8102` is the permanent home for `rotating-cube` (unchanged from the 08:36 session — still just a technical verification on my end, not a human confirmation).
 4. Everything else carried over: Layer B, Layer D confirmation, CP2 decision (all pre-existing, unaffected by this session).
 ---
+
+## Session: [2026-09-20 10:07] — [Node: Somatic]
+**Goal:** Close the last remaining blocker from the 09:08 session — SSH key exchange with Hippocampal — and get `maestro status` reaching this node end-to-end.
+**Completed:**
+- User supplied the `dad@mac` public key from Hippocampal (`ssh-ed25519 AAAA...ZmBTz dad@mac`); confirmed via `ssh-keygen -lf` that its fingerprint (`SHA256:MGfeJUuYFDVUU/rK5vIDSIb4VxXnll3dOIVGdg/4nm8`) matches the exact key referenced in the 2026-07-29 log entry — same key, still in use, no new key needed. Added it to `~/.ssh/authorized_keys` (0600, dir 0700).
+- Verified `sshd_config` has no `PubkeyAuthentication`/`PasswordAuthentication` overrides — uses OpenSSH's compiled-in default (pubkey enabled). User confirmed `ssh gasu@100.92.12.89` from Hippocampal works non-interactively.
+- **Found and fixed the actual remaining gap**: Hippocampal's live `maestro/.env` (gitignored, never touched by the earlier code-default changes) still hardcoded `SOMATIC_TAILSCALE_IP=100.92.95.39` — the retired WSL node's IP — which overrode the new `SomaticConfig` default from the 09:08 session. `maestro status` was correctly reaching Hippocampal's own services but timing out on `vllm`/`whisperx` and showing the tailscale peer as offline. Walked the user through updating their `.env` (`SOMATIC_TAILSCALE_IP=100.92.12.89`, `SOMATIC_SSH_HOST=100.92.12.89`, `SOMATIC_USE_WSL=false`) via `grep -v`+append rather than `sed -i`, after two copy-paste line-wrap artifacts in their terminal UI mangled a `sed -i ''` invocation and a `mv` path.
+- **`maestro status` now reports 7/7 HEALTHY**, both nodes, verified live:
+  - `vllm` (somatic): HEALTHY, 592ms, `DeepSeek-R1-Distill-Qwen-14B-AWQ`
+  - `whisperx` (somatic): HEALTHY, 594ms, `model_loaded: True, device: cpu`
+  - `neo4j`/`chromadb`/`mcp`/`docker` (hippocampal): HEALTHY, unaffected
+  - `tailscale` (mesh): HEALTHY, `self: online · acefsan-ubuntu: online · 9 peers`
+- A separate agent session running concurrently on Hippocampal (GPT-5.3 Codex) flagged a suspected `~/ubik` vs `~/UBIK` case-mismatch on this host — checked and it's a non-issue: the `~/ubik → ~/UBIK` symlink from the 08:36 session is intact and resolves correctly (`~/ubik/somatic/inference/vllm_server.py` reads fine); no action needed.
+**State left in:**
+- **This closes the entire Somatic migration arc** (started this session-chain with locating the WSL backup): both nodes fully healthy, maestro managing this node remotely over SSH + Tailscale, both vLLM and WhisperX self-healing via systemd, GitHub push access working.
+- Hippocampal's live `maestro/.env` now has explicit `SOMATIC_TAILSCALE_IP`/`SOMATIC_SSH_HOST`/`SOMATIC_USE_WSL` entries (previously only the IP was set, to the old value) — gitignored, not reflected in any repo file, but noted here since it was the actual blocker.
+**Files changed:**
+- `ubik_sessions.md`: this entry.
+- (Hippocampal-local, not in repo): `maestro/.env` — `SOMATIC_TAILSCALE_IP` corrected, `SOMATIC_SSH_HOST`/`SOMATIC_USE_WSL` added.
+- (Somatic-local, not in repo): `~/.ssh/authorized_keys` — added the `dad@mac` public key.
+**Next session should:**
+1. Consider auditing `maestro/services/*.py` for the same `_find_vllm_pids`-style test-isolation pattern in other services (flagged 09:08, still not done).
+2. Confirm with `acefsan` that port `8102` is the permanent home for `rotating-cube` (still just a technical verification on my end).
+3. Everything else carried over: Layer B, Layer D confirmation, CP2 decision (all pre-existing, unaffected by this session-chain).
+---
