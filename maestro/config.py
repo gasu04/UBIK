@@ -253,19 +253,20 @@ class SomaticConfig(BaseSettings):
     Example:
         >>> cfg = SomaticConfig()
         >>> cfg.vllm_url
-        'http://100.79.166.114:8002'
+        'http://100.92.12.89:8002'
     """
 
     # Node identity — resolved via env_prefix="SOMATIC_"
-    tailscale_ip: str = "100.79.166.114"
+    tailscale_ip: str = "100.92.12.89"
     tailscale_hostname: str = "ubik-somatic"
 
     # Remote-control (SSH) parameters — how the Hippocampal Maestro reaches
-    # this node to start/stop its services.  Somatic is a Windows host with a
-    # WSL2 Linux guest; ``ssh_host`` targets the Windows OpenSSH server and
-    # ``use_wsl`` wraps remote commands in ``wsl`` to land in the Linux guest.
-    ssh_host: str = "windows-server"          # SOMATIC_SSH_HOST
-    use_wsl: bool = True                        # SOMATIC_USE_WSL
+    # this node to start/stop its services.  As of 2026-09-20, Somatic is a
+    # native Ubuntu Linux host (migrated off the retired WSL2/Windows box) —
+    # ``ssh_host`` targets its OpenSSH server directly and ``use_wsl=False``
+    # sends plain ``bash -s`` (no more ``wsl bash -s`` wrapping).
+    ssh_host: str = "100.92.12.89"              # SOMATIC_SSH_HOST
+    use_wsl: bool = False                       # SOMATIC_USE_WSL
     ssh_connect_timeout: float = 8.0            # SOMATIC_SSH_CONNECT_TIMEOUT
     remote_ubik_root: str = "/home/gasu/ubik"   # SOMATIC_REMOTE_UBIK_ROOT
 

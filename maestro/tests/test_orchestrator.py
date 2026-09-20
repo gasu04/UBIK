@@ -347,6 +347,8 @@ class TestStartHealthWait:
                    return_value=None), \
              patch("maestro.services.vllm_service.subprocess.Popen",
                    return_value=MagicMock()), \
+             patch("maestro.services.vllm_service._find_vllm_pids",
+                   return_value=[]), \
              patch.object(svc, "probe_with_timeout",
                           new_callable=AsyncMock, return_value=healthy):
             result = await svc.start(tmp_path)

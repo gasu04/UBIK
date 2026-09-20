@@ -619,6 +619,8 @@ class TestVllmServiceLifecycle:
                    return_value=None), \
              patch("maestro.services.vllm_service.subprocess.Popen",
                    return_value=mock_popen) as mock_popen_cls, \
+             patch("maestro.services.vllm_service._find_vllm_pids",
+                   return_value=[]), \
              patch.object(svc, "probe_with_timeout",
                           new_callable=AsyncMock, return_value=healthy):
             result = await svc.start(_FAKE_ROOT)
@@ -633,10 +635,14 @@ class TestVllmServiceLifecycle:
     @pytest.mark.asyncio
     async def test_start_exception(self):
         svc = VllmService(model_path="/fake/model")
-        with patch("maestro.services.vllm_service._find_conda",
+        with patch("maestro.services.vllm_service.detect_node",
+                   return_value=_somatic_identity()), \
+             patch("maestro.services.vllm_service._find_conda",
                    return_value="/usr/bin/conda"), \
              patch("maestro.services.vllm_service._detect_venv_path",
                    return_value=None), \
+             patch("maestro.services.vllm_service._find_vllm_pids",
+                   return_value=[]), \
              patch("maestro.services.vllm_service.subprocess.Popen",
                    side_effect=FileNotFoundError("conda not found")):
             result = await svc.start(_FAKE_ROOT)
@@ -659,8 +665,18 @@ class TestVllmServiceLifecycle:
 
     @pytest.mark.asyncio
     async def test_stop_no_process_returns_false(self):
+        # Must mock _run_proc (fuser) and _find_vllm_pids too, not just the
+        # _kill_port fallback: the primary path calls the real `fuser` +
+        # os.killpg on whatever it finds on self._port. Without these mocks,
+        # running this test on a machine with a real vLLM listening on the
+        # default port (8002) kills the live process — confirmed the hard
+        # way on the Somatic node, 2026-09-20 (see ubik_sessions.md).
         svc = VllmService(model_path="/fake/model")
-        with patch("maestro.services.vllm_service._kill_port",
+        with patch("maestro.services.vllm_service._run_proc",
+                   new_callable=AsyncMock, return_value=(0, "", "")), \
+             patch("maestro.services.vllm_service._find_vllm_pids",
+                   return_value=[]), \
+             patch("maestro.services.vllm_service._kill_port",
                    new_callable=AsyncMock, return_value=False):
             result = await svc.stop()
         assert result is False

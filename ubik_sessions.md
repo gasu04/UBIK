@@ -1535,3 +1535,37 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 4. Consider tightening the loosened `wsldata` backup permissions back down now that the one-time restore is done, if that partition should stay locked to `acefsan` normally.
 5. Everything else carried over from the 2026-08-01 pending list (Layer B, Layer D confirmation, CP2 decision) — unaffected by this session, still open.
 ---
+
+## Session: [2026-09-20 09:08] — [Node: Somatic]
+**Goal:** Continue the 08:36 migration wrap-up: persist WhisperX as an installed unit, set up GitHub SSH auth + push, wire SSH/Tailscale config for Hippocampal's `maestro`, and re-verify the port-8102 change. Along the way, discovered and fixed a real safety bug in the test suite.
+**Completed:**
+- **WhisperX persisted**: replaced the transient `systemd-run` unit with an installed `~/.config/systemd/user/ubik-whisperx.service` (mirrors `ubik-vllm`'s Layer A pattern — `Restart=on-failure`, `enable --now`). Live-verified self-heal: `kill -9` on the main PID → systemd auto-respawned within seconds → `/health` returned `model_loaded:true` again shortly after.
+- **GitHub auth set up**: generated a dedicated ed25519 keypair (`~/.ssh/id_ed25519_github`), user added the public key to the `gasu04` GitHub account, verified via `ssh -T git@github.com`. Switched `origin` from HTTPS to SSH and pushed the pending commit (`c0599e5`) — confirmed live on GitHub via the API.
+- **SSH server installed**: this box had no SSH server at all (`sshd` not present). Installed + enabled `openssh-server`, confirmed listening on `:22`.
+- **Retired the WSL-era `SomaticConfig` defaults** in `maestro/config.py` and `maestro/.env.example`: `tailscale_ip` `100.79.166.114` → `100.92.12.89` (this box's real Tailscale IP — it shares the same tailnet as `ubik-hippocampal`, registered under a different account, `acefsan-ubuntu`), `ssh_host` `"windows-server"` → the same IP, `use_wsl` `True` → `False` (confirmed via `remote.py` that this correctly switches the SSH payload from `wsl bash -s` to plain `bash -s`). Verified no test asserts on `SomaticConfig()`'s bare defaults (all construct `RemoteExecutor`/`VllmService` with explicit test values), so this was safe to change without touching test fixtures.
+- **Note**: key-based SSH auth *from* Hippocampal *to* this box (so `maestro` can actually drive it) was **not completed** — that requires access to the separate Hippocampal Mac (its own SSH keypair, or the `dad@mac` key referenced in the 2026-07-29 log) which this session has no access to. Flagged as the actual remaining blocker below.
+- **Safety incident — found and fixed while running maestro's test suite for verification** (see below).
+**INCIDENT: running `maestro/tests/` on a live Somatic node killed the real vLLM process, twice.**
+- Root cause: two long-standing test-isolation gaps, both in `VllmService`'s local (non-SSH) code paths, neither ever surfaced before because no one had previously run this suite on a machine with a real vLLM listening on the default port:
+  1. `test_service_probes.py::TestVllmServiceLifecycle::test_stop_no_process_returns_false` mocked only the `_kill_port` fallback, not the primary path (real `fuser 8002/tcp` + `os.killpg` on whatever it finds).
+  2. `test_service_probes.py::TestVllmServiceLifecycle::{test_start_uses_conda_run,test_start_exception}` and `test_orchestrator.py::TestStartHealthWait::test_vllm_health_wait_called_after_conda` all reach `VllmService.start()`'s orphan-cleanup step (`_find_vllm_pids`) unmocked. That function matches **any** process whose cmdline starts with `"VLLM::"` — vLLM's EngineCore renames itself via `setproctitle` — completely independent of the test's fake `model_path`. It found our real EngineCore and `SIGKILL`ed it as a supposed orphan.
+- Both classes of gap fixed by explicitly mocking `_run_proc`/`_find_vllm_pids`/`_kill_port` (and, for `test_start_exception`, `detect_node`) in all four affected tests, so they no longer depend on the absence of a real process to pass safely.
+- vLLM recovered each time via `systemctl --user restart ubik-vllm` (hit `StartLimitBurst=4` once from repeated recovery attempts — cleared with `reset-failed`). **Verified fix**: ran the full 649-test suite twice in a row with live before/after health checks — vLLM stayed healthy (`200`) through both runs. Real inference re-confirmed afterward (0.26s response, warm).
+**State left in:**
+- vLLM + WhisperX both healthy and persistent (installed systemd units, both self-heal on kill, both survive reboot via linger).
+- `maestro/tests/` (649 tests) now safe to run on a live Somatic node — confirmed empirically, twice.
+- `origin` remote now uses SSH; `c0599e5` and this session's commit both pushed.
+- `SomaticConfig` defaults point at this box's real Tailscale IP with `use_wsl=False`, but **Hippocampal still cannot actually reach it** — no SSH key exchange has happened from that side.
+**Files changed:**
+- `maestro/config.py`: `SomaticConfig.tailscale_ip`/`ssh_host`/`use_wsl` defaults updated for the native-Linux migration; docstring example updated to match.
+- `maestro/.env.example`: Somatic section rewritten (native host, shared-server note, `SOMATIC_SSH_HOST`/`SOMATIC_USE_WSL` added).
+- `maestro/tests/test_service_probes.py`: added missing `_run_proc`/`_find_vllm_pids`/`_kill_port` mocks to 3 tests (safety fix).
+- `maestro/tests/test_orchestrator.py`: added missing `_find_vllm_pids` mock to 1 test (safety fix).
+- `ubik_sessions.md`: this entry.
+- (local, not in repo): `~/.ssh/id_ed25519_github` keypair + `~/.ssh/config` GitHub entry; `openssh-server` installed+enabled; `~/.config/systemd/user/ubik-whisperx.service` installed (replaces the transient unit from the 08:36 session).
+**Next session should:**
+1. **The real remaining blocker for maestro control**: from Hippocampal, generate or locate an SSH keypair and add its public half to this box's `~/.ssh/authorized_keys` for user `gasu`. Then verify `ssh gasu@100.92.12.89` (or via a `~/.ssh/config` alias) works non-interactively from Hippocampal, and that `maestro status`/`maestro start --service vllm` correctly reach this node.
+2. Consider auditing the rest of `maestro/services/*.py` for the same `_find_vllm_pids`-style "matches by process-title convention regardless of test's fake identifiers" pattern in other services (neo4j/chromadb/mcp) — not done this session, scope was limited to what actually broke.
+3. Confirm with `acefsan` that port `8102` is the permanent home for `rotating-cube` (unchanged from the 08:36 session — still just a technical verification on my end, not a human confirmation).
+4. Everything else carried over: Layer B, Layer D confirmation, CP2 decision (all pre-existing, unaffected by this session).
+---
