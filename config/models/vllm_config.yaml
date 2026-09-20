@@ -5,8 +5,8 @@ model:
   dtype: float16                    # AWQ requires float16, not auto/bfloat16
   quantization: awq_marlin          # Faster than awq
   tensor_parallel_size: 1
-  gpu_memory_utilization: 0.93  # Uses ~full 32GB RTX 5090 (0.90 left KV cache short for 98K ctx; 0.95 exceeds free VRAM behind WSLg Xwayland)
-  max_model_len: 98304  # Extended context (98K tokens)
+  gpu_memory_utilization: 0.85  # Lowered from 0.93 (2026-09-20): native Ubuntu desktop (gnome-shell, vocalinux, remote-desktop) uses ~3.2GB VRAM that didn't exist under headless WSL2; 0.93 left insufficient headroom and would OOM on start
+  max_model_len: 81920  # Reduced from 98304 (2026-09-20): at the safer gpu_memory_utilization=0.85 (see above), vLLM's own profiler measured only 15.27GiB available for KV cache (98K ctx needs 18GiB, est. max ctx was 83376) — 81920 leaves a small safety margin under that ceiling
   trust_remote_code: true
 
 server:
