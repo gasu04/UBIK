@@ -8,6 +8,7 @@ _kill_port) is mocked.  No network or Docker daemon required.
 """
 
 import asyncio
+import os
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -482,6 +483,96 @@ class TestMcpServerServiceLifecycle:
 # ---------------------------------------------------------------------------
 # VllmService
 # ---------------------------------------------------------------------------
+
+class TestFindVllmPids:
+    """Pin the /proc-matching behavior of _find_vllm_pids in isolation.
+
+    These tests use a fake proc filesystem so they never inspect the real
+    process table.  They document why the ``VLLM::`` title match is both
+    necessary (EngineCore has no model path) and dangerous in tests (it can
+    match a real EngineCore even when the test uses a fake model_path).
+    """
+
+    def _make_fake_proc(self, tmp_path, entries):
+        """Build a fake /proc tree.
+
+        Args:
+            tmp_path: pytest tmp_path fixture.
+            entries: dict mapping pid (int) to cmdline bytes.
+
+        Returns:
+            Path to the fake /proc directory.
+        """
+        proc_dir = tmp_path / "proc"
+        for pid, cmdline in entries.items():
+            pdir = proc_dir / str(pid)
+            pdir.mkdir(parents=True)
+            (pdir / "cmdline").write_bytes(cmdline)
+        return proc_dir
+
+    def _patch_proc(self, monkeypatch, proc_dir):
+        """Redirect _find_vllm_pids' /proc access to *proc_dir*.
+
+        Patches both ``os.listdir`` and ``builtins.open`` so the function
+        reads the fake tree instead of the real ``/proc``.
+        """
+        real_listdir = os.listdir
+        monkeypatch.setattr(
+            "maestro.services.vllm_service.os.listdir",
+            lambda path: real_listdir(proc_dir),
+        )
+
+        real_open = open
+
+        def _fake_open(path, *args, **kwargs):
+            str_path = str(path)
+            if str_path.startswith("/proc/") and str_path.endswith("/cmdline"):
+                pid = str_path.split("/")[2]
+                return real_open(proc_dir / pid / "cmdline", *args, **kwargs)
+            return real_open(path, *args, **kwargs)
+
+        monkeypatch.setattr("builtins.open", _fake_open)
+
+    def test_matches_model_path(self, tmp_path, monkeypatch):
+        from maestro.services.vllm_service import _find_vllm_pids
+
+        proc_dir = self._make_fake_proc(tmp_path, {1234: b"python vllm_server.py --model /fake/model"})
+        self._patch_proc(monkeypatch, proc_dir)
+
+        assert _find_vllm_pids("/fake/model") == [1234]
+
+    def test_matches_vllm_title_prefix_even_without_model_path(self, tmp_path, monkeypatch):
+        """EngineCore renames itself to VLLM::EngineCore; must still match."""
+        from maestro.services.vllm_service import _find_vllm_pids
+
+        proc_dir = self._make_fake_proc(tmp_path, {5678: b"VLLM::EngineCore"})
+        self._patch_proc(monkeypatch, proc_dir)
+
+        # The title prefix matches even though the model path is unrelated.
+        assert _find_vllm_pids("/totally/different/model") == [5678]
+
+    def test_skips_non_matching_processes(self, tmp_path, monkeypatch):
+        from maestro.services.vllm_service import _find_vllm_pids
+
+        proc_dir = self._make_fake_proc(tmp_path, {
+            1: b"init",
+            100: b"python some_other_server.py",
+            999: b"",
+        })
+        self._patch_proc(monkeypatch, proc_dir)
+
+        assert _find_vllm_pids("/fake/model") == []
+
+    def test_returns_empty_when_proc_unreadable(self, monkeypatch):
+        from maestro.services.vllm_service import _find_vllm_pids
+
+        monkeypatch.setattr(
+            "maestro.services.vllm_service.os.listdir",
+            lambda path: (_ for _ in ()).throw(OSError("permission denied")),
+        )
+
+        assert _find_vllm_pids("/fake/model") == []
+
 
 class TestVllmServiceProperties:
     def test_name(self):

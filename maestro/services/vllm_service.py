@@ -321,6 +321,16 @@ def _find_vllm_pids(model_path: str) -> list[int]:
 
     Returns:
         List of matching PIDs.
+
+    Note:
+        The ``VLLM::`` title match is intentionally broad: EngineCore workers
+        do not contain ``model_path`` in their cmdline, so the title prefix is
+        the only reliable handle.  This also means a test using a fake
+        ``model_path`` can still match a *real* running EngineCore.  Any test
+        that constructs :class:`VllmService` and calls ``start()``/``stop()``
+        on a machine where vLLM may be running MUST mock
+        ``maestro.services.vllm_service._find_vllm_pids`` (and ``_run_proc`` /
+        ``_kill_port``) — see ``test_service_probes.py`` for the safe pattern.
     """
     found: list[int] = []
     try:

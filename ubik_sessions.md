@@ -1594,3 +1594,32 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 2. Confirm with `acefsan` that port `8102` is the permanent home for `rotating-cube` (still just a technical verification on my end).
 3. Everything else carried over: Layer B, Layer D confirmation, CP2 decision (all pre-existing, unaffected by this session-chain).
 ---
+
+## Session: [2026-09-20 11:05] — [Node: Hippocampal]
+**Goal:** Run Task 1 from the prior session: audit `maestro/services/*.py` for the same `_find_vllm_pids`-style live-process matching pattern that killed the real vLLM during test runs, and add mocks / safety coverage where needed.
+
+**Completed:**
+- Audited every service module for `/proc` scanning, `pgrep`/`pkill` by process title, `setproctitle` matching, `psutil.net_connections`, and port-based `lsof`/`fuser` kills.
+- **Finding: only `vllm_service.py` has the dangerous pattern.** `_find_vllm_pids(model_path)` scans `/proc` and matches either `model_path in cmdline` **or** `cmdline.startswith("VLLM::")`. The second clause is required in production (EngineCore/relay workers rename themselves via `setproctitle` and do not contain the model path), but it also means a test with a fake `model_path` can still match a real running EngineCore and `SIGKILL` it.
+- **Other services are safe by design or already isolated:**
+  - `McpServerService` / `WhisperXService` (local): use `_kill_port()` — port-based, not title-based; their existing stop tests already mock `_kill_port`.
+  - `WhisperXService` (remote): `pkill -f "whisperx_server.py"` runs only inside an SSH script; tests mock `RemoteExecutor.run()`.
+  - `Neo4jService`, `ChromaDbService`, `DockerService`: use `docker compose`, `launchctl`, `systemctl`, `osascript` — no title matching.
+  - `shutdown.py::emergency_shutdown`: uses `psutil.net_connections` + `Process.kill`; tests mock `psutil`.
+- Added a **safety docstring note** to `_find_vllm_pids` warning that the `VLLM::` title match is broad and that any test calling `VllmService.start()`/`stop()` on hardware where vLLM may be running must mock `_find_vllm_pids` (and `_run_proc`/`_kill_port`).
+- Added a new isolated test class `TestFindVllmPids` in `maestro/tests/test_service_probes.py` that exercises the matching logic against a fake `/proc` tree (never touches the real process table). It pins both the model-path match and the title-prefix match, explicitly documenting the hazard that a fake model path still matches `VLLM::EngineCore`.
+- Verified no new mocks were needed beyond what the 2026-09-20 09:08 session already added — the existing VllmService lifecycle/orchestrator tests already mock `_find_vllm_pids`, `_run_proc`, and `_kill_port` correctly.
+- Full test suite: **653 passed** (4 new + 649 existing), 0 failed, 1 unrelated warning in `test_metrics.py`.
+
+**State left in:**
+- Task 1 complete. The test suite is safe to run on a live Somatic node; the hazard is documented and pinned by tests.
+- No services currently running were touched (this was a code-only audit + unit-test change).
+
+**Files changed:**
+- `maestro/services/vllm_service.py`: added test-safety note to `_find_vllm_pids` docstring.
+- `maestro/tests/test_service_probes.py`: added `import os`; added `TestFindVllmPids` (4 tests) with fake `/proc` tree.
+- `ubik_sessions.md`: this entry.
+
+**Next session should:**
+- Commit/push the audit changes, or continue with the remaining open items: Layer B (Windows admin now moot / native Ubuntu), Layer D field confirmation, CP2 decision, confirm `rotating-cube` port 8102 with `acefsan`.
+---
