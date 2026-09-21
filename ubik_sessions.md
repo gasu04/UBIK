@@ -1623,3 +1623,47 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 **Next session should:**
 - Commit/push the audit changes, or continue with the remaining open items: Layer B (Windows admin now moot / native Ubuntu), Layer D field confirmation, CP2 decision, confirm `rotating-cube` port 8102 with `acefsan`.
 ---
+
+## Session: [2026-09-20 11:40] — [Node: Hippocampal]
+**Goal:** Produce a readable CP2 status summary for review in Obsidian, then mirror it to Google Drive.
+
+**Completed:**
+- Wrote `CP2_status.md` at the UBIK repo root: background on Phase 3 / CP2, current files/directories, the 3 enriched outputs, the denominator problem (gate = ≥6 of 8, only 3 files exist), the File 2 degenerate-input concern, infrastructure blockers now cleared, stale-Somatic-IP caveat, proposed next steps, and open questions for Gines.
+- Copied `CP2_status.md` to the Google Drive mirror at `~/Library/CloudStorage/GoogleDrive-gsanchezurrutia@gmail.com/My Drive/Ubik_drive/CP2_status.md` (verified 10,128 bytes, same as source).
+
+**State left in:**
+- `CP2_status.md` exists in both the repo and the Drive mirror. Not committed yet.
+
+**Files changed:**
+- `CP2_status.md`: new (repo + Drive mirror).
+- `ubik_sessions.md`: this entry.
+
+**Next session should:**
+- Decide whether to commit `CP2_status.md` to the repo or leave it as a working note, then continue with the CP2 decision itself.
+---
+
+## Session: [2026-09-20 11:45] — [Node: Hippocampal]
+**Goal:** Wrap up today's session per CLAUDE.md §Session Journaling.
+
+**Completed:**
+- Read `ubik_sessions.md` end-to-end and summarized next steps for project development.
+- Executed Task 1: audited `maestro/services/*.py` for live-process matching hazards; confirmed only `vllm_service.py` has the `_find_vllm_pids` pattern; added a test-safety docstring note and 4 isolated unit tests with a fake `/proc` tree; full maestro suite 653/653 passed.
+- Committed and pushed the audit work (`d52ea1e`).
+- Wrote `CP2_status.md` (Obsidian-friendly status on the CP2 enrichment gate) and mirrored it to Google Drive `Ubik_drive/`.
+
+**State left in:**
+- `master` = `d52ea1e` on local and origin (audit commit pushed).
+- `CP2_status.md` is uncommitted in the repo but copied to Drive.
+- All services untouched; cluster remains 7/7 healthy as of prior sessions.
+
+**Files changed today:**
+- `maestro/services/vllm_service.py`: test-safety docstring note on `_find_vllm_pids`.
+- `maestro/tests/test_service_probes.py`: added `TestFindVllmPids` (4 tests) + `import os`.
+- `CP2_status.md`: new — CP2 decision background/status/next steps.
+- `ubik_sessions.md`: this and preceding entries.
+
+**Next session should:**
+1. Decide whether to commit `CP2_status.md` to the repo.
+2. Tackle the CP2 decision: Path A (stage 8 files and rerun) or Path B (explicitly accept 3/3 and lower the gate); if Path A, first update `ingestion/.env` and `.env.example` Somatic IPs to `100.92.12.89`.
+3. Continue remaining backlog: Layer D field confirmation, Layer B status update for native Ubuntu, confirm `rotating-cube` port 8102 with `acefsan`.
+---
