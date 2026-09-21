@@ -1667,3 +1667,20 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 2. Tackle the CP2 decision: Path A (stage 8 files and rerun) or Path B (explicitly accept 3/3 and lower the gate); if Path A, first update `ingestion/.env` and `.env.example` Somatic IPs to `100.92.12.89`.
 3. Continue remaining backlog: Layer D field confirmation, Layer B status update for native Ubuntu, confirm `rotating-cube` port 8102 with `acefsan`.
 ---
+
+## Session: [2026-09-20 11:50] — [Node: Hippocampal]
+**Goal:** Copy `CP2_status.md` to iCloud Drive as requested.
+
+**Completed:**
+- Copied `CP2_status.md` to `~/Library/Mobile Documents/com~apple~CloudDocs/CP2_status.md` (verified 10,128 bytes).
+- Left the repo copy in place at `/Volumes/990PRO 4T/UBIK/CP2_status.md`.
+
+**State left in:**
+- `CP2_status.md` now exists in three places: repo (uncommitted), Google Drive `Ubik_drive/`, and iCloud Drive root.
+
+**Files changed:**
+- `ubik_sessions.md`: this entry.
+
+**Next session should:**
+- Decide whether to commit the repo copy of `CP2_status.md` or remove it now that it lives in Drive/iCloud.
+---
