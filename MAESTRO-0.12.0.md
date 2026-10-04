@@ -9,7 +9,7 @@ Infrastructure orchestrator for the UBIK two-node cluster.
 | Node | Hardware | Role | Tailscale IP |
 |------|----------|------|--------------|
 | **Hippocampal** | Mac Mini M4 Pro (macOS) | Neo4j · ChromaDB · MCP | 100.103.242.91 |
-| **Somatic** | PowerSpec RTX 5090 (WSL2) | vLLM inference | 100.92.12.89 |
+| **Somatic** | PowerSpec RTX 5090 (native Ubuntu) | vLLM inference | 100.92.12.89 |
 
 **Services:**
 

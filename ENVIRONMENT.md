@@ -8,8 +8,8 @@ Somatic node's legacy `~/pytorch_env` setup. Canonical reference: CLAUDE.md §3.
 |---|---|---|---|---|
 | DeepSeek venv | Hippocampal (macOS) | `/Volumes/990PRO 4T/DeepSeek/venv` | 3.13.7 | The DeepSeek RAG project (unrelated finance/LangChain app) — **not** used for UBIK code anymore |
 | **UBIK venv (canonical)** | Hippocampal (macOS) | `/Volumes/990PRO 4T/UBIK/.venv` | 3.13.7 | `maestro`, `hippocampal`, `ingestion`, repo-root tooling |
-| Somatic vLLM venv | Somatic (WSL2 Ubuntu) | `~/pytorch_env_vllm024` | 3.12.3 | vLLM inference server (active since the 2026-07-20 upgrade) |
-| Somatic WhisperX venv | Somatic (WSL2 Ubuntu) | `~/ubik-whisperx-venv` | 3.12.3 | WhisperX transcription service |
+| Somatic vLLM venv | Somatic (native Ubuntu) | `~/pytorch_env_vllm024` | 3.12.3 | vLLM inference server (active since the 2026-07-20 upgrade) |
+| Somatic WhisperX venv | Somatic (native Ubuntu) | `~/ubik-whisperx-venv` | 3.12.3 | WhisperX transcription service |
 
 `~/pytorch_env` (vLLM 0.13.0, the pre-upgrade venv) is retained on Somatic as
 a rollback target but is not in active use.

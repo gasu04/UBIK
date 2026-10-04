@@ -156,7 +156,7 @@ Run verification scripts:
 ## Notes
 
 - PyTorch includes CUDA 12.8 libraries
-- WSL2 uses Windows NVIDIA driver (577.00)
+- Native Ubuntu uses NVIDIA Linux driver 595.91.07 (RTX 5090; verified via nvidia-smi 2026-10-03)
 - CUDA toolkit 12.4 installed for compilation
 - BitsAndBytes compiled for CUDA 12.x
 - All packages tested on RTX 5090

@@ -361,7 +361,7 @@ After implementation, verify:
 
 1. **Do not break existing functionality.** The pipeline must still work with `--no-track` and in dry-run mode exactly as before.
 
-2. **Environment awareness.** The Somatic Node is Linux (WSL2, Ubuntu). Use `pathlib.Path` everywhere. The ingested data directory uses `~/ubik/Ingested_data/` — note the capital `I` matching the existing UBIK directory naming convention.
+2. **Environment awareness.** The Somatic Node is Linux (native Ubuntu). Use `pathlib.Path` everywhere. The ingested data directory uses `~/ubik/Ingested_data/` — note the capital `I` matching the existing UBIK directory naming convention.
 
 3. **File paths.** The project location is `~/ubik/somatic/ubik_ingest/`. The `mcp_client` package is at `~/ubik/somatic/mcp_client/`. The virtual environment is `source /home/gasu/pytorch_env/bin/activate`.
 

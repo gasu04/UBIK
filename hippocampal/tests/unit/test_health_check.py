@@ -393,7 +393,7 @@ class TestCheckTailscale:
             "Self": {"HostName": "mac", "Online": true},
             "Peer": {
                 "abc123": {
-                    "HostName": "adrian-wsl",
+                    "HostName": "acefsan-ubuntu",
                     "TailscaleIPs": ["100.92.12.89"],
                     "Online": true
                 }
@@ -406,7 +406,7 @@ class TestCheckTailscale:
 
         assert result is True
         captured = capsys.readouterr()
-        assert "adrian-wsl" in captured.out
+        assert "acefsan-ubuntu" in captured.out
 
 
 # =============================================================================

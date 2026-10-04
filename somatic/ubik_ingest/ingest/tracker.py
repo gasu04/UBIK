@@ -182,7 +182,7 @@ class IngestionManifest:
     check_file() (or is_already_ingested()) will treat the file as new.
 
     File locking (fcntl LOCK_EX) prevents concurrent write corruption on
-    Linux / WSL2.
+    Linux.
 
     Note:
         Log rotation is not implemented in Phase 1. Consider adding rotation

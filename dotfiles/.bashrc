@@ -123,12 +123,12 @@ if [ -n "$SSH_CONNECTION" ] && [ -z "$VNC_AUTOSTART_DONE" ]; then
     ~/vnc-init.sh
 fi
 
-# CUDA Configuration for WSL2
+# CUDA Configuration
 export CUDA_HOME=/usr/local/cuda-12.4
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
-# WSL2 NVIDIA driver libraries
-export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
+# WSL2 NVIDIA driver libraries (legacy WSL2 node only — path absent on native Ubuntu)
+[ -d /usr/lib/wsl/lib ] && export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
 # PyTorch optimization
 export TORCH_CUDA_ARCH_LIST="8.9;9.0;12.0"

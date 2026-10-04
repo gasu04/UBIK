@@ -52,10 +52,10 @@ def _make_hippo(
 def _make_somatic() -> NodeIdentity:
     return NodeIdentity(
         node_type=NodeType.SOMATIC,
-        hostname="adrian",
+        hostname="acefsan-a100",
         platform="linux",
         ubik_root=Path("/home/gasu/ubik"),
-        is_wsl=True,
+        is_wsl=False,
         tailscale_ip="100.0.0.2",
         python_venv_path=None,
         python_activate_cmd="conda activate pytorch_env",

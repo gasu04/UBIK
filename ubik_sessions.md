@@ -1714,3 +1714,32 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 3. Optional hardening: `DockerService.stop()` returns early on container-stop failure and skips the Docker Desktop quit — a wedged daemon therefore never gets quit by maestro.
 4. Backlog unchanged: CP2 decision (Path A needs `ingestion/.env` Somatic IP → 100.92.12.89), Layer D field confirmation, Layer B native-Ubuntu status, confirm `rotating-cube` port 8102 with acefsan.
 ---
+
+## Session: 2026-10-03 21:24 — Node: Hippocampal
+**Goal:** Fix `ingestion/.env`'s stale Somatic IP, clean all stale Tailscale IPs repo-wide, then replace every retired-WSL2 reference with the native-Ubuntu Somatic node.
+**Completed:**
+- Answered the CP2 drop-location question: `ingestion/sources/tactiq/` (currently 3 .docx; gate needs ≥6 of 8 — the denominator blocker documented in `CP2_status.md`).
+- `ingestion/.env` + `.env.example`: `SOMATIC_HOST`/`SOMATIC_TAILSCALE_IP` `100.92.95.39` → `100.92.12.89`; verified through the real `load_config()` path — all endpoints resolve to `http://100.92.12.89:8002/v1`. `CP2_status.md` Step 0 marked DONE.
+- Stale-IP cleanup across 17 files (maestro/hippocampal/config/docs/test fixtures) — committed `001d341`; prior session's WhisperX persistent-unit fix committed `42ac401`.
+- WSL→Ubuntu pass: verified live facts first — tailnet device `acefsan-ubuntu` @ 100.92.12.89 (active, direct), machine hostname `acefsan-A100`, NVIDIA driver 595.91.07 on the RTX 5090. Replaced WSL-era references repo-wide: `platform_detect.py` SOMATIC hostname markers `{"adrian","wsl"}` → `{"acefsan","a100"}` (the old markers could never match the new box), `remote.py` docstring rewritten (direct ssh→Ubuntu documented; `wsl=True` retained as legacy mode), `tailscale_config.json` hostname + services (dead ollama/inference_api → vllm 8002 / whisperx 9100), health_check/quick_test display names, `.bashrc`/`activate_ubik.sh` WSL lib-path now guarded (no-op on native Ubuntu), `PACKAGES.md` driver fact corrected, all docs updated.
+- Tests: maestro **655 passed** (incl. new regression test that `adrian-wsl` no longer classifies as SOMATIC), hippocampal health_check **27 passed**; `bash -n` on touched scripts + JSON validation OK.
+**State left in:**
+- Repo is consistent for the native-Ubuntu Somatic node; remaining `wsl`/`adrian-wsl` mentions are intentional: legacy `wsl=True` executor mode + its tests, design-rationale comments in `vllm_service.py`/`whisperx_service.py`, the `_check_wsl()` detection mechanism, historical logs.
+- Left untouched by design: `SOMATIC_NODE_INFO.txt` (old-node info dump), `somatic/windows/` (obsolete WSL keepalive tooling), `HARDENING_PLAN_2026-07-23.md` (dated plan doc).
+- Deployed `~/.bashrc` on the Ubuntu box NOT updated — only the repo copy (`dotfiles/.bashrc`).
+- Drive auto-sync of `ubik_sessions.md` failed on commit `42ac401` ("Operation not permitted" — Google Drive app/permissions); mirror may be stale.
+**Files changed:**
+- `maestro/platform_detect.py`: SOMATIC hostname markers → `{"acefsan","a100"}`; docstrings → native Ubuntu.
+- `maestro/remote.py`: module docstring rewritten for direct-Ubuntu ssh; `wsl=True` documented as legacy.
+- `maestro/config.py`, `maestro/cli.py`, `maestro/__init__.py`: WSL2 descriptors → native Ubuntu.
+- `config/tailscale_config.json`: somatic hostname → `acefsan-A100`; services → vllm 8002 / whisperx 9100.
+- `hippocampal/health_check.py`, `hippocampal/quick_test.sh`: display names → `acefsan-ubuntu`.
+- `dotfiles/.bashrc`, `scripts/activate_ubik.sh`: `/usr/lib/wsl/lib` export guarded.
+- `maestro/tests/test_platform_detect.py`, `test_orchestrator.py`, `test_venv_service.py`, `test_remote.py`, `hippocampal/tests/unit/test_health_check.py`: fixtures now model the Ubuntu node; +1 regression test.
+- Docs: `CLAUDE.md`, `ENVIRONMENT.md`, `PACKAGES.md`, `MAESTRO-0.12.0.md`, `instructions_maestro_v0.11.0.md`, `maestro/README.md`, `UBIK_PROJECT_DOCUMENTATION.md`, `july2026_ubik_test.md`, `Claude_prompts/UBIK_Ingestion_Pipeline_Enhancement.md`, `ingestion/ingest/tracker.py`, `somatic/ubik_ingest/ingest/tracker.py`.
+- `ubik_sessions.md`: this entry.
+**Next session should:**
+1. Decide: regenerate `SOMATIC_NODE_INFO.txt` from the Ubuntu box; archive or delete the obsolete `somatic/windows/` WSL tooling.
+2. Fix the Drive sync hook failure ("Operation not permitted") or run `bash scripts/sync_sessions.sh` manually once Drive is accessible.
+3. CP2 decision (Path A 8-file test vs Path B accept 3/3) — `ingestion/.env` is now correct, so Path A is unblocked config-wise; source files can come from the Seagate2T Tactiq zips.
+---

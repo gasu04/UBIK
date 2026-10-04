@@ -330,7 +330,7 @@ def check_tailscale() -> bool:
             # Check for somatic node
             peers: Dict[str, Any] = status.get("Peer", {})
             somatic_ip = "100.92.12.89"
-            somatic_dns = "adrian-wsl"
+            somatic_dns = "acefsan-ubuntu"
 
             somatic_peer: Optional[Dict[str, Any]] = None
             for peer in peers.values():

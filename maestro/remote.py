@@ -7,23 +7,24 @@ so that a single Maestro instance (running on Hippocampal) can start, stop and
 otherwise manage services that physically live on Somatic.
 
 Why this exists:
-    Somatic is a separate physical machine (PowerSpec, Windows host + WSL2
-    Linux guest).  vLLM and WhisperX run inside the WSL2 guest.  Reaching that
-    guest non-interactively is a three-layer problem:
+    Somatic is a separate physical machine (PowerSpec RTX 5090, native
+    Ubuntu Linux — tailnet device ``acefsan-ubuntu``).  vLLM and WhisperX
+    run there under ``systemd --user``.  Reaching the node non-interactively
+    is a single ssh hop:
 
-        macOS ssh → Windows OpenSSH (default shell) → ``wsl`` → bash
+        macOS ssh → Ubuntu OpenSSH → bash
 
-    The user's ``~/.ssh/config`` forces ``RequestTTY yes`` and
-    ``RemoteCommand wsl ~`` for the ``windows-server`` host (great for
-    interactive use, fatal for automation — you get "Cannot execute
-    command-line and remote command").  We override both.
+    Historically (pre-2026-09) Somatic was a Windows host + WSL2 guest and
+    the path was ``macOS ssh → Windows OpenSSH → wsl → bash``; the
+    ``wsl=True`` executor mode is retained for that legacy layout only.
 
 Command delivery:
-    Rather than fight cmd.exe → wsl → bash quoting, the bash script is fed to
-    the remote ``bash -s`` over **stdin**.  ssh forwards our stdin to the remote
-    process, so the script travels as raw bytes and no shell on the path tries
-    to re-parse it.  The only thing on the command line is the literal
-    ``wsl bash -s`` (no user data), which quotes cleanly everywhere.
+    The bash script is fed to the remote ``bash -s`` over **stdin**.  ssh
+    forwards our stdin to the remote process, so the script travels as raw
+    bytes and no shell on the path tries to re-parse it.  The only thing on
+    the command line is the literal ``bash -s`` (no user data), which quotes
+    cleanly everywhere.  (Legacy ``wsl=True`` mode substitutes
+    ``wsl bash -s``.)
 
 Public API:
     RemoteExecutor            — run(script), check() over SSH
@@ -61,11 +62,12 @@ from maestro._canonical_resilience import CircuitBreaker, CircuitBreakerConfig
 
 logger = logging.getLogger(__name__)
 
-# SSH options that make a non-interactive command possible on the
-# ``windows-server`` host despite its interactive-only ~/.ssh/config:
+# SSH options that make a non-interactive command possible even when the
+# target host's ~/.ssh/config is interactive-only (as the retired
+# ``windows-server`` alias was):
 #   BatchMode=yes       — never prompt for a password (fail fast instead)
-#   RequestTTY=no       — override the config's "RequestTTY yes"
-#   RemoteCommand=none  — override the config's "RemoteCommand wsl ~"
+#   RequestTTY=no       — override any config's "RequestTTY yes"
+#   RemoteCommand=none  — override any config's forced RemoteCommand
 _BASE_SSH_OPTS: tuple[str, ...] = (
     "-o", "BatchMode=yes",
     "-o", "RequestTTY=no",
@@ -97,11 +99,13 @@ class RemoteExecutor:
     """Runs bash scripts on the Somatic node over SSH.
 
     Args:
-        ssh_host: SSH host alias or address of the Somatic Windows host
-            (e.g. ``"windows-server"``).
-        wsl: When ``True``, wrap the remote payload in ``wsl bash -s`` so it
-            runs inside the WSL2 Linux guest.  When ``False``, run
-            ``bash -s`` directly (native Linux host).
+        ssh_host: SSH host alias or address of the Somatic node
+            (e.g. ``"100.92.12.89"``; the retired WSL2 layout used the
+            ``"windows-server"`` alias).
+        wsl: When ``True`` (legacy Windows+WSL2 layout only), wrap the
+            remote payload in ``wsl bash -s`` so it runs inside the WSL2
+            Linux guest.  When ``False`` (current native-Ubuntu node), run
+            ``bash -s`` directly.
         connect_timeout: Seconds for ssh's ``ConnectTimeout`` — how long to
             wait for the TCP/SSH handshake before giving up.
         circuit_breaker: Probe-Latch breaker guarding :meth:`run` (CLAUDE.md

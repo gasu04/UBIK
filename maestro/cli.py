@@ -263,7 +263,7 @@ def cli(ctx: click.Context, config_path: Optional[str], log_level: Optional[str]
     """UBIK Maestro — Infrastructure Orchestrator.
 
     Monitors Neo4j, ChromaDB, MCP, vLLM, Tailscale, and Docker across
-    the Hippocampal (Mac Mini M4 Pro) and Somatic (PowerSpec WSL2) nodes.
+    the Hippocampal (Mac Mini M4 Pro) and Somatic (PowerSpec, native Ubuntu) nodes.
 
     Configuration is read from environment variables or
     {UBIK_ROOT}/maestro/.env — see .env.example for all options.

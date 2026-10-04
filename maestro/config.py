@@ -9,7 +9,7 @@ are hardcoded here; every sensitive value comes from the environment.
 Architecture:
     MaestroConfig      — orchestrator operational parameters (MAESTRO_* prefix)
     HippocampalConfig  — Mac Mini M4 Pro node + hosted services
-    SomaticConfig      — PowerSpec WSL2 node + hosted services
+    SomaticConfig      — PowerSpec native-Ubuntu node + hosted services
     AppConfig          — immutable composite container returned by get_config()
     get_config()       — @lru_cache factory; call this everywhere
 
@@ -78,7 +78,7 @@ def _detect_ubik_root() -> Path:
     system = platform.system()
     if system == "Darwin":
         default = Path("/Volumes/990PRO 4T/UBIK")
-    else:  # Linux / WSL
+    else:  # Linux (native Ubuntu on Somatic)
         default = Path("/home/gasu/ubik")
 
     if not default.exists():
@@ -231,7 +231,7 @@ class HippocampalConfig(BaseSettings):
 
 
 class SomaticConfig(BaseSettings):
-    """Somatic Node (PowerSpec RTX 5090, WSL2 Linux) configuration.
+    """Somatic Node (PowerSpec RTX 5090, native Ubuntu Linux) configuration.
 
     Services hosted on this node:
         - vLLM inference server
@@ -351,7 +351,7 @@ class AppConfig:
         ubik_root: Detected UBIK project root directory.
         maestro: Maestro orchestrator operational settings.
         hippocampal: Hippocampal node (Mac Mini M4 Pro) settings.
-        somatic: Somatic node (PowerSpec WSL2) settings.
+        somatic: Somatic node (PowerSpec, native Ubuntu) settings.
 
     Example:
         >>> from maestro.config import get_config

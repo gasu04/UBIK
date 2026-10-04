@@ -68,10 +68,10 @@ def _hippocampal_identity() -> NodeIdentity:
 def _somatic_identity() -> NodeIdentity:
     return NodeIdentity(
         node_type=NodeType.SOMATIC,
-        hostname="adrian",
+        hostname="acefsan-a100",
         platform="linux",
         ubik_root=_FAKE_ROOT,
-        is_wsl=True,
+        is_wsl=False,
         tailscale_ip="100.0.0.2",
         python_venv_path=None,
         python_activate_cmd=None,
@@ -97,8 +97,8 @@ class TestStartNodeCheck:
     async def test_docker_refuses_somatic_node(self):
         svc = DockerService(max_wait_s=0.1)
         somatic_id = NodeIdentity(
-            node_type=NodeType.SOMATIC, hostname="adrian", platform="linux",
-            ubik_root=_FAKE_ROOT, is_wsl=True, tailscale_ip=None,
+            node_type=NodeType.SOMATIC, hostname="acefsan-a100", platform="linux",
+            ubik_root=_FAKE_ROOT, is_wsl=False, tailscale_ip=None,
             python_venv_path=None, python_activate_cmd=None,
         )
         with patch("maestro.services.docker_service.detect_node", return_value=somatic_id):
@@ -109,8 +109,8 @@ class TestStartNodeCheck:
     async def test_neo4j_refuses_somatic_node(self):
         svc = Neo4jService(ubik_root=_FAKE_ROOT, max_wait_s=0.1)
         somatic_id = NodeIdentity(
-            node_type=NodeType.SOMATIC, hostname="adrian", platform="linux",
-            ubik_root=_FAKE_ROOT, is_wsl=True, tailscale_ip=None,
+            node_type=NodeType.SOMATIC, hostname="acefsan-a100", platform="linux",
+            ubik_root=_FAKE_ROOT, is_wsl=False, tailscale_ip=None,
             python_venv_path=None, python_activate_cmd=None,
         )
         with patch("maestro.services.neo4j_service.detect_node", return_value=somatic_id):
@@ -121,8 +121,8 @@ class TestStartNodeCheck:
     async def test_chromadb_refuses_somatic_node(self):
         svc = ChromaDbService(ubik_root=_FAKE_ROOT, max_wait_s=0.1)
         somatic_id = NodeIdentity(
-            node_type=NodeType.SOMATIC, hostname="adrian", platform="linux",
-            ubik_root=_FAKE_ROOT, is_wsl=True, tailscale_ip=None,
+            node_type=NodeType.SOMATIC, hostname="acefsan-a100", platform="linux",
+            ubik_root=_FAKE_ROOT, is_wsl=False, tailscale_ip=None,
             python_venv_path=None, python_activate_cmd=None,
         )
         with patch("maestro.services.chromadb_service.detect_node", return_value=somatic_id):
@@ -133,8 +133,8 @@ class TestStartNodeCheck:
     async def test_mcp_refuses_somatic_node(self):
         svc = McpServerService(ubik_root=_FAKE_ROOT, max_wait_s=0.1)
         somatic_id = NodeIdentity(
-            node_type=NodeType.SOMATIC, hostname="adrian", platform="linux",
-            ubik_root=_FAKE_ROOT, is_wsl=True, tailscale_ip=None,
+            node_type=NodeType.SOMATIC, hostname="acefsan-a100", platform="linux",
+            ubik_root=_FAKE_ROOT, is_wsl=False, tailscale_ip=None,
             python_venv_path=None, python_activate_cmd=None,
         )
         with patch("maestro.services.mcp_server_service.detect_node", return_value=somatic_id):
@@ -334,8 +334,8 @@ class TestStartHealthWait:
     async def test_vllm_health_wait_called_after_conda(self, tmp_path):
         svc = VllmService(model_path="/fake/model", max_wait_s=5.0)
         somatic_id = NodeIdentity(
-            node_type=NodeType.SOMATIC, hostname="adrian", platform="linux",
-            ubik_root=tmp_path, is_wsl=True, tailscale_ip=None,
+            node_type=NodeType.SOMATIC, hostname="acefsan-a100", platform="linux",
+            ubik_root=tmp_path, is_wsl=False, tailscale_ip=None,
             python_venv_path=None, python_activate_cmd=None,
         )
         healthy = _healthy("vllm", NodeType.SOMATIC)

@@ -82,7 +82,7 @@ Run in `UBIK/.venv`. Covers unit + integration.
 
 ### 4. somatic — ⛔ NOT RUNNABLE ON THIS MAC (by design)
 
-Per CLAUDE.md §3.5/§3.6: `somatic/` is the **Somatic node** (PowerSpec RTX 5090, WSL2 Linux, CUDA). Its config and tests are hardwired to that environment.
+Per CLAUDE.md §3.5/§3.6: `somatic/` is the **Somatic node** (PowerSpec RTX 5090, native Ubuntu Linux, CUDA). Its config and tests are hardwired to that environment.
 
 **somatic/tests (4 files):** All 4 fail at *collection time*:
 ```

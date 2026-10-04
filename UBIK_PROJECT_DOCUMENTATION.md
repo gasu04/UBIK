@@ -49,12 +49,12 @@ The system implements Derek Parfit's theory that personal identity persists thro
 │   HIPPOCAMPAL NODE      │         │     SOMATIC NODE        │
 │   (Memory Storage)      │◄───────►│     (Inference)         │
 │                         │Tailscale│                         │
-│   Host: minim4-2025     │ Mesh    │   Host: adrian-wsl      │
-│   IP: 100.103.242.91    │         │   IP: 100.92.12.89    │
+│   Host: minim4-2025     │ Mesh    │   Host: acefsan-A100    │
+│   IP: 100.103.242.91    │         │   IP: 100.92.12.89      │
 │                         │         │                         │
 │   Services:             │         │   Services:             │
-│   • Neo4j (7474, 7687)  │         │   • Ollama (11434)      │
-│   • ChromaDB (8001)     │         │   • Inference API (8081)│
+│   • Neo4j (7474, 7687)  │         │   • vLLM (8002)         │
+│   • ChromaDB (8001)     │         │   • WhisperX (9100)     │
 │   • MCP Server (8080)   │         │                         │
 └─────────────────────────┘         └─────────────────────────┘
 ```
@@ -199,12 +199,12 @@ networks:
             }
         },
         "somatic": {
-            "hostname": "adrian-wsl",
+            "hostname": "acefsan-A100",
             "target_hostname": "ubik-somatic",
             "tailscale_ip": "100.92.12.89",
             "services": {
-                "ollama": 11434,
-                "inference_api": 8081
+                "vllm": 8002,
+                "whisperx": 9100
             }
         }
     },
@@ -1570,7 +1570,7 @@ def check_tailscale():
             # Check for somatic node by IP
             peers = status.get("Peer", {})
             somatic_ip = "100.92.12.89"
-            somatic_dns = "adrian-wsl"
+            somatic_dns = "acefsan-ubuntu"
 
             somatic_peer = None
             for peer in peers.values():
@@ -1673,7 +1673,7 @@ echo "Ubik Hippocampal Node - Quick Test"
 echo "============================================"
 
 # Somatic node config
-SOMATIC_HOST="adrian-wsl"
+SOMATIC_HOST="acefsan-ubuntu"
 SOMATIC_IP="100.92.12.89"
 
 # Test Neo4j
@@ -1767,8 +1767,8 @@ echo "============================================"
 ============================================================
   ✓ Tailscale status
     └─ Hostname: MiniM4 2025
-  ✓ Somatic node (adrian-wsl)
-    └─ Host: Adrian, IP: 100.92.12.89
+  ✓ Somatic node (acefsan-ubuntu)
+    └─ Host: acefsan-ubuntu, IP: 100.92.12.89
 
 ============================================================
  Summary
@@ -1854,7 +1854,7 @@ python health_check.py
 
 ### Network Access (via Tailscale)
 
-From the Somatic Node (adrian-wsl / 100.92.12.89):
+From the Somatic Node (acefsan-ubuntu / 100.92.12.89):
 - Neo4j Bolt: `bolt://100.103.242.91:7687`
 - ChromaDB: `http://100.103.242.91:8001`
 - MCP Server: `http://100.103.242.91:8080`

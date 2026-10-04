@@ -13,8 +13,8 @@ export TORCH_HOME=~/ubik/data/cache/torch
 export CUDA_HOME=/usr/local/cuda-12.4
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
-# WSL2 NVIDIA driver libraries
-export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
+# WSL2 NVIDIA driver libraries (legacy WSL2 node only — path absent on native Ubuntu)
+[ -d /usr/lib/wsl/lib ] && export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH
 
 # Verify activation
 echo "Ubik environment activated (using pytorch_env)"

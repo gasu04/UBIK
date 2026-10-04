@@ -6,7 +6,7 @@ echo "Ubik Hippocampal Node - Quick Test"
 echo "============================================"
 
 # Somatic node config
-SOMATIC_HOST="adrian-wsl"
+SOMATIC_HOST="acefsan-ubuntu"
 SOMATIC_IP="100.92.12.89"
 
 # Test Neo4j

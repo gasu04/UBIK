@@ -1,7 +1,7 @@
 # UBIK Maestro
 
 Orchestration daemon for the UBIK distributed AI memory system.
-Maestro monitors, starts, and shuts down services across the two-node cluster — **Hippocampal** (Mac Mini M4 Pro, macOS) and **Somatic** (PowerSpec RTX 5090, WSL2 Linux) — over Tailscale.
+Maestro monitors, starts, and shuts down services across the two-node cluster — **Hippocampal** (Mac Mini M4 Pro, macOS) and **Somatic** (PowerSpec RTX 5090, native Ubuntu Linux) — over Tailscale.
 
 ---
 
@@ -23,7 +23,7 @@ Maestro monitors, starts, and shuts down services across the two-node cluster �
 | Node | OS | Python |
 |------|----|--------|
 | Hippocampal | macOS (arm64) | venv at `{UBIK_ROOT}/hippocampal/venv` |
-| Somatic | Linux / WSL2 (x86_64) | venv at `{UBIK_ROOT}/venv` |
+| Somatic | Linux, native Ubuntu (x86_64) | venv at `{UBIK_ROOT}/venv` |
 
 ### Deploy (run on each node)
 
@@ -48,7 +48,7 @@ echo "alias maestro='cd \"/Volumes/990PRO 4T/UBIK\" && \"/Volumes/990PRO 4T/UBIK
 source ~/.zshrc
 ```
 
-**Somatic (WSL2, bash):**
+**Somatic (Ubuntu, bash):**
 ```bash
 echo "alias maestro='cd /home/gasu/ubik && \"/home/gasu/ubik/venv/bin/python\" -m maestro'" >> ~/.bashrc
 source ~/.bashrc

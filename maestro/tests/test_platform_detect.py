@@ -12,8 +12,9 @@ Coverage:
         WSL marker (/proc/version contains 'microsoft') → is_wsl=True
         hostname 'MiniM4-2025' → HIPPOCAMPAL (even on linux)
         hostname 'mac.lan'     → HIPPOCAMPAL
-        hostname 'Adrian'      → SOMATIC (even on darwin)
-        hostname 'adrian-wsl'  → SOMATIC
+        hostname 'acefsan-A100'  → SOMATIC (even on darwin)
+        hostname 'acefsan-ubuntu' → SOMATIC
+        hostname 'adrian-wsl' (retired WSL node) → NOT SOMATIC
         hostname unknown + platform darwin → HIPPOCAMPAL via platform
         UBIK_ROOT path fallback when platform unknown
         ubik_root defaults when no path found
@@ -177,20 +178,22 @@ class TestDetectNodeByHostname:
             node = detect_node()
         assert node.node_type == NodeType.HIPPOCAMPAL
 
-    def test_adrian_hostname_gives_somatic(self):
-        with _patch_env(platform="darwin", hostname="Adrian"):
+    def test_acefsan_hostname_gives_somatic(self):
+        with _patch_env(platform="darwin", hostname="acefsan-A100"):
             node = detect_node()
         assert node.node_type == NodeType.SOMATIC
 
-    def test_adrian_wsl_hostname_gives_somatic(self):
-        with _patch_env(platform="linux", hostname="Adrian-WSL"):
+    def test_acefsan_ubuntu_hostname_gives_somatic(self):
+        with _patch_env(platform="linux", hostname="acefsan-ubuntu"):
             node = detect_node()
         assert node.node_type == NodeType.SOMATIC
 
-    def test_wsl_in_hostname_gives_somatic(self):
-        with _patch_env(platform="win32", hostname="my-wsl-box"):
+    def test_retired_adrian_wsl_hostname_not_somatic(self):
+        # The retired WSL node's hostname must no longer classify as SOMATIC —
+        # detection falls back to the platform signal.
+        with _patch_env(platform="darwin", hostname="adrian-wsl"):
             node = detect_node()
-        assert node.node_type == NodeType.SOMATIC
+        assert node.node_type == NodeType.HIPPOCAMPAL
 
     def test_unknown_hostname_falls_back_to_platform(self):
         with _patch_env(platform="darwin", hostname="mystery-machine"):

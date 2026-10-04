@@ -10,7 +10,7 @@ Nodes:
     HIPPOCAMPAL — Mac Mini M4 Pro (macOS, arm64)
                   UBIK root:  /Volumes/990PRO 4T/UBIK/
                   Python env: /Volumes/990PRO 4T/UBIK/.venv/
-    SOMATIC     — PowerSpec RTX 5090 (WSL2 Linux)
+    SOMATIC     — PowerSpec RTX 5090 (native Ubuntu Linux)
                   UBIK root:  /home/gasu/ubik/
                   Python env: conda, pytorch_env
     UNKNOWN     — Detection inconclusive (e.g. CI, new machine)
@@ -18,7 +18,7 @@ Nodes:
 Detection strategy (in priority order):
     1. sys.platform       — 'darwin' → HIPPOCAMPAL; 'linux' → SOMATIC
     2. hostname           — 'minim4*' / 'mac.lan' → HIPPOCAMPAL;
-                            'adrian*' / '*wsl*' → SOMATIC
+                            'acefsan*' / '*a100*' → SOMATIC
     3. WSL marker         — /proc/version contains 'microsoft' → is_wsl=True
     4. UBIK_ROOT path     — which candidate path exists on disk
 
@@ -66,7 +66,7 @@ _HIPPOCAMPAL_VENV_PATH = Path("/Volumes/990PRO 4T/UBIK/.venv")
 
 # Hostname substrings that reliably identify each node (case-insensitive).
 _HIPPOCAMPAL_HOSTNAME_MARKERS: frozenset[str] = frozenset({"minim4", "mac.lan"})
-_SOMATIC_HOSTNAME_MARKERS: frozenset[str] = frozenset({"adrian", "wsl"})
+_SOMATIC_HOSTNAME_MARKERS: frozenset[str] = frozenset({"acefsan", "a100"})
 
 # Fallback Tailscale IPs (overridden by get_config() when available).
 _HIPPOCAMPAL_TAILSCALE_IP_DEFAULT = "100.103.242.91"
@@ -85,7 +85,7 @@ class NodeType(str, Enum):
 
     Attributes:
         HIPPOCAMPAL: Mac Mini M4 Pro running macOS.
-        SOMATIC: PowerSpec RTX 5090 running vLLM under WSL2 Linux.
+        SOMATIC: PowerSpec RTX 5090 running vLLM on native Ubuntu Linux.
         UNKNOWN: Detection inconclusive — treat all remote operations with
             caution and do not attempt local-only service management.
     """

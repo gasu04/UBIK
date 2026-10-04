@@ -365,7 +365,7 @@ UBIK has **one canonical repo venv**, deliberately separate from the DeepSeek pr
 ### 3.6 Cross-Platform & Docker
 
 - Use `pathlib.Path` for all filesystem paths. Never string concatenation, never hardcoded `/home/gasu/...` or `C:\Users\...`.
-- Detect OS via `platform.system()` when platform-specific logic is unavoidable. UBIK runs on macOS (Hippocampal, Mac Mini M4) and Linux/WSL2 (Somatic).
+- Detect OS via `platform.system()` when platform-specific logic is unavoidable. UBIK runs on macOS (Hippocampal, Mac Mini M4) and native Ubuntu Linux (Somatic).
 - Docker: multi-stage builds, non-root user, explicit `HEALTHCHECK` directive, pinned base image digest.
 
 ---

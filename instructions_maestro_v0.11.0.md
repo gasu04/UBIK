@@ -5,7 +5,7 @@ It monitors and manages Neo4j, ChromaDB, MCP, vLLM, Tailscale, and Docker
 across two nodes:
 
 - **Hippocampal** — Mac Mini M4 Pro (100.103.242.91): Neo4j, ChromaDB, MCP, Docker
-- **Somatic** — PowerSpec RTX 5090 / WSL2 (100.92.12.89): vLLM inference
+- **Somatic** — PowerSpec RTX 5090 / native Ubuntu (100.92.12.89): vLLM inference
 
 Configuration is loaded from `{UBIK_ROOT}/maestro/.env` (see `.env.example`).
 

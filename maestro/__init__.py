@@ -7,7 +7,7 @@ providing health checking, service orchestration, and operational visibility.
 Nodes:
     Hippocampal Node — Mac Mini M4 Pro (macOS)
         Services: Neo4j, ChromaDB, MCP server
-    Somatic Node — PowerSpec RTX 5090 (WSL2 Linux)
+    Somatic Node — PowerSpec RTX 5090 (native Ubuntu Linux)
         Services: vLLM inference
 
 Quick start:
