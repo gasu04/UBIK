@@ -377,6 +377,44 @@ class TestWhisperXRemoteLifecycle:
         assert "whisperx_server.py" in script
 
     @pytest.mark.asyncio
+    async def test_remote_start_defers_to_persistent_unit_fragment(self):
+        """The script detects an on-node persistent fragment and starts it
+        with ``systemctl --user start`` instead of a transient systemd-run
+        (which would fail with UnitExists).  The transient path stays as the
+        fallback when no fragment exists."""
+        rx = _remote_ok("STARTED_PID=99")
+        svc = WhisperXService(remote=rx, remote_ubik_root="/home/gasu/ubik", probe_ip="10.0.0.2")
+        with patch("maestro.services.whisperx_service.detect_node", return_value=_hippo()), \
+             patch.object(svc, "_wait_for_healthy", new=AsyncMock(return_value=True)):
+            ok = await svc.start(Path("/local/ubik"))
+        assert ok is True
+        script = rx.run.await_args.args[0]
+        # Fragment detection (stale transient units under /run/ excluded).
+        assert "systemctl --user show -p FragmentPath --value ubik-whisperx.service" in script
+        assert "${FRAG#/run/}" in script
+        # Persistent branch.
+        assert "PERSISTENT_UNIT:$FRAG" in script
+        assert "systemctl --user start ubik-whisperx.service" in script
+        assert "STARTED_PERSISTENT=ubik-whisperx" in script
+        # Transient fallback retained for nodes without a fragment.
+        assert "systemd-run --user" in script
+
+    @pytest.mark.asyncio
+    async def test_remote_start_persistent_marker_still_waits_for_health(self):
+        """A STARTED_PERSISTENT result flows into the health wait like any
+        other successful launch."""
+        rx = _remote_ok(
+            "PERSISTENT_UNIT:/home/gasu/.config/systemd/user/ubik-whisperx.service\n"
+            "STARTED_PERSISTENT=ubik-whisperx rc=0"
+        )
+        svc = WhisperXService(remote=rx, probe_ip="10.0.0.2")
+        with patch("maestro.services.whisperx_service.detect_node", return_value=_hippo()), \
+             patch.object(svc, "_wait_for_healthy", new=AsyncMock(return_value=True)) as wait:
+            ok = await svc.start(Path("/local/ubik"))
+        assert ok is True
+        wait.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_remote_stop_confirms_down(self):
         rx = _remote_ok("STOPPING_UNIT\nSTOP_RC=0\nDONE")
         svc = WhisperXService(remote=rx, probe_ip="10.0.0.2")

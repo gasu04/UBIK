@@ -321,6 +321,12 @@ class WhisperXService(UbikService):
         SSH session — a plain ``nohup`` would be torn down when ``wsl.exe``
         exits.  Then polls ``/health`` over Tailscale.
 
+        If a *persistent* unit fragment named ``ubik-whisperx.service`` exists
+        on the node (e.g. ``~/.config/systemd/user/ubik-whisperx.service``),
+        the transient path would fail with ``UnitExists``.  In that case the
+        on-node configuration is treated as authoritative and the unit is
+        started with ``systemctl --user start`` instead of ``systemd-run``.
+
         Returns:
             ``True`` when WhisperX becomes healthy within :attr:`max_wait_s`.
         """
@@ -357,14 +363,24 @@ if curl -s -o /dev/null --max-time 3 http://localhost:{self._port}/health; then
     echo "ALREADY_RUNNING_UNMANAGED"; exit 0
 fi
 systemctl --user reset-failed {_WHISPERX_UNIT} 2>/dev/null || true
-systemd-run --user --unit={_WHISPERX_UNIT} \
-    --property=Type=simple \
-    --property=KillSignal=SIGTERM \
-    --property=KillMode=mixed \
-    --property=TimeoutStopSec={_REMOTE_STOP_GRACE_S} \
-    {setenv_flags} \
-    "$PYTHON" "$SERVER" 2>&1
-echo "STARTED_UNIT={_WHISPERX_UNIT} rc=$?"
+# A persistent fragment (e.g. ~/.config/systemd/user/{_WHISPERX_UNIT}.service)
+# makes StartTransientUnit fail with UnitExists — defer to the on-node config.
+# (FragmentPath under /run/ is a stale transient unit, not a real fragment.)
+FRAG=$(systemctl --user show -p FragmentPath --value {_WHISPERX_UNIT}.service 2>/dev/null || true)
+if [ -n "$FRAG" ] && [ "${{FRAG#/run/}}" = "$FRAG" ]; then
+    echo "PERSISTENT_UNIT:$FRAG"
+    systemctl --user start {_WHISPERX_UNIT}.service 2>&1
+    echo "STARTED_PERSISTENT={_WHISPERX_UNIT} rc=$?"
+else
+    systemd-run --user --unit={_WHISPERX_UNIT} \
+        --property=Type=simple \
+        --property=KillSignal=SIGTERM \
+        --property=KillMode=mixed \
+        --property=TimeoutStopSec={_REMOTE_STOP_GRACE_S} \
+        {setenv_flags} \
+        "$PYTHON" "$SERVER" 2>&1
+    echo "STARTED_UNIT={_WHISPERX_UNIT} rc=$?"
+fi
 """
         logger.info("whisperx: remote start on %s as user unit %s", self._remote.ssh_host, _WHISPERX_UNIT)
         res = await self._remote.run(script, timeout=30.0)

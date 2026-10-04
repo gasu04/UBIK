@@ -1684,3 +1684,33 @@ Durable fixes (priority): **(A)** make the health-wait detect unit death and sur
 **Next session should:**
 - Decide whether to commit the repo copy of `CP2_status.md` or remove it now that it lives in Drive/iCloud.
 ---
+
+## Session: [2026-10-03 21:15] — [Node: Hippocampal]
+**Goal:** Diagnose `maestro shutdown`/`maestro start` failures reported by the user, fix root causes, then implement fix (a) for the whisperx systemd unit conflict.
+
+**Completed:**
+- Diagnosed the partial-start failure chain:
+  - **Docker Desktop wedged** (13-day uptime; API returning 500s / hangs). This caused: shutdown `docker ps -q` + neo4j docker-stop timeouts (empty log messages = `asyncio.TimeoutError` stringifying to `""`), then start-side `docker info` probe failing for 180s → docker "failed to start" → neo4j/chromadb/mcp skipped by dependency chain.
+  - **WhisperX start failure root cause:** maestro's remote start uses a *transient* systemd unit `ubik-whisperx`, but a *persistent* fragment `~/.config/systemd/user/ubik-whisperx.service` (enabled, CPU/int8, `ubik-whisperx-venv`) now exists on the Somatic node → `StartTransientUnit` rejected with `UnitExists` (confirmed in remote journal) → nothing launched → 90s health timeout.
+  - Red herrings confirmed: `vllm-probe` circuit OPEN was transient (vLLM healthy throughout; fresh maestro process resets the breaker); `chromadb bootout rc=3` was cosmetic (launchctl job already unloaded).
+- Restored the cluster: restarted Docker Desktop (healthy in ~10s, ServerVersion 29.6.1); started the persistent `ubik-whisperx.service` on Somatic (healthy, model_loaded, cpu, large-v2); `maestro start` → **7/7 healthy**.
+- **Implemented fix (a):** `WhisperXService._remote_start` now detects a persistent unit fragment via `systemctl --user show -p FragmentPath --value` (stale transients under `/run/` excluded) and defers to it with `systemctl --user start`; transient `systemd-run` kept as fallback. New stdout markers: `PERSISTENT_UNIT:<path>`, `STARTED_PERSISTENT=ubik-whisperx rc=N`.
+- Tests: extended `test_remote_start_launches_server` coverage with 2 new tests (fragment-detection script content; persistent-marker health-wait flow). Generated bash verified with `bash -n`. Full maestro suite: **655 passed** (+2).
+- **Live round-trip verified:** stopped whisperx via maestro, restarted via the fixed `_remote_start` → `PERSISTENT_UNIT:/home/gasu/.config/systemd/user/ubik-whisperx.service STARTED_PERSISTENT rc=0` → healthy in 8s. Cluster re-verified 7/7.
+
+**State left in:**
+- Cluster 7/7 healthy; whisperx running under the persistent systemd unit on Somatic.
+- Fix is uncommitted. ruff/mypy not run (not installed in `.venv`).
+- Side observation: `maestro` entry point is not installed in the repo `.venv` (user runs it from a different venv, prompt shows `.venv_clean`); `.venv/bin/python -m maestro` works fine.
+
+**Files changed:**
+- `maestro/services/whisperx_service.py`: `_remote_start` — persistent-fragment detection + `systemctl --user start` deferral; docstring updated.
+- `maestro/tests/test_remote.py`: +2 tests in `TestWhisperXRemoteLifecycle`.
+- `ubik_sessions.md`: this entry.
+
+**Next session should:**
+1. Commit the whisperx fix (and decide on `CP2_status.md`).
+2. Consider the small log-quality fix: `_run_proc` timeouts log as empty messages (`stop failed: ` with nothing after the colon) — append "timed out after Ns" when `str(exc)` is empty.
+3. Optional hardening: `DockerService.stop()` returns early on container-stop failure and skips the Docker Desktop quit — a wedged daemon therefore never gets quit by maestro.
+4. Backlog unchanged: CP2 decision (Path A needs `ingestion/.env` Somatic IP → 100.92.12.89), Layer D field confirmation, Layer B native-Ubuntu status, confirm `rotating-cube` port 8102 with acefsan.
+---
