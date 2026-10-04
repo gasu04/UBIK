@@ -292,7 +292,7 @@ Auto-detection priority:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SOMATIC_TAILSCALE_IP` | `100.79.166.114` | Tailscale IP of the Linux node |
+| `SOMATIC_TAILSCALE_IP` | `100.92.12.89` | Tailscale IP of the Linux node |
 | `SOMATIC_TAILSCALE_HOSTNAME` | `ubik-somatic` | Tailscale hostname |
 
 ---
@@ -357,7 +357,7 @@ bash maestro/setup_maestro.sh
 ```bash
 rsync -avz --delete \
   "/Volumes/990PRO 4T/UBIK/maestro/" \
-  gasu@100.79.166.114:/home/gasu/ubik/maestro/
+  gasu@100.92.12.89:/home/gasu/ubik/maestro/
 
 # Then on Somatic:
 bash /home/gasu/ubik/maestro/setup_maestro.sh
@@ -443,7 +443,7 @@ python -m maestro status
 Check Tailscale is up on both nodes:
 ```bash
 tailscale status
-tailscale ping 100.79.166.114   # reach Somatic from Hippocampal
+tailscale ping 100.92.12.89   # reach Somatic from Hippocampal
 ```
 
 If Tailscale IPs have changed, update `.env`:

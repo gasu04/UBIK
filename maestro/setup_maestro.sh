@@ -290,7 +290,7 @@ echo "    git pull && bash maestro/setup_maestro.sh"
 echo ""
 
 if [[ "$NODE_TYPE" == "hippocampal" ]]; then
-    REMOTE_IP="100.79.166.114"
+    REMOTE_IP="100.92.12.89"
     REMOTE_ROOT="/home/gasu/ubik"
     echo "  Option B — rsync to Somatic over Tailscale:"
     echo "    rsync -avz --delete \\"

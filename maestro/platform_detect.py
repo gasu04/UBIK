@@ -70,7 +70,7 @@ _SOMATIC_HOSTNAME_MARKERS: frozenset[str] = frozenset({"adrian", "wsl"})
 
 # Fallback Tailscale IPs (overridden by get_config() when available).
 _HIPPOCAMPAL_TAILSCALE_IP_DEFAULT = "100.103.242.91"
-_SOMATIC_TAILSCALE_IP_DEFAULT = "100.79.166.114"
+_SOMATIC_TAILSCALE_IP_DEFAULT = "100.92.12.89"
 
 
 # ---------------------------------------------------------------------------
@@ -391,7 +391,7 @@ def get_remote_node_ip(local: NodeIdentity) -> str:
     Example:
         >>> node = detect_node()
         >>> get_remote_node_ip(node)
-        '100.79.166.114'   # Somatic IP when called from Hippocampal
+        '100.92.12.89'   # Somatic IP when called from Hippocampal
     """
     if local.node_type == NodeType.UNKNOWN:
         raise ValueError(

@@ -394,7 +394,7 @@ class TestCheckTailscale:
             "Peer": {
                 "abc123": {
                     "HostName": "adrian-wsl",
-                    "TailscaleIPs": ["100.79.166.114"],
+                    "TailscaleIPs": ["100.92.12.89"],
                     "Online": true
                 }
             }

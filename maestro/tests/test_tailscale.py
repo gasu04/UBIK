@@ -50,7 +50,7 @@ _PATCH_CLI_IP = "maestro.tailscale._cli_get_ip"
 _PATCH_CLI_PING = "maestro.tailscale._cli_ping"
 _PATCH_TCP = "maestro.tailscale._tcp_probe"
 
-_PEER_IP = "100.79.166.114"
+_PEER_IP = "100.92.12.89"
 _LOCAL_IP = "100.103.242.91"
 
 # Minimal valid status JSON returned by the CLI

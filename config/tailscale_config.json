@@ -15,7 +15,7 @@
         "somatic": {
             "hostname": "adrian-wsl",
             "target_hostname": "ubik-somatic",
-            "tailscale_ip": "100.79.166.114",
+            "tailscale_ip": "100.92.12.89",
             "services": {
                 "ollama": 11434,
                 "inference_api": 8081

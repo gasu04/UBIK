@@ -50,7 +50,7 @@ The system implements Derek Parfit's theory that personal identity persists thro
 │   (Memory Storage)      │◄───────►│     (Inference)         │
 │                         │Tailscale│                         │
 │   Host: minim4-2025     │ Mesh    │   Host: adrian-wsl      │
-│   IP: 100.103.242.91    │         │   IP: 100.79.166.114    │
+│   IP: 100.103.242.91    │         │   IP: 100.92.12.89    │
 │                         │         │                         │
 │   Services:             │         │   Services:             │
 │   • Neo4j (7474, 7687)  │         │   • Ollama (11434)      │
@@ -201,7 +201,7 @@ networks:
         "somatic": {
             "hostname": "adrian-wsl",
             "target_hostname": "ubik-somatic",
-            "tailscale_ip": "100.79.166.114",
+            "tailscale_ip": "100.92.12.89",
             "services": {
                 "ollama": 11434,
                 "inference_api": 8081
@@ -1569,7 +1569,7 @@ def check_tailscale():
 
             # Check for somatic node by IP
             peers = status.get("Peer", {})
-            somatic_ip = "100.79.166.114"
+            somatic_ip = "100.92.12.89"
             somatic_dns = "adrian-wsl"
 
             somatic_peer = None
@@ -1674,7 +1674,7 @@ echo "============================================"
 
 # Somatic node config
 SOMATIC_HOST="adrian-wsl"
-SOMATIC_IP="100.79.166.114"
+SOMATIC_IP="100.92.12.89"
 
 # Test Neo4j
 echo -e "\n[1/5] Testing Neo4j..."
@@ -1768,7 +1768,7 @@ echo "============================================"
   ✓ Tailscale status
     └─ Hostname: MiniM4 2025
   ✓ Somatic node (adrian-wsl)
-    └─ Host: Adrian, IP: 100.79.166.114
+    └─ Host: Adrian, IP: 100.92.12.89
 
 ============================================================
  Summary
@@ -1854,7 +1854,7 @@ python health_check.py
 
 ### Network Access (via Tailscale)
 
-From the Somatic Node (adrian-wsl / 100.79.166.114):
+From the Somatic Node (adrian-wsl / 100.92.12.89):
 - Neo4j Bolt: `bolt://100.103.242.91:7687`
 - ChromaDB: `http://100.103.242.91:8001`
 - MCP Server: `http://100.103.242.91:8080`

@@ -24,10 +24,10 @@ Usage:
     import asyncio
     from maestro.tailscale import check_tailscale_status, test_peer_connectivity
 
-    status = asyncio.run(check_tailscale_status("100.79.166.114"))
+    status = asyncio.run(check_tailscale_status("100.92.12.89"))
     print(status.peer_reachable)   # True if TCP probe succeeded
 
-    ports = asyncio.run(test_peer_connectivity("100.79.166.114", [22, 8002]))
+    ports = asyncio.run(test_peer_connectivity("100.92.12.89", [22, 8002]))
     # {22: True, 8002: True}
 
 Notes:
@@ -392,7 +392,7 @@ async def test_peer_connectivity(
         connection was established, ``False`` on timeout or refusal.
 
     Example:
-        >>> results = await test_peer_connectivity("100.79.166.114", [22, 8002])
+        >>> results = await test_peer_connectivity("100.92.12.89", [22, 8002])
         >>> results
         {22: True, 8002: True}
     """

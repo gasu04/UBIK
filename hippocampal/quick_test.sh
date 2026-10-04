@@ -7,7 +7,7 @@ echo "============================================"
 
 # Somatic node config
 SOMATIC_HOST="adrian-wsl"
-SOMATIC_IP="100.79.166.114"
+SOMATIC_IP="100.92.12.89"
 
 # Test Neo4j
 echo -e "\n[1/5] Testing Neo4j..."

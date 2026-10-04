@@ -15,7 +15,7 @@ Quick start:
 
     cfg = get_config()
     print(cfg.hippocampal.neo4j_http_url)   # http://100.103.242.91:7474
-    print(cfg.somatic.vllm_url)             # http://100.79.166.114:8002
+    print(cfg.somatic.vllm_url)             # http://100.92.12.89:8002
     print(cfg.maestro.log_level)            # INFO
 """
 
